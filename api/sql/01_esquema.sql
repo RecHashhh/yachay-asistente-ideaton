@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS messages (
   session_id  text NOT NULL,
   question    text NOT NULL,
   lang        text NOT NULL,
-  kind        text NOT NULL,                    -- respuesta, sin_fuente, fuera_de_dominio, aclaracion, lugar, error
+  kind        text NOT NULL,                    -- respuesta, sin_fuente, fuera_de_dominio, aclaracion, lugar, saludo, cierre, respeto, vacio, error
   doc_ids     text[] NOT NULL DEFAULT '{}',
   latency_ms  integer,
   tokens_in   integer,

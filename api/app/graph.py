@@ -93,6 +93,9 @@ def _contact(topic: str | None, lang: str) -> dict:
 
 async def route(state: State) -> State:
     q = PII.sub("[dato omitido]", state["question"])
+    if rules.smalltalk(q, state["lang"]):
+        return {"question": q, "route": "smalltalk"}
+    q = rules.strip_greeting(q)
     if rules.out_of_domain(q):
         return {"question": q, "route": "ood"}
     if rules.clarify(q, state["lang"]):
@@ -109,6 +112,12 @@ async def route(state: State) -> State:
 async def out_of_domain(state: State) -> State:
     get_stream_writer()({"type": "unknown", "item": {"reason": "fuera_de_dominio"}})
     return {"kind": "fuera_de_dominio", "doc_ids": []}
+
+
+async def smalltalk(state: State) -> State:
+    s = rules.smalltalk(state["question"], state["lang"])
+    get_stream_writer()({"type": "clarify", "question": s["question"], "options": s["options"]})
+    return {"kind": s["kind"], "doc_ids": []}
 
 
 async def ask_clarify(state: State) -> State:
@@ -258,7 +267,7 @@ async def finish(state: State) -> State:
         )
         if kind in ("sin_fuente", "fuera_de_dominio"):
             record_unanswered(c, state["question"], lang, kind)
-    if sug and kind != "aclaracion":
+    if sug and kind not in ("aclaracion", "saludo", "cierre", "respeto", "vacio"):
         w({"type": "suggestions", "items": [s["question"] for s in sug]})
     w({"type": "done", "messageId": state["message_id"], "latencyMs": latency})
     return {}
@@ -284,15 +293,16 @@ def build():
     g = StateGraph(State)
     g.add_node("route", route)
     g.add_node("ood", out_of_domain)
+    g.add_node("smalltalk", smalltalk)
     g.add_node("clarify", ask_clarify)
     g.add_node("place", place_answer)
     g.add_node("retrieve", retrieve)
     g.add_node("generate", generate)
     g.add_node("finish", finish)
     g.add_edge(START, "route")
-    g.add_conditional_edges("route", _next, {"ood": "ood", "clarify": "clarify", "place": "place", "retrieve": "retrieve"})
+    g.add_conditional_edges("route", _next, {"ood": "ood", "smalltalk": "smalltalk", "clarify": "clarify", "place": "place", "retrieve": "retrieve"})
     g.add_conditional_edges("retrieve", lambda s: "generate" if s.get("hits") else "finish", {"generate": "generate", "finish": "finish"})
-    for n in ("ood", "clarify", "place", "generate"):
+    for n in ("ood", "smalltalk", "clarify", "place", "generate"):
         g.add_edge(n, "finish")
     g.add_edge("finish", END)
     return g.compile()

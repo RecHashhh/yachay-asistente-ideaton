@@ -7,7 +7,8 @@ import { Fragment, type ReactNode } from 'react';
  */
 export function Markdown({ text, animate }: { text: string; animate: boolean }) {
   let offset = 0;
-  const blocks = text.split(/\n{2,}/);
+  // Títulos "### Sección" de los documentos: bloque propio en negrita (no se muestran los #).
+  const blocks = text.replace(/^[ \t]*#{1,6}[ \t]+(.+?)[ \t#]*$/gm, (_, h: string) => `\n\n**${h.replace(/\*\*/g, '')}**\n\n`).trim().split(/\n{2,}/);
   return (
     <div className="md">
       {blocks.map((block, bi) => {
