@@ -5,3 +5,14 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
+
+# Documentos fuente del reto: confidenciales (sección 7 del planteamiento). No subir al repositorio público.
+docs/*.pdf
+docs/*.xlsx
+docs/*.xls
+docs/*.csv
+!docs/kichwa-traduccion.csv
+docs/*.png
+docs/*.jpg
+docs/*.zip
+docs/fuentes/
