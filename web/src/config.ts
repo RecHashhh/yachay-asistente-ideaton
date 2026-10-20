@@ -7,7 +7,7 @@ export const BRAND = {
   mascotName: 'Yachi',
   tagline: 'Asistente institucional con IA',
   /** Versión del aviso de datos. Súbela cuando cambie el texto para volver a pedir la aceptación. */
-  consentVersion: '2026-10b',
+  consentVersion: '2026-10c',
   contact: 'secretaria@yachaytech.edu.ec',
 };
 

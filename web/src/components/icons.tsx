@@ -20,6 +20,8 @@ export const IcShield = (p: P) => <svg {...base} {...p}><path d="M12 3l8 3v6c0 4
 export const IcLock = (p: P) => <svg {...base} {...p}><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 018 0v3" /></svg>;
 export const IcUpload = (p: P) => <svg {...base} {...p}><path d="M12 16V4M6 10l6-6 6 6M4 20h16" /></svg>;
 export const IcDots = (p: P) => <svg {...base} {...p}><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none" /></svg>;
+export const IcWave = (p: P) => <svg {...base} {...p}><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4" /></svg>;
+export const IcSpeaker = (p: P) => <svg {...base} {...p}><path d="M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11" /></svg>;
 export const IcUser = (p: P) => <svg {...base} {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0116 0" /></svg>;
 export const IcCalendar = (p: P) => <svg {...base} {...p}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>;
 export const IcPencil = (p: P) => <svg {...base} {...p}><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4" /></svg>;

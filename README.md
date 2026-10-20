@@ -17,6 +17,7 @@ npm run dev          # http://localhost:5180
 ```
 
 - Chat público: `http://localhost:5180/`
+- **Modo voz directo** (para compartir con personas ciegas o con baja visión): `http://localhost:5180/#/voz`
 - Widget incrustado en otra página (estilo Messenger): `http://localhost:5180/demo-sitio.html`
 - Portal de administración: `http://localhost:5180/#/admin`. En modo de ejemplo entra cualquier correo `@yachaytech.edu.ec` con una contraseña de 4 caracteres o más.
 
@@ -44,6 +45,7 @@ Aparece un botón con la mascota abajo a la derecha; al tocarlo se abre un chat 
 | Mapa del campus con flecha y círculos: aulas, laboratorios, salas de estudio, residencias, representación estudiantil | `src/components/CampusMap.tsx`, `src/lib/campus.ts` |
 | Conversaciones: título automático según lo consultado, renombrar y eliminar (menú «⋯», con deshacer), agrupadas por fecha; sugerencias «para continuar» según tus consultas | `src/components/ChatList.tsx`, `Chat.tsx` |
 | **Aclaraciones** ante consultas ambiguas, **motivo del 👎** (llega a la bandeja), **hablar con una persona** con la conversación adjunta, **bienvenida de 3 pasos** y **añadir al calendario** (.ics) en trámites con plazo | `components/Feedback.tsx`, `ProcedureCard.tsx`, `ConsentDialog.tsx`, `lib/ics.ts` |
+| **Modo voz** manos libres (enlace `#/voz` o botón «Voz»): reconocimiento y síntesis del navegador con la mejor voz disponible, interrupción, comandos («siguiente», «anterior», «repetir», «todos los pasos», «uno/dos», «ayuda», «más despacio», «salir»), mapa descrito en palabras, fuentes leídas, datos personales omitidos, sonidos de estado y atajos de teclado; «Escuchar respuesta» en cada respuesta | `components/VoiceMode.tsx`, `lib/speech.ts` |
 | Aviso antes de enviar datos personales (cédula, teléfono, correo): se pueden quitar antes de enviar | `Chat.tsx` |
 | **Abrir documento** desde cada fuente citada (en PDF, directo en la página) | `Chat.tsx`, `ProcedureCard.tsx` |
 | Aviso de privacidad con lo que exige el art. 12 de la LOPDP (Ecuador), divulgación de que es una IA, revocar consentimiento y borrar datos del navegador; "Cómo funciona" (bilingües) | `src/components/ConsentDialog.tsx`, `Chat.tsx` → `AboutDialog` |

@@ -7,12 +7,14 @@ import { ConsentDialog, hasConsent, trapFocus } from '../components/ConsentDialo
 import { Markdown } from '../components/Markdown';
 import { Mascot } from '../components/Mascot';
 import { ProcedureCard, UnknownCard } from '../components/ProcedureCard';
-import { IcExternal, IcSpark, IcCheck, IcClose, IcCopy, IcDown, IcExpand, IcGlobe, IcInfo, IcLock, IcShield, IcMenu, IcMoon, IcPlus, IcRetry, IcSun, IcTrend, IcUp } from '../components/icons';
+import { IcSpeaker, IcExternal, IcSpark, IcCheck, IcClose, IcCopy, IcDown, IcExpand, IcGlobe, IcInfo, IcLock, IcShield, IcMenu, IcMoon, IcPlus, IcRetry, IcSun, IcTrend, IcUp } from '../components/icons';
 import { docHref, getTopics, getTrends, sendFeedback, streamChat } from '../lib/api';
 import { LANGS, detectLang, locatorLabel, topicLabel, useT, type Lang } from '../lib/i18n';
 import { placeById, placeName } from '../lib/campus';
 import { ChatList } from '../components/ChatList';
 import { ClarifyCard, FeedbackPanel } from '../components/Feedback';
+import { VoiceMode } from '../components/VoiceMode';
+import { loadPrefs, speak, stopSpeaking, toSpeech, ttsSupported } from '../lib/speech';
 import type { FeedbackReason } from '../lib/inbox';
 import type { Attachment, ChatTurn, MapAction, Procedure, Source, Topic, Trend, Unknown } from '../lib/types';
 
@@ -71,9 +73,9 @@ const redact = (s: string) => s.replace(new RegExp(PII_ID.source, 'g'), '[dato o
 
 const words = (s: string) => new Set(s.toLowerCase().normalize('NFD').replace(/[^a-z\s]/g, '').split(/\s+/).filter((w) => w.length > 3));
 
-interface Props { theme: 'light' | 'dark'; toggleTheme: () => void; setLang: (l: Lang) => void; embed?: boolean }
+interface Props { theme: 'light' | 'dark'; toggleTheme: () => void; setLang: (l: Lang) => void; embed?: boolean; voice?: boolean }
 
-export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
+export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
   const { t, lang } = useT();
   const [consent, setConsent] = useState(hasConsent);
   const [dialog, setDialog] = useState<'notice' | 'about' | null>(null);
@@ -88,13 +90,15 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
   const [mobileRail, setMobileRail] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [suggestLang, setSuggestLang] = useState<Lang | null>(null);
+  const [voiceOpen, setVoiceOpen] = useState(!!voice);
+  useEffect(() => { if (voice) setVoiceOpen(true); }, [voice]);
   const [pii, setPii] = useState<{ text: string; base: Msg[]; att: Attachment[] } | null>(null);
   const [undo, setUndo] = useState<{ chat: Conversation; index: number } | null>(null);
   useEffect(() => { if (!undo) return; const x = setTimeout(() => setUndo(null), 6000); return () => clearTimeout(x); }, [undo]);
   const abort = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const busy = msgs.some((m) => m.streaming);
-  const modalOpen = !consent || dialog !== null;
+  const modalOpen = !consent || dialog !== null || voiceOpen;
   // Lo que oye un lector de pantalla: el estado al empezar y la respuesta completa al terminar, no cada palabra del stream.
   const lastAi = [...msgs].reverse().find((m) => m.role === 'assistant');
   const announce = !lastAi ? '' : lastAi.streaming ? t('thinking') + '…' : lastAi.unknown ? t(lastAi.unknown.reason === 'fuera_de_dominio' ? 'outOfDomain' : 'unknownTitle') : [lastAi.text.replaceAll('**', ''),lastAi.procedure?.title].filter(Boolean).join('. ');
@@ -232,7 +236,7 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
 
   const composer = (
     <Composer value={input} onChange={setInput} files={files} onFiles={setFiles} onSend={() => void send(input)} onStop={stop} busy={busy}
-      disabled={!consent} autoFocus={empty && !embed} hints={empty ? [] : hints} onHint={(q) => void send(q)} toast={setToastMsg} />
+      disabled={!consent} autoFocus={empty && !embed} hints={empty ? [] : hints} onHint={(q) => void send(q)} toast={setToastMsg} onVoice={() => setVoiceOpen(true)} />
   );
 
   const langBanner = (
@@ -359,6 +363,13 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
     </div>
       <ConsentDialog intro={!consent} open={!consent || dialog === 'notice'} onAccept={() => { setConsent(true); setDialog(null); setTimeout(() => document.getElementById('ask')?.focus(), 50); }} onClose={consent ? () => setDialog(null) : undefined} />
       <AboutDialog open={dialog === 'about'} onClose={() => setDialog(null)} />
+      <AnimatePresence>
+        {voiceOpen && consent && (
+          <VoiceMode answer={[...msgs].reverse().find((m) => m.role === 'assistant')} busy={busy}
+            onSend={(q) => void send(q, msgs, [], 'skip')} onStopAnswer={stop}
+            onClose={() => { setVoiceOpen(false); if (location.hash.startsWith('#/voz')) history.replaceState(null, '', `${location.pathname}${location.search}#/`); setTimeout(() => document.getElementById('ask')?.focus(), 50); }} />
+        )}
+      </AnimatePresence>
     </>
   );
 }
@@ -367,6 +378,16 @@ function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAs
   const { t, lang } = useT();
   const [copied, setCopied] = useState(false);
   const [openSrc, setOpenSrc] = useState<string | null>(null);
+  const [reading, setReading] = useState(false);
+  useEffect(() => () => { if (reading) stopSpeaking(); }, [reading]);
+  // Lectura completa de la respuesta (incluye los pasos del trámite y la fuente).
+  const readAloud = async () => {
+    if (reading) { stopSpeaking(); setReading(false); return; }
+    const s = toSpeech(m, lang, t('unknownTitle'), t('unknownBody'));
+    setReading(true);
+    await speak([s.intro.replace(/Di "siguiente"[^.]*\.|Say "next"[^.]*\./, ''), ...s.steps, s.outro].join(' '), lang, loadPrefs());
+    setReading(false);
+  };
   const mood = m.streaming ? (m.text ? 'talking' : 'thinking') : 'idle';
   const srcKey = (s: Source) => `${s.docId}|${s.locator ?? ''}`;
   const src = m.sources?.find((s) => srcKey(s) === openSrc);
@@ -425,6 +446,7 @@ function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAs
             {m.text && <button className="icon-btn" aria-label={t('copy')} title={t('copy')} onClick={() => { void navigator.clipboard.writeText(m.text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>{copied ? <IcCheck /> : <IcCopy />}</button>}
             <button className="icon-btn" aria-label={t('good')} title={t('good')} aria-pressed={m.vote === 'up'} onClick={() => onVote('up')}><IcUp /></button>
             <button className="icon-btn" aria-label={t('bad')} title={t('bad')} aria-pressed={m.vote === 'down'} onClick={() => onVote('down')}><IcDown /></button>
+            {ttsSupported() && <button className="icon-btn" aria-label={reading ? t('stopReading') : t('readAloud')} title={reading ? t('stopReading') : t('readAloud')} aria-pressed={reading} onClick={readAloud}><IcSpeaker /></button>}
             <button className="icon-btn" aria-label={t('retry')} title={t('retry')} onClick={onRetry}><IcRetry /></button>
             {m.latencyMs !== undefined && <span className="latency mono">{(m.latencyMs / 1000).toFixed(1)} s</span>}
           </div>

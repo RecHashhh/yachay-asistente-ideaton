@@ -21,11 +21,12 @@ const initialLang = (): Lang => {
   return navigator.language.toLowerCase().startsWith('en') ? 'en' : 'es';
 };
 
-/** Rutas por hash: `#/` chat, `#/embed` chat compacto para el widget, `#/admin` portal (la lista de documentos solo la ven los administradores). */
+/** Rutas por hash: `#/` chat, `#/voz` modo voz directo (accesibilidad), `#/embed` chat compacto para el widget, `#/admin` portal (la lista de documentos solo la ven los administradores). */
 const route = () => {
   const h = location.hash;
   if (h.startsWith('#/admin')) return 'admin';
   if (h.startsWith('#/embed')) return 'embed';
+  if (h.startsWith('#/voz')) return 'voice';
   return 'chat';
 };
 
@@ -55,7 +56,7 @@ export function App() {
       <MotionConfig reducedMotion="user">
       {page === 'admin'
         ? <Admin theme={theme} toggleTheme={toggleTheme} />
-        : <Chat theme={theme} toggleTheme={toggleTheme} setLang={setLang} embed={page === 'embed'} />}
+        : <Chat theme={theme} toggleTheme={toggleTheme} setLang={setLang} embed={page === 'embed'} voice={page === 'voice'} />}
       </MotionConfig>
     </LangContext.Provider>
   );

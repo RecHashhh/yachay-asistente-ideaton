@@ -89,6 +89,13 @@ Resultado actual (simulador, 20-10-2026): **100 %** de exactitud, **0** alucinac
 - **Kichwa:** ningún servicio de traducción automática soporta kichwa ecuatoriano (Google y DeepL ofrecen quechua sureño). Se dejaron los 81 textos en `docs/kichwa-traduccion.csv` para que los traduzca un hablante nativo, y la interfaz lo indica con honestidad ("Kichwa (Ecuador) · beta"). Es un argumento de rigor para el jurado.
 - **Accesibilidad:** WCAG 2.2 AA verificado con axe-core, con **0 violaciones** en todas las pantallas, temas claro y oscuro y ambos idiomas. Además: lector de pantalla con un solo anuncio por respuesta, foco atrapado en diálogos, movimiento reducido y alto contraste de Windows.
 - **Respuesta inmediata:** el estado ("Buscando en los documentos oficiales…") aparece en menos de un segundo y el texto llega en streaming; la latencia se muestra en cada respuesta.
+- **Modo voz (accesibilidad y valor agregado):** conversación manos libres en `#/voz`, un enlace que se puede compartir con estudiantes ciegos o con baja visión, o desde el botón «Voz». Funciona así:
+  - Yachi escucha, responde en voz alta y vuelve a escuchar, y se puede interrumpir.
+  - Los trámites se recorren por voz («siguiente», «anterior», «todos los pasos»), las aclaraciones se responden con «uno» o «dos», y el mapa se describe en palabras («desde la entrada principal, camina hacia el noreste…»).
+  - Las fuentes se leen al final y los datos personales dichos en voz alta se omiten.
+  - Hay sonidos de estado, atajos de teclado y se puede ajustar la velocidad y la voz.
+  - Costo cero: usa el reconocimiento y la síntesis del navegador; el reconocimiento funciona en Chrome y Edge. Se probó la conversación completa con un micrófono simulado.
+  - Complementa a los lectores de pantalla (NVDA, JAWS, TalkBack, VoiceOver), con los que la interfaz ya es compatible; no los reemplaza.
 - **Otros:** dictado por voz, adjuntar imagen o PDF, captura de pantalla, modo oscuro, diseño con la identidad de yachaytech.edu.ec (Inter, azul `#27618E`, celeste `#06B0EE`).
 
 **Falta:** validar el kichwa; probar voz y captura con hardware real.

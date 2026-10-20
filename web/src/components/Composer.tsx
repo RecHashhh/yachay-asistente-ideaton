@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { BRAND } from '../config';
 import { LANGS, useT } from '../lib/i18n';
 import type { Attachment } from '../lib/types';
-import { IcCapture, IcClip, IcMic, IcSend, IcStop } from './icons';
+import { IcCapture, IcClip, IcMic, IcSend, IcStop, IcWave } from './icons';
 
 const MAX_FILES = 4;
 const MAX_MB = 8;
@@ -22,13 +22,14 @@ interface Props {
   hints?: string[];
   onHint?: (q: string) => void;
   toast: (msg: string) => void;
+  onVoice?: () => void;
 }
 
 /**
  * Caja de texto con lo que ya usa el Help Desk de RIPCON: dictado por voz, adjuntar imagen o PDF,
  * capturar pantalla y pegar capturas con Ctrl+V.
  */
-export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy, disabled, autoFocus, hints = [], onHint, toast }: Props) {
+export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy, disabled, autoFocus, hints = [], onHint, toast, onVoice }: Props) {
   const { t, lang } = useT();
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -129,6 +130,7 @@ export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy
           <button type="button" className="icon-btn" title={t('capture')} aria-label={t('capture')} onClick={capture} disabled={disabled || files.length >= MAX_FILES}><IcCapture /></button>
           <button type="button" className={`icon-btn mic${rec ? ' on' : ''}`} title={t('mic')} aria-label={t('mic')} aria-pressed={!!rec} onClick={mic} disabled={disabled}><IcMic /></button>
           <span className="sp" />
+          {onVoice && <button type="button" className="voice-btn" onClick={onVoice} disabled={disabled} title={t('voiceMode')}><IcWave /><span>{lang === 'en' ? 'Voice' : 'Voz'}</span><span className="sr"> — {t('voiceMode')}</span></button>}
           {busy
             ? <button type="button" className="send" onClick={onStop} aria-label={t('stop')}><IcStop /></button>
             : <button type="submit" className="send" disabled={!canSend} aria-label={t('send')}><IcSend /></button>}
