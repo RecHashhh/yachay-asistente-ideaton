@@ -26,15 +26,17 @@ Estas decisiones las dio el equipo en sus instrucciones; la IA las implementó:
 - Aviso de uso de datos, acceso abierto y portal para actualizar la base de conocimiento.
 - Estilo visual minimalista basado en el Help Desk de RIPCON, y micro-interacciones tipo Claude.
 - Reutilizar del Help Desk el dictado por voz, los adjuntos y la captura de pantalla.
+- Textos institucionales ("Sin información oficial" en lugar de "no sé"), qué ve el público y qué solo el administrador, y las mejoras inspiradas en otros chatbots (aclaraciones, motivo del 👎, hablar con una persona, bienvenida, calendario).
 - Widget flotante tipo Messenger para otras páginas.
 - Priorización del alcance: solo frontend en esta etapa.
 
 ### Generado por la IA (revisado por el equipo)
 - Todo el código de `web/` (React + TypeScript): chat, portal, documentos, widget, simulador.
 - El contenido de ejemplo del simulador (`web/src/lib/mock.ts`). **No es información oficial** y se reemplaza con los documentos del Día 1.
-- El set de 21 preguntas de control y las métricas de la pestaña Validación.
+- El set de 26 preguntas de control y las métricas de la pestaña Validación.
 - La calculadora de costo y sus supuestos (precios de la API consultados el 20-10-2026; ver la pestaña Costo).
 - Los textos de la interfaz en español e inglés y el borrador del aviso de datos.
+- Investigación de apoyo (con agentes de Claude Code y búsqueda web, fuentes citadas): comparación con repositorios de GitHub y chatbots institucionales en producción, recursos de kichwa ecuatoriano, precios de la API y del servidor, y artículos de la LOPDP. Base de `docs/INFORME-RUBRICA.md`; el equipo debe verificar las fuentes antes de citarlas en el paper.
 
 ### Pendiente de autoría del equipo
 - _(equipo)_ Paper en formato IEEE: problema, estado del arte, metodología, validación, conclusiones.

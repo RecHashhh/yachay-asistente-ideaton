@@ -43,6 +43,7 @@ Aparece un botón con la mascota abajo a la derecha; al tocarlo se abre un chat 
 | Texto que aparece palabra por palabra al estilo Claude, y estado "Buscando en los documentos…" con pulso | `src/components/Markdown.tsx`, `.working` en `styles.css` |
 | Mapa del campus con flecha y círculos: aulas, laboratorios, salas de estudio, residencias, representación estudiantil | `src/components/CampusMap.tsx`, `src/lib/campus.ts` |
 | Conversaciones: título automático según lo consultado, renombrar y eliminar (menú «⋯», con deshacer), agrupadas por fecha; sugerencias «para continuar» según tus consultas | `src/components/ChatList.tsx`, `Chat.tsx` |
+| **Aclaraciones** ante consultas ambiguas, **motivo del 👎** (llega a la bandeja), **hablar con una persona** con la conversación adjunta, **bienvenida de 3 pasos** y **añadir al calendario** (.ics) en trámites con plazo | `components/Feedback.tsx`, `ProcedureCard.tsx`, `ConsentDialog.tsx`, `lib/ics.ts` |
 | Aviso antes de enviar datos personales (cédula, teléfono, correo): se pueden quitar antes de enviar | `Chat.tsx` |
 | **Abrir documento** desde cada fuente citada (en PDF, directo en la página) | `Chat.tsx`, `ProcedureCard.tsx` |
 | Aviso de privacidad con lo que exige el art. 12 de la LOPDP (Ecuador), divulgación de que es una IA, revocar consentimiento y borrar datos del navegador; "Cómo funciona" (bilingües) | `src/components/ConsentDialog.tsx`, `Chat.tsx` → `AboutDialog` |
@@ -55,6 +56,8 @@ Aparece un botón con la mascota abajo a la derecha; al tocarlo se abre un chat 
 | Contrato con el backend | `src/lib/types.ts`, `src/lib/api.ts` |
 
 ## Cobertura de la rúbrica del reto
+
+Detalle por criterio, evidencia y guion del pitch: [docs/INFORME-RUBRICA.md](docs/INFORME-RUBRICA.md).
 
 | Criterio | Dónde se ve en el prototipo | Falta (fuera del frontend) |
 |---|---|---|

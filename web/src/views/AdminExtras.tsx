@@ -89,8 +89,8 @@ export function Validation() {
                 <td className="mono">{r.id}</td>
                 <td>{r.q}</td>
                 <td className="mono">{r.lang.toUpperCase()}</td>
-                <td className="mono">{r.expect === 'no_se' ? 'sin información' : r.expect}</td>
-                <td className="mono">{r.got === 'no_se' ? 'sin información' : r.got || '(sin fuente)'}</td>
+                <td className="mono">{r.expect === 'no_se' ? 'sin información' : r.expect === 'aclaracion' ? 'pedir aclaración' : r.expect}</td>
+                <td className="mono">{r.got === 'no_se' ? 'sin información' : r.got === 'aclaracion' ? 'pidió aclaración' : r.got || '(sin fuente)'}</td>
                 <td><span className={`st ${r.ok ? 'indexado' : 'error'}`}>{r.ok ? 'Correcta' : r.hallucination ? 'Alucinación' : 'Incorrecta'}</span></td>
               </tr>
             ))}
@@ -239,6 +239,7 @@ export function Cost() {
 // ---------------------------------------------------------------------------
 
 const REASON: Record<InboxItem['reason'], string> = { sin_fuente: 'Sin fuente', fuera_de_dominio: 'Fuera del ámbito', voto_negativo: 'Voto negativo' };
+const FB_LABEL: Record<string, string> = { incorrecta: 'Incorrecta', desactualizada: 'Desactualizada', no_responde: 'No responde', confusa: 'Confusa' };
 
 /**
  * Cierra el ciclo de mejora: pregunta sin respuesta → falta un documento (subirlo) → pregunta de control → Validación.
@@ -305,7 +306,7 @@ export function Inbox({ docs, onUpload, onValidate }: { docs: DocMeta[]; onUploa
                     </div>
                   )}
                 </td>
-                <td>{REASON[x.reason]}</td>
+                <td>{REASON[x.reason]}{x.details && <div className="small muted">{Object.entries(x.details).map(([k, n]) => `${FB_LABEL[k] ?? k} (${n})`).join(' · ')}</div>}</td>
                 <td className="mono">{x.count}</td>
                 <td className="small">{fmt(x.lastAt)}</td>
                 <td><span className={`st ${x.status === 'nuevo' ? 'procesando' : x.status === 'convertida' ? 'indexado' : 'error'}`}>{x.status === 'nuevo' ? 'Pendiente' : x.status === 'convertida' ? `Convertida (${x.controlId})` : 'Descartada'}</span></td>

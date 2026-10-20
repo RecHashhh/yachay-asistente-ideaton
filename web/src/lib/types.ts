@@ -94,6 +94,8 @@ export interface Procedure {
   documents: string[];
   steps: { title: string; detail?: string }[];
   source: Source;
+  /** Plazos del trámite (del calendario académico) para "Añadir al calendario". */
+  deadlines?: { title: string; start: string; end?: string }[];
 }
 
 /** Respuesta explícita "sin información oficial": no hay fragmento con relevancia suficiente o la pregunta está fuera del dominio. */
@@ -109,6 +111,8 @@ export type StreamEvent =
   | { type: 'tool'; name: 'mostrar_en_mapa'; input: MapAction }
   | { type: 'procedure'; item: Procedure }
   | { type: 'unknown'; item: Unknown }
+  /** Consulta ambigua: el asistente pide precisar con opciones antes de responder (no adivina la intención). */
+  | { type: 'clarify'; question: string; options: string[] }
   | { type: 'sources'; items: Source[] }
   | { type: 'suggestions'; items: string[] }
   /** Botón de acción dentro de la respuesta, p. ej. abrir "Documentos disponibles". Solo rutas internas (#/...). */

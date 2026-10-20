@@ -4,7 +4,8 @@ import { placeById, placeName } from '../lib/campus';
 import { docHref, sendInquiry } from '../lib/api';
 import { locatorLabel, useT } from '../lib/i18n';
 import type { Procedure, Unknown } from '../lib/types';
-import { IcCheck, IcMap, IcSend } from './icons';
+import { downloadIcs } from '../lib/ics';
+import { IcCalendar, IcCheck, IcMap, IcSend } from './icons';
 
 /** Guía paso a paso: qué es, qué documentos, en qué orden y dónde. El estudiante puede ir marcando los pasos. */
 export function ProcedureCard({ p, onShowMap }: { p: Procedure; onShowMap: (placeId: string) => void }) {
@@ -42,6 +43,21 @@ export function ProcedureCard({ p, onShowMap }: { p: Procedure; onShowMap: (plac
           ))}
         </ol>
       </div>
+      {p.deadlines && p.deadlines.length > 0 && (
+        <div className="proc-block">
+          <h3>{t('deadlines')}</h3>
+          <ul className="deadlines">
+            {p.deadlines.map((d) => (
+              <li key={d.title}>
+                <span><b>{d.title}</b><span className="small muted"> · {fmtRange(d.start, d.end, lang)}</span></span>
+                <button className="btn sm" onClick={() => downloadIcs(d, `${p.title}. ${t('office')}: ${p.office}. ${p.source.title} (${t('version')} ${p.source.version}, ${p.source.locator}).`)}>
+                  <IcCalendar width={14} height={14} />{t('addCal')}<span className="sr">: {d.title}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <footer className="small muted row">
         <span>{p.source.title} · {t('version')} {p.source.version} · {locatorLabel(p.source.locator, lang)}</span>
         <span className="sp" />
@@ -52,7 +68,7 @@ export function ProcedureCard({ p, onShowMap }: { p: Procedure; onShowMap: (plac
 }
 
 /** Respuesta "sin información oficial": nunca se inventa una respuesta sin fuente. */
-export function UnknownCard({ u, question, onShowMap }: { u: Unknown; question?: string; onShowMap: (placeId: string) => void }) {
+export function UnknownCard({ u, question, transcript, onShowMap }: { u: Unknown; question?: string; transcript?: string; onShowMap: (placeId: string) => void }) {
   const { t } = useT();
   const [form, setForm] = useState(false);
   const place = u.contact?.placeId ? placeById(u.contact.placeId) : undefined;
@@ -68,7 +84,7 @@ export function UnknownCard({ u, question, onShowMap }: { u: Unknown; question?:
             {place && <button className="btn sm" onClick={() => onShowMap(place.id)}><IcMap width={14} height={14} />{t('showMap')}</button>}
             {!form && <button className="btn sm primary" onClick={() => setForm(true)}><IcSend width={14} height={14} />{t('sendToOffice')}</button>}
           </div>
-          {form && <InquiryForm office={u.contact.office} question={question ?? ''} onCancel={() => setForm(false)} />}
+          {form && <InquiryForm office={u.contact.office} question={question ?? ''} transcript={transcript} onCancel={() => setForm(false)} />}
         </>
       ) : <p className="muted">{t('outOfDomainBody')}</p>}
     </motion.div>
@@ -79,8 +95,10 @@ export function UnknownCard({ u, question, onShowMap }: { u: Unknown; question?:
  * Envía la consulta a la dependencia. Pide solo lo necesario (correo y pregunta) y una autorización explícita (LOPDP).
  * Devuelve un código de seguimiento; en producción crea la consulta en el backend y avisa a la dependencia.
  */
-function InquiryForm({ office, question, onCancel }: { office: string; question: string; onCancel: () => void }) {
+export function InquiryForm({ office, question, transcript, onCancel }: { office: string; question: string; transcript?: string; onCancel: () => void }) {
   const { t, lang } = useT();
+  const [attach, setAttach] = useState(true);
+  const turns = transcript ? transcript.split('\n').filter(Boolean).length : 0;
   const [email, setEmail] = useState('');
   const [q, setQ] = useState(question);
   const [ok, setOk] = useState(false);
@@ -91,7 +109,7 @@ function InquiryForm({ office, question, onCancel }: { office: string; question:
     e.preventDefault();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setErr(t('inqInvalid')); return; }
     setErr(null); setState('sending');
-    try { const r = await sendInquiry({ office, email: email.trim(), question: q.trim(), lang }); setCode(r.code); setState('done'); }
+    try { const r = await sendInquiry({ office, email: email.trim(), question: q.trim(), lang, transcript: attach && transcript ? transcript : undefined }); setCode(r.code); setState('done'); }
     catch { setState('error'); }
   };
   if (state === 'done') return <p className="inq-done" role="status"><IcCheck width={16} height={16} />{t('inqDone', { office, code })}</p>;
@@ -103,6 +121,7 @@ function InquiryForm({ office, question, onCancel }: { office: string; question:
       <label className="field"><span>{t('inqQuestion')}</span>
         <textarea className="inp" rows={2} required maxLength={1000} value={q} onChange={(e) => setQ(e.target.value)} />
       </label>
+      {turns > 1 && <label className="check"><input type="checkbox" checked={attach} onChange={(e) => setAttach(e.target.checked)} />{t('attachChat', { n: String(turns) })}</label>}
       <label className="check"><input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} required />{t('inqConsent', { office })}</label>
       {err && <p id="inq-err" className="err">{err}</p>}
       {state === 'error' && <p className="err" role="alert">{t('inqError')}</p>}
@@ -112,4 +131,9 @@ function InquiryForm({ office, question, onCancel }: { office: string; question:
       </div>
     </form>
   );
+}
+
+function fmtRange(start: string, end: string | undefined, lang: string) {
+  const f = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString(lang === 'en' ? 'en-US' : 'es-EC', { day: 'numeric', month: 'short', year: 'numeric' });
+  return end && end !== start ? `${f(start)} – ${f(end)}` : f(start);
 }

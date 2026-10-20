@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { Mascot } from './Mascot';
 import { BRAND, PRIVACY } from '../config';
 import { useT } from '../lib/i18n';
 import { IcShield } from './icons';
@@ -28,6 +29,28 @@ export function revokeConsent() {
 }
 
 type Row = [string, ReactNode];
+
+/** Bienvenida de la primera visita: qué hace, cómo verificar y (paso 3) el aviso de datos. Patrón validado por GOV.UK Chat. */
+const ONBOARD = {
+  es: {
+    step: 'Paso {n} de 3', next: 'Siguiente', back: 'Atrás', skip: 'Ir al aviso',
+    srcExample: 'Reglamento de régimen académico · pág. 18',
+    title: [`Hola, soy ${BRAND.mascotName}`, 'Cada respuesta trae su fuente'],
+    body: [
+      `Te ayudo con trámites, normativa, servicios y ubicaciones de ${BRAND.university}, en español e inglés. Pregunta como le preguntarías a un compañero; si tu consulta es ambigua, te pediré precisarla.`,
+      'Verás el documento, la versión y la fecha de donde sale cada dato. Si no hay información oficial, te lo diré y te conectaré con la dependencia. Soy una inteligencia artificial y puedo equivocarme: revisa la fuente antes de decidir.',
+    ],
+  },
+  en: {
+    step: 'Step {n} of 3', next: 'Next', back: 'Back', skip: 'Go to notice',
+    srcExample: 'Academic regulations · p. 18',
+    title: [`Hi, I'm ${BRAND.mascotName}`, 'Every answer shows its source'],
+    body: [
+      `I help with ${BRAND.university} procedures, regulations, services and locations, in Spanish and English. Ask as you would ask a classmate; if your question is ambiguous, I will ask you to clarify.`,
+      'You will see the document, version and date behind each fact. If there is no official information, I will say so and connect you with the office. I am an artificial intelligence and can make mistakes: check the source before deciding.',
+    ],
+  },
+};
 
 const TEXT: Record<'es' | 'en', { title: string; intro: string; items: ReactNode[]; more: string; rows: Row[]; contact: string; close: string; accept: string; revoke: string }> = {
   es: {
@@ -88,17 +111,39 @@ const TEXT: Record<'es' | 'en', { title: string; intro: string; items: ReactNode
  * Aviso de uso de datos con la información que exige el art. 12 de la LOPDP (Ecuador) y la divulgación de que es una IA.
  * BORRADOR: los datos de PRIVACY (config.ts) y el texto deben confirmarlos el área legal y el delegado de protección de datos.
  */
-export function ConsentDialog({ open, onAccept, onClose }: { open: boolean; onAccept: () => void; onClose?: () => void }) {
+export function ConsentDialog({ open, intro, onAccept, onClose }: { open: boolean; intro?: boolean; onAccept: () => void; onClose?: () => void }) {
   const { lang } = useT();
   const x = TEXT[lang === 'en' ? 'en' : 'es'];
+  const o = ONBOARD[lang === 'en' ? 'en' : 'es'];
   const btn = useRef<HTMLButtonElement>(null);
-  useEffect(() => { if (open) btn.current?.focus(); }, [open]);
+  const [step, setStep] = useState(intro ? 0 : 2);
+  useEffect(() => { if (open) setStep(intro ? 0 : 2); }, [open, intro]);
+  useEffect(() => { if (open) btn.current?.focus(); }, [open, step]);
   return (
     <AnimatePresence>
       {open && (
         <motion.div className="scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onKeyDown={(e) => e.key === 'Escape' && onClose?.()}>
           <motion.div className="dialog" role="dialog" aria-modal="true" aria-labelledby="consent-title" onKeyDown={trapFocus}
             initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8 }} transition={{ type: 'spring', stiffness: 320, damping: 28 }}>
+            {intro && (
+              <div className="ob-head">
+                <span className="small muted" aria-live="polite">{o.step.replace('{n}', String(step + 1))}</span>
+                <span className="ob-dots" aria-hidden="true">{[0, 1, 2].map((i) => <i key={i} className={i === step ? 'on' : undefined} />)}</span>
+              </div>
+            )}
+            {step < 2 ? (
+              <>
+                <div className="ob-art" aria-hidden="true">{step === 0 ? <Mascot size={72} /> : <span className="ob-src"><span className="kind">v2</span>{o.srcExample}</span>}</div>
+                <h2 id="consent-title">{o.title[step]}</h2>
+                <p className="muted">{o.body[step]}</p>
+                <div className="row" style={{ justifyContent: 'flex-end' }}>
+                  <button className="btn ghost" onClick={() => setStep(2)}>{o.skip}</button>
+                  <span className="sp" />
+                  {step > 0 && <button className="btn" onClick={() => setStep(step - 1)}>{o.back}</button>}
+                  <button ref={btn} className="btn primary" onClick={() => setStep(step + 1)}>{o.next}</button>
+                </div>
+              </>
+            ) : (<>
             <div className="row" style={{ gap: 10 }}><IcShield width={22} height={22} style={{ color: 'var(--accent)' }} /><h2 id="consent-title">{x.title}</h2></div>
             <p className="muted">{x.intro}</p>
             <ul>{x.items.map((it, i) => <li key={i}>{it}</li>)}</ul>
@@ -111,8 +156,10 @@ export function ConsentDialog({ open, onAccept, onClose }: { open: boolean; onAc
               {onClose && <button className="btn ghost danger" onClick={revokeConsent}>{x.revoke}</button>}
               <span className="sp" />
               {onClose && <button className="btn ghost" onClick={onClose}>{x.close}</button>}
+              {intro && <button className="btn" onClick={() => setStep(1)}>{o.back}</button>}
               <button ref={btn} className="btn primary" onClick={() => { saveConsent(); onAccept(); }}>{x.accept}</button>
             </div>
+            </>)}
           </motion.div>
         </motion.div>
       )}

@@ -337,3 +337,25 @@ select option{background:var(--surface);color:var(--ink)}
 .check input{margin-top:3px;flex:none}
 .inq-done{display:flex;gap:8px;align-items:flex-start;color:var(--ok);font-weight:500;margin-top:4px}
 .inq-done svg{flex:none;margin-top:3px}
+
+/* Pregunta de aclaración */
+.clarify{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.clarify p{font-weight:500}
+.chip:disabled{cursor:default;opacity:.55}
+.chip[aria-pressed="true"]:disabled{opacity:1}
+/* Panel tras el voto negativo */
+.fb-panel{display:flex;flex-direction:column;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 14px;background:var(--surface)}
+.fb-panel .inq{align-self:stretch}
+.fb-thanks{display:flex;gap:6px;align-items:center;color:var(--ok);font-weight:500}
+.chip.ghost{border-style:dashed;color:var(--muted)}
+/* Fechas clave del trámite */
+.deadlines{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.deadlines li{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+/* Bienvenida en 3 pasos */
+.ob-head{display:flex;align-items:center;justify-content:space-between}
+.ob-dots{display:inline-flex;gap:6px}
+.ob-dots i{width:8px;height:8px;border-radius:50%;background:var(--line-hi);transition:background .2s,transform .2s}
+.ob-dots i.on{background:var(--accent);transform:scale(1.15)}
+.ob-art{display:grid;place-items:center;min-height:96px;background:var(--surface-2);border-radius:var(--r-lg)}
+.ob-src{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 12px 4px 6px;font-size:13px}
+.ob-src .kind{font-family:var(--f-mono);font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;background:var(--surface-2);color:var(--muted)}

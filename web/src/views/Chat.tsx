@@ -12,6 +12,8 @@ import { docHref, getTopics, getTrends, sendFeedback, streamChat } from '../lib/
 import { LANGS, detectLang, locatorLabel, topicLabel, useT, type Lang } from '../lib/i18n';
 import { placeById, placeName } from '../lib/campus';
 import { ChatList } from '../components/ChatList';
+import { ClarifyCard, FeedbackPanel } from '../components/Feedback';
+import type { FeedbackReason } from '../lib/inbox';
 import type { Attachment, ChatTurn, MapAction, Procedure, Source, Topic, Trend, Unknown } from '../lib/types';
 
 interface Msg {
@@ -25,6 +27,7 @@ interface Msg {
   procedure?: Procedure;
   unknown?: Unknown;
   suggestions?: string[];
+  clarify?: { question: string; options: string[] };
   link?: { label: string; href: string };
   streaming?: boolean;
   error?: string;
@@ -57,6 +60,13 @@ function autoTitle(msgs: Msg[], lang: Lang): string {
 /** Datos personales que no hace falta enviar (LOPDP, minimización): cédula/teléfono de 10 dígitos o correo. */
 const PII_ID = /\b\d{10}\b/;
 const PII_EMAIL = /[\w.+-]+@[\w-]+\.[\w.]+/;
+/** Conversación en texto para adjuntar a la consulta a una dependencia (datos personales omitidos). */
+function transcriptOf(msgs: Msg[], lang: Lang): string {
+  const who = (m: Msg) => (m.role === 'user' ? (lang === 'en' ? 'Student' : 'Estudiante') : 'Yachi');
+  const body = (m: Msg) => m.text || m.procedure?.title || m.clarify?.question || (m.unknown ? (lang === 'en' ? '(no official information)' : '(sin información oficial)') : '');
+  return msgs.map((m) => `${who(m)}: ${redact(body(m).replaceAll('**', ''))}`).filter((l) => !l.endsWith(': ')).join('\n');
+}
+
 const redact = (s: string) => s.replace(new RegExp(PII_ID.source, 'g'), '[dato omitido]').replace(new RegExp(PII_EMAIL.source, 'g'), '[dato omitido]');
 
 const words = (s: string) => new Set(s.toLowerCase().normalize('NFD').replace(/[^a-z\s]/g, '').split(/\s+/).filter((w) => w.length > 3));
@@ -151,6 +161,7 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
         else if (ev.type === 'tool') patch(ai.id, () => ({ map: ev.input }));
         else if (ev.type === 'procedure') patch(ai.id, () => ({ procedure: ev.item }));
         else if (ev.type === 'unknown') patch(ai.id, () => ({ unknown: ev.item, status: undefined }));
+        else if (ev.type === 'clarify') patch(ai.id, () => ({ clarify: { question: ev.question, options: ev.options }, status: undefined }));
         else if (ev.type === 'sources') patch(ai.id, () => ({ sources: ev.items }));
         else if (ev.type === 'suggestions') patch(ai.id, () => ({ suggestions: ev.items }));
         else if (ev.type === 'link' && ev.href.startsWith('#/')) patch(ai.id, () => ({ link: { label: ev.label, href: ev.href } }));
@@ -323,8 +334,10 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
                       </motion.div>
                     )
                     : <AssistantMsg key={m.id} m={m}
-                        onVote={(v) => { patch(m.id, () => ({ vote: v })); if (m.serverId) void sendFeedback(m.serverId, v, { question: msgs[i - 1]?.text ?? '', lang }); }}
+                        onVote={(v) => { patch(m.id, () => ({ vote: v })); if (v === 'up' && m.serverId) void sendFeedback(m.serverId, v); }}
+                        onReason={(r) => { if (m.serverId) void sendFeedback(m.serverId, 'down', { question: msgs[i - 1]?.text ?? '', lang, reason: r ?? undefined }); }}
                         question={msgs[i - 1]?.text}
+                        transcript={transcriptOf(msgs.slice(0, i + 1), lang)}
                         onRetry={() => retry(m.id)} onAsk={(q) => void send(q)}
                         onShowMap={(placeId) => patch(m.id, () => ({ map: { destino: placeId, origen: 'entrada' } }))} />)}
                 </AnimatePresence>
@@ -344,13 +357,13 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
       <AnimatePresence>{toastMsg && <motion.div className="toast" role="status" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>{toastMsg}</motion.div>}</AnimatePresence>
       <AnimatePresence>{undo && <motion.div className="toast row" role="status" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>{t('deleted')}<button className="btn sm" onClick={undoDelete}>{t('undo')}</button></motion.div>}</AnimatePresence>
     </div>
-      <ConsentDialog open={!consent || dialog === 'notice'} onAccept={() => { setConsent(true); setDialog(null); setTimeout(() => document.getElementById('ask')?.focus(), 50); }} onClose={consent ? () => setDialog(null) : undefined} />
+      <ConsentDialog intro={!consent} open={!consent || dialog === 'notice'} onAccept={() => { setConsent(true); setDialog(null); setTimeout(() => document.getElementById('ask')?.focus(), 50); }} onClose={consent ? () => setDialog(null) : undefined} />
       <AboutDialog open={dialog === 'about'} onClose={() => setDialog(null)} />
     </>
   );
 }
 
-function AssistantMsg({ m, question, onVote, onRetry, onAsk, onShowMap }: { m: Msg; question?: string; onVote: (v: 'up' | 'down') => void; onRetry: () => void; onAsk: (q: string) => void; onShowMap: (placeId: string) => void }) {
+function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAsk, onShowMap }: { m: Msg; question?: string; transcript: string; onVote: (v: 'up' | 'down') => void; onReason: (r: FeedbackReason | null) => void; onRetry: () => void; onAsk: (q: string) => void; onShowMap: (placeId: string) => void }) {
   const { t, lang } = useT();
   const [copied, setCopied] = useState(false);
   const [openSrc, setOpenSrc] = useState<string | null>(null);
@@ -373,7 +386,8 @@ function AssistantMsg({ m, question, onVote, onRetry, onAsk, onShowMap }: { m: M
         {m.map && !mapAfter && <CampusMap action={m.map} />}
         {m.text && <Markdown text={m.text} animate={!!m.streaming} />}
         {m.procedure && <ProcedureCard p={m.procedure} onShowMap={onShowMap} />}
-        {m.unknown && <UnknownCard u={m.unknown} question={question} onShowMap={onShowMap} />}
+        {m.clarify && <ClarifyCard question={m.clarify.question} options={m.clarify.options} onPick={onAsk} />}
+        {m.unknown && <UnknownCard u={m.unknown} question={question} transcript={transcript} onShowMap={onShowMap} />}
         {m.map && mapAfter && <CampusMap action={m.map} scrollIntoView />}
         {m.error && <p className="err" role="alert">{m.error}</p>}
 
@@ -406,7 +420,7 @@ function AssistantMsg({ m, question, onVote, onRetry, onAsk, onShowMap }: { m: M
           </motion.div>
         )}
 
-        {!m.streaming && (m.text || m.error || m.unknown) && (
+        {!m.streaming && (m.text || m.error || m.unknown || m.clarify) && (
           <div className="actions">
             {m.text && <button className="icon-btn" aria-label={t('copy')} title={t('copy')} onClick={() => { void navigator.clipboard.writeText(m.text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>{copied ? <IcCheck /> : <IcCopy />}</button>}
             <button className="icon-btn" aria-label={t('good')} title={t('good')} aria-pressed={m.vote === 'up'} onClick={() => onVote('up')}><IcUp /></button>
@@ -414,6 +428,10 @@ function AssistantMsg({ m, question, onVote, onRetry, onAsk, onShowMap }: { m: M
             <button className="icon-btn" aria-label={t('retry')} title={t('retry')} onClick={onRetry}><IcRetry /></button>
             {m.latencyMs !== undefined && <span className="latency mono">{(m.latencyMs / 1000).toFixed(1)} s</span>}
           </div>
+        )}
+
+        {m.vote === 'down' && !m.streaming && (
+          <FeedbackPanel office={m.procedure?.office ?? (lang === 'en' ? "Registrar's Office" : 'Secretaría General')} question={question ?? ''} transcript={transcript} onReason={onReason} />
         )}
 
         {!m.streaming && m.suggestions && m.suggestions.length > 0 && (

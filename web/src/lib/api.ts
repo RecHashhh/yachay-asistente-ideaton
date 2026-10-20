@@ -41,16 +41,16 @@ export const getTrends = (lang: 'es' | 'en' | 'qu' = 'es'): Promise<Trend[]> =>
   MOCK ? Promise.resolve(mock.trends.map((t) => ({ ...t, query: lang === 'en' ? mock.trendsEn[t.query] ?? t.query : t.query }))) : json(`/trends?lang=${lang}`);
 
 /** Voto de utilidad de una respuesta; alimenta la revisión semanal de respuestas marcadas como no útiles. */
-export function sendFeedback(messageId: string, vote: 'up' | 'down', ctx?: { question: string; lang: 'es' | 'en' | 'qu' }): Promise<void> {
+export function sendFeedback(messageId: string, vote: 'up' | 'down', ctx?: { question: string; lang: 'es' | 'en' | 'qu'; reason?: inbox.FeedbackReason }): Promise<void> {
   if (MOCK) {
     // Un voto negativo también llega a la bandeja "Sin respuesta" para revisarlo.
-    if (vote === 'down' && ctx) inbox.recordUnanswered(ctx.question, ctx.lang, 'voto_negativo');
+    if (vote === 'down' && ctx) inbox.recordUnanswered(ctx.question, ctx.lang, 'voto_negativo', ctx.reason);
     return Promise.resolve();
   }
-  return fetch(`${API}/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messageId, vote }) }).then(() => undefined);
+  return fetch(`${API}/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messageId, vote, reason: ctx?.reason }) }).then(() => undefined);
 }
 
-export type { InboxItem, InboxStatus, Inquiry } from './inbox';
+export type { FeedbackReason, InboxItem, InboxStatus, Inquiry } from './inbox';
 
 /** Envía la pregunta sin respuesta a la dependencia responsable. Devuelve el código de seguimiento. */
 export function sendInquiry(i: Omit<inbox.Inquiry, 'code' | 'at'>): Promise<inbox.Inquiry> {

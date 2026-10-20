@@ -66,7 +66,7 @@ const src = (id: string, locator: string, snippet: string): Source => {
   return { docId: d.id, title: d.title, version: d.version, docDate: d.docDate, locator, snippet, url: d.url, page: d.kind === 'pdf' ? page : undefined, origin: d.origin };
 };
 
-interface Proc { title: L; summary: L; office: L; placeId?: string; duration?: L; documents: L[]; steps: { title: L; detail?: L }[]; doc: string; locator: string; snippet: string }
+interface Proc { deadlines?: { title: L; start: string; end?: string }[]; title: L; summary: L; office: L; placeId?: string; duration?: L; documents: L[]; steps: { title: L; detail?: L }[]; doc: string; locator: string; snippet: string }
 
 interface Entry {
   id: string;
@@ -90,6 +90,7 @@ const KB: Entry[] = [
       summary: { es: 'Pasar de tu carrera actual a otra carrera de grado de la universidad, con homologación de materias aprobadas.', en: 'Move from your current major to another undergraduate program, transferring the courses you passed.' },
       office: { es: 'Secretaría General', en: "Registrar's Office" }, placeId: 'admisiones',
       duration: { es: '10 a 15 días hábiles', en: '10 to 15 business days' },
+      deadlines: [{ title: { es: 'Plazo para pedir cambio de carrera (periodo 2027-1)', en: 'Deadline to request a change of major (term 2027-1)' }, start: '2027-03-02', end: '2027-03-13' }],
       documents: [
         { es: 'Solicitud de cambio de carrera (formulario F-SG-03)', en: 'Change of major request (form F-SG-03)' },
         { es: 'Récord académico actualizado', en: 'Updated academic transcript' },
@@ -135,6 +136,7 @@ const KB: Entry[] = [
       title: { es: 'Solicitud de residencia', en: 'Student housing application' },
       summary: { es: 'Postular a un cupo en las residencias universitarias del campus.', en: 'Apply for a place in the on-campus residences.' },
       office: { es: 'Bienestar Estudiantil', en: "Student Welfare Office" }, placeId: 'residencias',
+      deadlines: [{ title: { es: 'Convocatoria de residencias (periodo 2027-1)', en: 'Student housing call (term 2027-1)' }, start: '2027-02-23', end: '2027-02-27' }],
       duration: { es: 'Resultados en 2 semanas', en: 'Results in 2 weeks' },
       documents: [
         { es: 'Formulario de postulación', en: 'Application form' },
@@ -193,6 +195,16 @@ const KB: Entry[] = [
     follow: [{ es: '¿Dónde queda Bienestar?', en: 'Where is Student Welfare?' }],
   },
   {
+    // Solo si habla de matrícula o aranceles: "¿cuánto cuesta el parqueadero?" no debe responder con la matrícula (lo detectó el set de control).
+    id: 'aranceles', match: /((cu[aá]nto cuesta|costo|valor|precio|pago).*(matr[ií]cula|arancel))|arancel|tuition|((how much|cost|fee).*enrol)/,
+    text: {
+      es: 'La matrícula ordinaria de grado tiene un valor de **USD 120** por periodo. La matrícula extraordinaria tiene un recargo del 10 %. Se paga por transferencia o en la ventanilla de Admisiones.',
+      en: 'Regular undergraduate enrollment costs **USD 120** per term. Late enrollment has a 10% surcharge. It is paid by bank transfer or at the Admissions window.',
+    },
+    doc: 'd3', locator: 'hoja Aranceles, fila 3', snippet: 'Matrícula ordinaria grado | 120,00',
+    follow: [{ es: '¿Cuándo empiezan las clases y las matrículas?', en: 'When do classes and enrollment start?' }],
+  },
+  {
     id: 'calendario', match: /(clases|semestre|calendario|examen|feriado|semester|classes start|calendar|exam)/,
     text: {
       es: 'El próximo periodo académico empieza el **lunes 2 de marzo de 2027**:\n\n- Matrículas ordinarias: 9 al 20 de febrero.\n- Exámenes parciales: semana del 20 de abril.\n- Fin de clases: 10 de julio.',
@@ -201,6 +213,18 @@ const KB: Entry[] = [
     doc: 'd1', locator: 'pág. 2', snippet: 'Inicio de clases periodo 2027-1: 02/03/2027…',
     follow: [{ es: '¿Cómo hago un cambio de carrera?', en: 'How do I change my major?' }],
   },
+];
+
+/** Temas que, preguntados solos, pueden significar cosas distintas. */
+const CLARIFY: { match: RegExp; question: L; options: L[] }[] = [
+  { match: /(residenc|housing|dorm|residence)/, question: { es: '¿Qué necesitas saber de las residencias?', en: 'What do you need to know about student housing?' },
+    options: [{ es: '¿Cómo solicito una residencia?', en: 'How do I apply for student housing?' }, { es: '¿Dónde quedan las residencias?', en: 'Where are the residences?' }] },
+  { match: /(laborator|\blabs?\b)/, question: { es: '¿Quieres reservar un laboratorio o ubicarlo en el campus?', en: 'Do you want to book a lab or find it on campus?' },
+    options: [{ es: '¿Cómo reservo un laboratorio?', en: 'How do I book a lab?' }, { es: '¿Dónde quedan los laboratorios?', en: 'Where are the labs?' }] },
+  { match: /(matr[ií]cula|enrol)/, question: { es: '¿Te refieres a las fechas o al valor de la matrícula?', en: 'Do you mean enrollment dates or fees?' },
+    options: [{ es: '¿Cuándo empiezan las clases y las matrículas?', en: 'When do classes and enrollment start?' }, { es: '¿Cuánto cuesta la matrícula?', en: 'How much is enrollment?' }] },
+  { match: /^(tr[aá]mites?|procedimientos?|procedures?|ayuda|help)$/, question: { es: '¿Qué trámite necesitas hacer?', en: 'Which procedure do you need?' },
+    options: [{ es: '¿Cómo hago un cambio de carrera?', en: 'How do I change my major?' }, { es: '¿Cómo justifico una inasistencia?', en: 'How do I justify an absence?' }, { es: '¿Cómo solicito una residencia?', en: 'How do I apply for student housing?' }, { es: '¿Cómo reservo un laboratorio?', en: 'How do I book a lab?' }] },
 ];
 
 const OUT_OF_DOMAIN = /(clima|fútbol|futbol|receta|chiste|bitcoin|presidente|película|weather|football|recipe|joke|movie|crypto)/;
@@ -213,6 +237,7 @@ export interface Answer {
   unknown?: Unknown;
   map?: string;
   link?: { label: string; href: string };
+  clarify?: { question: string; options: string[] };
   follow: string[];
 }
 
@@ -222,6 +247,12 @@ export function answerFor(q: string, lang: Lang): Answer {
   const isEn = lang === 'en';
   if (OUT_OF_DOMAIN.test(t)) {
     return { entryId: null, text: '', sources: [], unknown: { reason: 'fuera_de_dominio' }, follow: topTrends(lang, 3) };
+  }
+  // Consultas ambiguas y cortas: se pide precisar en vez de adivinar.
+  const words = t.replace(/[¿?¡!.,]/g, ' ').split(/\s+/).filter(Boolean);
+  if (words.length <= 3) {
+    const c = CLARIFY.find((x) => x.match.test(t));
+    if (c) return { entryId: 'aclaracion', text: '', sources: [], clarify: { question: pick(c.question, lang), options: c.options.map((o) => pick(o, lang)) }, follow: [] };
   }
   if (/(qu[ée] documentos|cu[áa]les (son los )?documentos|qu[ée] informaci[óo]n tienes|qu[ée] sabes|what documents|which documents|what do you know|documentos (disponibles|tienes|hay))/.test(t)) {
     const list = publicDocs();
@@ -251,6 +282,7 @@ export function answerFor(q: string, lang: Lang): Answer {
         title: pick(p.title, lang), summary: pick(p.summary, lang), office: pick(p.office, lang), placeId: p.placeId,
         duration: p.duration && pick(p.duration, lang), documents: p.documents.map((d) => pick(d, lang)),
         steps: p.steps.map((x) => ({ title: pick(x.title, lang), detail: x.detail && pick(x.detail, lang) })), source: s,
+        deadlines: p.deadlines?.map((d) => ({ title: pick(d.title, lang), start: d.start, end: d.end })),
       };
     }
     return { entryId: e.id, text: pick(e.text, lang), sources, procedure, map: e.map, follow: e.follow.map((f) => pick(f, lang)) };
@@ -280,6 +312,11 @@ export async function* mockChat(req: ChatRequest, signal?: AbortSignal): AsyncGe
   }
   yield { type: 'status', label: en ? 'Searching official documents' : 'Buscando en los documentos oficiales' };
   await wait(450, signal);
+  if (a.clarify) {
+    yield { type: 'clarify', ...a.clarify };
+    yield { type: 'done', messageId: crypto.randomUUID(), latencyMs: Math.round(performance.now() - t0) };
+    return;
+  }
   if (a.unknown) {
     yield { type: 'status', label: en ? 'Checking relevance' : 'Comprobando relevancia' };
     await wait(300, signal);
@@ -339,6 +376,10 @@ export const controlSet: ControlCase[] = [
   { id: 'C14', q: '¿Qué becas hay?', lang: 'es', expect: 'd2' },
   { id: 'C15', q: 'When does the next semester start?', lang: 'en', expect: 'd1' },
   { id: 'C21', q: '¿Qué documentos tienes?', lang: 'es', expect: 'inventario' },
+  { id: 'C23', q: 'Residencias', lang: 'es', expect: 'aclaracion' },
+  { id: 'C24', q: 'labs', lang: 'en', expect: 'aclaracion' },
+  { id: 'C25', q: '¿Cuánto cuesta la matrícula?', lang: 'es', expect: 'd3' },
+  { id: 'C26', q: 'How much is enrollment?', lang: 'en', expect: 'd3' },
   { id: 'C16', q: '¿Cuál es el sueldo del rector?', lang: 'es', expect: 'no_se' },
   { id: 'C17', q: '¿Qué clima hará mañana en Urcuquí?', lang: 'es', expect: 'no_se' },
   { id: 'C18', q: 'Tell me a joke', lang: 'en', expect: 'no_se' },
@@ -375,9 +416,9 @@ export async function runControl(onProgress?: (done: number) => void): Promise<C
     const t0 = performance.now();
     const a = answerFor(c.q, c.lang);
     await wait(60);
-    const got = a.unknown ? 'no_se' : a.entryId === 'inventario' ? 'inventario' : a.sources.map((s) => s.docId).join(',');
-    const ok = c.expect === 'no_se' ? !!a.unknown : c.expect === 'inventario' ? a.entryId === 'inventario' : a.sources.some((s) => s.docId === c.expect);
-    out.push({ ...c, got, ok, hallucination: !a.unknown && a.sources.length === 0 && a.entryId !== 'inventario', ms: Math.round(performance.now() - t0) + 620 });
+    const got = a.unknown ? 'no_se' : a.clarify ? 'aclaracion' : a.entryId === 'inventario' ? 'inventario' : a.sources.map((s) => s.docId).join(',');
+    const ok = c.expect === 'no_se' ? !!a.unknown : c.expect === 'aclaracion' ? !!a.clarify : c.expect === 'inventario' ? a.entryId === 'inventario' : a.sources.some((s) => s.docId === c.expect);
+    out.push({ ...c, got, ok, hallucination: !a.unknown && !a.clarify && a.sources.length === 0 && a.entryId !== 'inventario', ms: Math.round(performance.now() - t0) + 620 });
     onProgress?.(out.length);
   }
   return out;
