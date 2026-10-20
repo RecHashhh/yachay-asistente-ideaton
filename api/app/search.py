@@ -1,8 +1,4 @@
-"""Búsqueda híbrida: texto completo en PostgreSQL (español sin tildes) + vectores, fusionados con RRF.
-
-Los vectores están en la columna `embedding` de `chunks` y se comparan en memoria (1.400 fragmentos: milisegundos).
-En producción, con pgvector, la parte vectorial pasa a `ORDER BY embedding <=> :q LIMIT k` sin cambiar el resto.
-"""
+"""Búsqueda híbrida en PostgreSQL: texto completo (español sin tildes) + vectores con pgvector (HNSW), fusionados con RRF."""
 
 import re
 import threading
@@ -40,42 +36,35 @@ class Hit:
 
 
 class _Vectors:
-    """Matriz normalizada de embeddings de los fragmentos vigentes (se recarga si cambian los documentos)."""
+    """Búsqueda vectorial en PostgreSQL con pgvector (índice HNSW, distancia coseno). Aquí solo vive el modelo de la consulta."""
 
     def __init__(self) -> None:
-        self.ids: list[str] = []
-        self.matrix: np.ndarray | None = None
         self.model = None
         self.lock = threading.Lock()
 
     def load(self) -> None:
-        with conn() as c:
-            rows = c.execute(
-                "SELECT c.id, c.embedding FROM chunks c JOIN documents d ON d.id = c.doc_id "
-                "WHERE d.is_current AND d.status = 'indexado' AND c.embedding IS NOT NULL"
-            ).fetchall()
-        with self.lock:
-            self.ids = [r["id"] for r in rows]
-            if rows:
-                m = np.array([r["embedding"] for r in rows], dtype=np.float32)
-                self.matrix = m / np.linalg.norm(m, axis=1, keepdims=True)
-            else:
-                self.matrix = None
+        """Precarga el modelo de embeddings para que la primera consulta no espere la carga."""
+        self.embed("precarga")
 
     def embed(self, text: str) -> np.ndarray:
-        if self.model is None:
-            from fastembed import TextEmbedding
+        with self.lock:
+            if self.model is None:
+                from fastembed import TextEmbedding
 
-            self.model = TextEmbedding(settings.embedding_model, cache_dir=str(API_DIR / ".cache"))
+                self.model = TextEmbedding(settings.embedding_model, cache_dir=str(API_DIR / ".cache"))
         v = np.array(next(iter(self.model.embed([text]))), dtype=np.float32)
         return v / np.linalg.norm(v)
 
     def search(self, text: str, k: int) -> list[tuple[str, float]]:
-        if self.matrix is None:
-            return []
-        sims = self.matrix @ self.embed(text)
-        idx = np.argsort(-sims)[:k]
-        return [(self.ids[i], float(sims[i])) for i in idx]
+        q = "[" + ",".join(f"{x:.6f}" for x in self.embed(text)) + "]"
+        with conn() as c:
+            c.execute("SET hnsw.ef_search = 60")
+            rows = c.execute(
+                "SELECT c.id, 1 - (c.embedding <=> %s::vector) AS cos FROM chunks c JOIN documents d ON d.id = c.doc_id "
+                "WHERE d.is_current AND d.status = 'indexado' AND c.embedding IS NOT NULL ORDER BY c.embedding <=> %s::vector LIMIT %s",
+                (q, q, k),
+            ).fetchall()
+        return [(r["id"], float(r["cos"])) for r in rows]
 
 
 vectors = _Vectors()

@@ -1,0 +1,161 @@
+[
+  {
+    "width": 1440,
+    "height": 1000,
+    "docWidth": 1440,
+    "hello": {
+      "client": 944,
+      "scroll": 944,
+      "firstTop": 279.53125
+    },
+    "buttons": [
+      {
+        "name": "Adjuntar imagen o PDF",
+        "width": 34,
+        "height": 34
+      },
+      {
+        "name": "Capturar pantalla",
+        "width": 34,
+        "height": 34
+      },
+      {
+        "name": "Dictar por voz",
+        "width": 34,
+        "height": 34
+      },
+      {
+        "name": "Voz\n— Modo voz: conversar con Yachi hablando",
+        "width": 71.140625,
+        "height": 34
+      },
+      {
+        "name": "Enviar",
+        "width": 38,
+        "height": 38
+      }
+    ]
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "docWidth": 390,
+    "hello": {
+      "client": 788,
+      "scroll": 788,
+      "firstTop": 120.75
+    },
+    "buttons": [
+      {
+        "name": "Adjuntar imagen o PDF",
+        "width": 34,
+        "height": 34
+      },
+      {
+        "name": "Capturar pantalla",
+        "width": 34,
+        "height": 34
+      },
+      {
+        "name": "Dictar por voz",
+        "width": 34,
+        "height": 34
+      },
+      {
+        "name": "Voz\n— Modo voz: conversar con Yachi hablando",
+        "width": 71.140625,
+        "height": 34
+      },
+      {
+        "name": "Enviar",
+        "width": 38,
+        "height": 38
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "height": 568,
+    "docWidth": 320,
+    "hello": {
+      "client": 512,
+      "scroll": 589,
+      "firstTop": -21.15625
+    },
+    "buttons": [
+      {
+        "name": "Adjuntar imagen o PDF",
+        "width": 34,
+        "height": 34
+      },
+      {
+        "name": "Capturar pantalla",
+        "width": 34,
+        "height": 34
+      },
+      {
+        "name": "Dictar por voz",
+        "width": 34,
+        "height": 34
+      },
+      {
+        "name": "Voz\n— Modo voz: conversar con Yachi hablando",
+        "width": 71.140625,
+        "height": 34
+      },
+      {
+        "name": "Enviar",
+        "width": 38,
+        "height": 38
+      }
+    ]
+  },
+  {
+    "width": 390,
+    "height": 400,
+    "docWidth": 390,
+    "hello": {
+      "client": 344,
+      "scroll": 484,
+      "firstTop": -83.484375
+    },
+    "buttons": [
+      {
+        "name": "Adjuntar imagen o PDF",
+        "width": 34,
+        "height": 34
+      },
+      {
+        "name": "Capturar pantalla",
+        "width": 34,
+        "height": 34
+      },
+      {
+        "name": "Dictar por voz",
+        "width": 34,
+        "height": 34
+      },
+      {
+        "name": "Voz\n— Modo voz: conversar con Yachi hablando",
+        "width": 71.140625,
+        "height": 34
+      },
+      {
+        "name": "Enviar",
+        "width": 38,
+        "height": 38
+      }
+    ]
+  },
+  {
+    "escapeClosesMobileMenu": false
+  },
+  {
+    "adminText": "Base de conocimiento\nDocumentos\nSubir\nTemas\nTendencias\nSin respuesta\nValidación\nCosto\nauditoria@yachaytech.edu.ec\nSalir\nDocumentos\n\nLo que Yachi usa para responder. Solo se usa la versión vigente de cada documento.\n\nSubir documento\n9\ndocumentos activos\n317\nfragmentos indexados\n0\nen proceso\n0\ncon más de un año (revisar)\nDocumento\tTema\tVersión\tFecha del documento\tOrigen\tEstado\t\nAcciones\n\n\npdf\nCalendario académico 2026-2027\nReemplaza v1\tCalendario académico\tv2\t2026-08-12\tPágina web\tIndexado · 38\t\nNueva versión\n\n\npdf\nReglamento de becas\n\tBecas y ayudas\t2025-3\t2025-11-20\tPágina web\tIndexado · 64\t\nNueva versión\n\n\nxlsx\nAranceles y valores de matrícula\n\tAdmisión y matrícula\tv1\t2026-07-01\tInterno\tIndexado · 12\t\nNueva versión\n\n\ncsv\nHorarios y ubicaciones de servicios\n\tCampus y ubicaciones\tv4\t2026-09-28\tInterno\tIndexado · 9\t\nNueva versión\n\n\npdf\nGuía de trámites estudiantiles\n\tTrámites académicos\tv1\t2026-03-15\tPágina web\tIndexado · 27\t\nNueva versión\n\n\npdf\nReglamento de régimen académico\n\tTrámites académicos\t2026-1\t2026-02-10\tPágina web\tIndexado · 112\t\nNueva versión\n\n\npdf\nReglamento de residencias universitarias\n\tCampus y ubicaciones\tv3\t2026-05-04\tPágina web\tIndexado · 31\t\nNueva versión\n\n\npdf\nProcedimiento de uso y reserva de laboratorios\n\tCampus y ubicaciones\tv2\t2026-04-18\tInterno\tIndexado · 18\t\nNueva versión\n\n\nxlsx\nRepresentantes estudiantiles 2026\n\tRepresentación estudiantil\tv1\t2026-09-01\tPágina web\tIndexado · 6\t\nNueva versión"
+  },
+  {
+    "adminViewport": 390,
+    "documentWidth": 730,
+    "tabsWidth": 545.546875
+  }
+]

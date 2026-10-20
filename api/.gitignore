@@ -5,3 +5,4 @@ __pycache__/
 uploads/
 .cache/
 .cache-db-ok
+vendor/

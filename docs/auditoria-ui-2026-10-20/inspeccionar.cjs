@@ -1,0 +1,42 @@
+const { chromium } = require('C:/Users/Administrador/AppData/Local/npm-cache/_npx/9833c18b2d85bc59/node_modules/playwright');
+const fs = require('node:fs');
+const path = require('node:path');
+const out = __dirname;
+(async () => {
+  const browser = await chromium.launch({headless: true, channel: 'chrome'});
+  const page = await browser.newPage({viewport: {width:1440,height:1000}});
+  page.setDefaultTimeout(8000);
+  await page.goto('http://127.0.0.1:5180', {waitUntil:'domcontentloaded'});
+  await page.evaluate(()=>localStorage.setItem('yt-consent-2026-10c','1'));
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForTimeout(600);
+  const results = [];
+  for (const [width,height] of [[1440,1000],[390,844],[320,568],[390,400]]) {
+    await page.setViewportSize({width,height});
+    await page.waitForTimeout(400);
+    results.push(await page.evaluate(({width,height})=>({width,height,docWidth:document.documentElement.scrollWidth,hello:(()=>{const e=document.querySelector('.hello');return {client:e.clientHeight,scroll:e.scrollHeight,firstTop:e.querySelector('.greet').getBoundingClientRect().top}})(),buttons:[...document.querySelectorAll('.composer button')].map(e=>({name:e.getAttribute('aria-label')||e.innerText,width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height}))}),{width,height}));
+    await page.screenshot({path:path.join(out,`actual-inicio-${width}x${height}.png`)});
+  }
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('.topbar button').first().click();
+  await page.waitForTimeout(350);
+  await page.keyboard.press('Escape');
+  results.push({escapeClosesMobileMenu:!await page.locator('.app').evaluate(e=>e.classList.contains('rail-open-mobile'))});
+  await page.locator('.scrim').click({position:{x:380,y:300}});
+  await page.setViewportSize({width:1440,height:1000});
+  await page.getByRole('button',{name:'Activar tema oscuro'}).click().catch(async()=>{await page.locator('.topbar .icon-btn').last().click()});
+  await page.screenshot({path:path.join(out,'actual-oscuro.png')});
+  await page.goto('http://127.0.0.1:5180/#/admin',{waitUntil:'domcontentloaded'});
+  await page.getByLabel('Correo institucional').fill('auditoria@yachaytech.edu.ec');
+  await page.getByLabel('Contraseña',{exact:true}).fill('demo-audit');
+  await page.getByRole('button',{name:'Entrar',exact:true}).click();
+  await page.waitForTimeout(600);
+  await page.screenshot({path:path.join(out,'actual-admin.png')});
+  results.push({adminText:await page.locator('body').innerText()});
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:path.join(out,'actual-admin-movil.png')});
+  results.push(await page.evaluate(()=>({adminViewport:innerWidth,documentWidth:document.documentElement.scrollWidth,tabsWidth:document.querySelector('.tabs').getBoundingClientRect().width})));
+  fs.writeFileSync(path.join(out,'mediciones.json'),JSON.stringify(results,null,2));
+  console.log(JSON.stringify(results,null,2));
+  await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});

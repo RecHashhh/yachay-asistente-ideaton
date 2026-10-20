@@ -140,17 +140,17 @@ def main() -> None:
             )
         known = {f["doc_id"] for f in fuentes}
         rows = [ch for ch in chunks if ch["doc_id"] in known]
-        vectors: list[list[float] | None] = [None] * len(rows)
+        vectors: list[str | None] = [None] * len(rows)
         if with_embeddings:
             from fastembed import TextEmbedding
 
             print(f"Calculando embeddings de {len(rows)} fragmentos con {settings.embedding_model} (la primera vez descarga el modelo)…")
             model = TextEmbedding(settings.embedding_model, cache_dir=str(API_DIR / ".cache"))
             texts = [f"{ch.get('seccion', '')}\n{ch['texto'][:2000]}" for ch in rows]
-            vectors = [[round(float(x), 6) for x in v] for v in model.embed(texts, batch_size=64)]
+            vectors = ["[" + ",".join(f"{float(x):.6f}" for x in v) + "]" for v in model.embed(texts, batch_size=64)]
         with c.cursor() as cur:
             cur.executemany(
-                "INSERT INTO chunks (id, doc_id, ord, seccion, texto, tokens, embedding) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                "INSERT INTO chunks (id, doc_id, ord, seccion, texto, tokens, embedding) VALUES (%s,%s,%s,%s,%s,%s,%s::vector)",
                 [
                     (ch["chunk_id"], ch["doc_id"], int(str(ch["chunk_id"]).rsplit("#", 1)[-1]) if "#" in str(ch["chunk_id"]) else i,
                      ch.get("seccion") or "", ch["texto"], int(ch.get("tokens_aprox") or 0), vectors[i])

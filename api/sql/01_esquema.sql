@@ -2,6 +2,7 @@
 
 CREATE EXTENSION IF NOT EXISTS unaccent;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS vector;   -- pgvector (instalado por scripts/crear_base.ps1)
 
 -- Búsqueda de texto en español sin tildes: "matricula" encuentra "matrícula".
 DO $$ BEGIN
@@ -48,11 +49,12 @@ CREATE TABLE IF NOT EXISTS chunks (
   texto     text NOT NULL,
   tokens    integer NOT NULL DEFAULT 0,
   tsv       tsvector GENERATED ALWAYS AS (to_tsvector('es_unaccent', coalesce(seccion, '') || ' ' || texto)) STORED,
-  -- Vector del modelo de embeddings (384 dimensiones). En producción: columna vector(384) de pgvector con índice HNSW.
-  embedding real[]
+  -- Vector del modelo de embeddings multilingüe (384 dimensiones), con índice HNSW por similitud coseno.
+  embedding vector(384)
 );
 CREATE INDEX IF NOT EXISTS chunks_tsv_idx ON chunks USING gin (tsv);
 CREATE INDEX IF NOT EXISTS chunks_doc_idx ON chunks (doc_id);
+CREATE INDEX IF NOT EXISTS chunks_embedding_hnsw ON chunks USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 
 -- Lugares con coordenadas reales (puntos importantes y zonas de aulas).
 CREATE TABLE IF NOT EXISTS places (

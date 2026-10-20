@@ -1,0 +1,124 @@
+{
+  "checks": [
+    "8 pantallas capturadas en escritorio",
+    "7 pantallas sin desbordamiento a 320 y 390 px",
+    "checklist",
+    "estado de voz simulado",
+    "búsqueda y estado vacío",
+    "Escape y retorno de foco del menú propuesto",
+    "sin errores JavaScript"
+  ],
+  "results": [
+    {
+      "view": "home",
+      "width": 1440,
+      "documentWidth": 1440
+    },
+    {
+      "view": "answer",
+      "width": 1440,
+      "documentWidth": 1440
+    },
+    {
+      "view": "mobile",
+      "width": 1440,
+      "documentWidth": 1440
+    },
+    {
+      "view": "unknown",
+      "width": 1440,
+      "documentWidth": 1440
+    },
+    {
+      "view": "voice",
+      "width": 1440,
+      "documentWidth": 1440
+    },
+    {
+      "view": "admin",
+      "width": 1440,
+      "documentWidth": 1440
+    },
+    {
+      "view": "upload",
+      "width": 1440,
+      "documentWidth": 1440
+    },
+    {
+      "view": "notice",
+      "width": 1440,
+      "documentWidth": 1440
+    },
+    {
+      "view": "home",
+      "width": 390,
+      "documentWidth": 390
+    },
+    {
+      "view": "answer",
+      "width": 390,
+      "documentWidth": 390
+    },
+    {
+      "view": "unknown",
+      "width": 390,
+      "documentWidth": 390
+    },
+    {
+      "view": "voice",
+      "width": 390,
+      "documentWidth": 390
+    },
+    {
+      "view": "admin",
+      "width": 390,
+      "documentWidth": 390
+    },
+    {
+      "view": "upload",
+      "width": 390,
+      "documentWidth": 390
+    },
+    {
+      "view": "notice",
+      "width": 390,
+      "documentWidth": 390
+    },
+    {
+      "view": "home",
+      "width": 320,
+      "documentWidth": 320
+    },
+    {
+      "view": "answer",
+      "width": 320,
+      "documentWidth": 320
+    },
+    {
+      "view": "unknown",
+      "width": 320,
+      "documentWidth": 320
+    },
+    {
+      "view": "voice",
+      "width": 320,
+      "documentWidth": 320
+    },
+    {
+      "view": "admin",
+      "width": 320,
+      "documentWidth": 320
+    },
+    {
+      "view": "upload",
+      "width": 320,
+      "documentWidth": 320
+    },
+    {
+      "view": "notice",
+      "width": 320,
+      "documentWidth": 320
+    }
+  ],
+  "errors": []
+}
