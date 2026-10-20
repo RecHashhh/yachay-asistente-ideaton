@@ -36,7 +36,7 @@ Leyenda: ✅ hecho y verificado · 🟡 hecho en parte o sin verificar con el si
 
 | Sección | Requisito | Estado | Nota |
 |---|---|---|---|
-| 4.1 | Relevar y estructurar la información | ✅ | Corpus del equipo + 3 tablas corregidas a mano (cambios de carrera, cambio de IES, postulación) tras auditoría automática de 31 PDF |
+| 4.1 | Relevar y estructurar la información | ✅ | Corpus del equipo (ahora 73 documentos, 1.452 fragmentos) + 3 tablas corregidas a mano tras auditoría automática de 31 PDF + becas (7 tipos y reglamento) y horario de buses 2026 agregados desde la web pública |
 | 4.2 | Arquitectura que responda solo con fuentes verificadas | 🟡 | Diseñada e implementada (9 capas); falta medirla con el modelo real |
 | 4.3 | Interfaz amigable ES/EN | ✅ | |
 | 4.4 | Validación teórica de veracidad | 🟡 | Mecanismo y set de 34 preguntas reales listos; **falta correrlo contra el sistema real** |
@@ -72,7 +72,7 @@ Leyenda: ✅ hecho y verificado · 🟡 hecho en parte o sin verificar con el si
 
 | Métrica | Dónde se mide | Valor actual |
 |---|---|---|
-| Exactitud total | Portal → Validación | 100 % **en el simulador** (26 casos); real: pendiente |
+| Exactitud total | Portal → Validación | 100 % **en el simulador** (26 casos); set real: 40 preguntas listas, ejecución pendiente |
 | Citación correcta | Portal → Validación | 100 % simulador; real: pendiente |
 | "Sin información" correcto | Portal → Validación | 100 % simulador; real: pendiente |
 | Alucinaciones (respuestas sin fuente) | Portal → Validación | 0 simulador; real: pendiente |
@@ -80,14 +80,14 @@ Leyenda: ✅ hecho y verificado · 🟡 hecho en parte o sin verificar con el si
 | Latencia p50 / p95 | Validación y cada respuesta | Simulador ~1 s; real: pendiente |
 | Accesibilidad WCAG 2.2 AA | axe-core | **0 violaciones** (real, todas las pantallas) |
 | Costo por consulta / mes | Portal → Costo | $0,00031 · ≈ $54/mes (precios verificados) |
-| Calidad del corpus | Auditoría de tablas | 28/31 PDF públicos limpios; 3 corregidos a mano; 3 avisos restantes son falsos positivos |
+| Calidad del corpus | Auditoría de tablas | 28/31 PDF públicos limpios; 3 corregidos a mano; 3 avisos restantes son falsos positivos; 0 fragmentos > 1.200 tokens |
 
 ## E. Riesgos y huecos detectados
 
 1. **El backend no se ha ejecutado** contra la base: cualquier defecto aparecerá al cargarlo. Prioridad 1.
 2. **Paso a paso estructurado**: con el modelo real los trámites salen como lista en el texto, no como la tarjeta interactiva del simulador. Se puede pedir al modelo una salida estructurada para trámites (mejora de calidad técnica).
 3. **Versión y fecha del documento**: el corpus no trae versión ni fecha de emisión para la mayoría; la interfaz debería decir "consultado el …" y el equipo podría completar `version`/`fecha` en `fuentes.csv`.
-4. **Faltan documentos clave**: Reglamento de Admisión y Nivelación (y 3 más con error 401), tipos de becas, horario de buses.
+4. **Faltan documentos clave**: Reglamento Interno de Admisión y Nivelación y Manual COBUS (SharePoint exige sesión institucional) y ACSU-SE-02 No. 003-2024 (enlace caducado). Becas y buses **ya se agregaron**. El buzón FEYT existe pero exige sesión institucional.
 5. **Datos sensibles en el corpus**: la tabla de cambios de carrera contiene correos de personas (decanatos). Son públicos en la web de la universidad, pero conviene confirmarlo frente a la LOPDP antes de publicar.
 6. **"Confesionario"** sin definir.
 

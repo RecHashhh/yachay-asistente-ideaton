@@ -28,7 +28,7 @@ _TOPIC_RULES = [
     (r"calendario", "academico"),
     (r"cambio|retiro|tercera|reingreso|cambio_de_ies|certificados|titulacion|faq_registros|medico_tratando|practicas|regimen_academico|instructivo_de_postulacion", "tramites"),
     (r"beca|bienestar|prevencion|riesgos_psicosociales|siniestro|clubes", "bienestar"),
-    (r"residencia|conoce_el_campus|biblioteca|servicios|mapa|aulas|puntos_importantes|higiene_y_seguridad", "campus"),
+    (r"residencia|conoce_el_campus|biblioteca|servicios|mapa|aulas|puntos_importantes|higiene_y_seguridad|buses", "campus"),
     (r"representatividad|cogobierno|eleccion_del_representante", "representacion"),
     (r"oferta_academica|posgrado|escuela_de|acerca_de|estudiantes|programa_de_ingles", "admision"),
     (r"investigacion|ceish|lineamentos|proyectos", "investigacion"),
