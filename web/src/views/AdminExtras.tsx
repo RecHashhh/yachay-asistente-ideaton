@@ -238,7 +238,7 @@ export function Cost() {
 // Bandeja "Sin respuesta": lo que el asistente no supo responder o recibió voto negativo
 // ---------------------------------------------------------------------------
 
-const REASON: Record<InboxItem['reason'], string> = { sin_fuente: 'Sin fuente', fuera_de_dominio: 'Fuera del ámbito', voto_negativo: 'Voto negativo' };
+const REASON: Record<InboxItem['reason'], string> = { sin_fuente: 'Sin fuente', fuera_de_dominio: 'Fuera del ámbito', voto_negativo: 'Voto negativo', no_verificada: 'Dato no verificado' };
 const FB_LABEL: Record<string, string> = { incorrecta: 'Incorrecta', desactualizada: 'Desactualizada', no_responde: 'No responde', confusa: 'Confusa' };
 
 /**
@@ -276,6 +276,7 @@ export function Inbox({ docs, onUpload, onValidate }: { docs: DocMeta[]; onUploa
         <div className="kpi"><b>{count('sin_fuente')}</b><span>sin fuente (posible documento faltante)</span></div>
         <div className="kpi"><b>{count('voto_negativo')}</b><span>con voto negativo</span></div>
         <div className="kpi"><b>{count('fuera_de_dominio')}</b><span>fuera del ámbito</span></div>
+        <div className="kpi"><b>{count('no_verificada')}</b><span>con datos no verificados en la fuente</span></div>
         <div className="kpi"><b>{items.filter((x) => x.status === 'convertida').length}</b><span>convertidas en preguntas de control</span></div>
       </div>
       <div className="row">

@@ -27,6 +27,14 @@ class Settings:
     admin_emails: tuple[str, ...] = field(default_factory=lambda: tuple(e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()))
     admin_password: str = field(default_factory=lambda: os.environ.get("ADMIN_PASSWORD", ""))
     frontend_origin: str = field(default_factory=lambda: os.environ.get("FRONTEND_ORIGIN", "http://localhost:5180"))
+    # Límite de uso del chat (OWASP LLM10). Por IP es alto porque el campus sale a internet con pocas IP compartidas.
+    rate_session_min: int = field(default_factory=lambda: int(os.environ.get("RATE_SESSION_PER_MIN", "12")))
+    rate_session_day: int = field(default_factory=lambda: int(os.environ.get("RATE_SESSION_PER_DAY", "300")))
+    rate_ip_min: int = field(default_factory=lambda: int(os.environ.get("RATE_IP_PER_MIN", "120")))
+    # Detrás de App Service o un proxy: tomar la IP del último X-Forwarded-For (lo agrega el proxy, no el cliente).
+    trust_proxy: bool = field(default_factory=lambda: os.environ.get("TRUST_PROXY", "").lower() in ("1", "true", "si"))
+    # Conservación (LOPDP): preguntas anónimas y votos; debe coincidir con el aviso de datos (web/src/config.ts).
+    retention_days: int = field(default_factory=lambda: int(os.environ.get("RETENTION_DAYS", "365")))
 
 
 settings = Settings()

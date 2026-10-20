@@ -31,6 +31,7 @@ interface Msg {
   suggestions?: string[];
   clarify?: { question: string; options: string[] };
   link?: { label: string; href: string };
+  notice?: string;
   streaming?: boolean;
   error?: string;
   vote?: 'up' | 'down';
@@ -168,6 +169,7 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
         else if (ev.type === 'clarify') patch(ai.id, () => ({ clarify: { question: ev.question, options: ev.options }, status: undefined }));
         else if (ev.type === 'sources') patch(ai.id, () => ({ sources: ev.items }));
         else if (ev.type === 'suggestions') patch(ai.id, () => ({ suggestions: ev.items }));
+        else if (ev.type === 'notice') patch(ai.id, () => ({ notice: ev.text }));
         else if (ev.type === 'link' && ev.href.startsWith('#/')) patch(ai.id, () => ({ link: { label: ev.label, href: ev.href } }));
         else if (ev.type === 'done') patch(ai.id, () => ({ serverId: ev.messageId, latencyMs: ev.latencyMs }));
         else if (ev.type === 'error') patch(ai.id, () => ({ error: ev.message }));
@@ -411,6 +413,7 @@ function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAs
         {m.unknown && <UnknownCard u={m.unknown} question={question} transcript={transcript} onShowMap={onShowMap} />}
         {m.map && mapAfter && <CampusMap action={m.map} scrollIntoView />}
         {m.error && <p className="err" role="alert">{m.error}</p>}
+        {!m.streaming && m.notice && <p className="notice-warn" role="note">{m.notice}</p>}
 
         {!m.streaming && m.sources && m.sources.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

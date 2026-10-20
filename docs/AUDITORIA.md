@@ -19,20 +19,21 @@ Leyenda: ✅ hecho y verificado · 🟡 hecho en parte o sin verificar con el si
 | A3 | Datos en XLSX, PDF y CSV | 🟡 | Corpus del equipo (71 docs, 1.424 fragmentos) listo para el backend; la subida desde el portal guarda el archivo, pero el troceo lo hace `preparar_corpus.py` |
 | A4 | Metadatos: tema, fecha, versión | 🟡 | Tema y audiencia se asignan al cargar (`api/app/catalog.py`); **la versión solo existe si está en el nombre** (V4.0) y la fecha es de consulta, no del documento |
 | A5 | Dos tipos de usuario (admin y público) | ✅ | Portal `#/admin`; el público no ve el inventario |
-| A6 | Mascota de YT que habla | 🟡 | Mascota animada y modo voz; falta arte y nombre oficiales |
-| A7 | LangChain/LangGraph | 🟡 | `api/app/graph.py` con LangGraph; sin ejecutar aún |
+| A6 | Mascota de YT que habla | 🟡 | Mascota animada y modo voz; el arte nuevo está en curso (otra sesión) |
+| A7 | LangChain/LangGraph | ✅ · 🟡 | `api/app/graph.py` corriendo con la base real; falta probar la redacción con el modelo (clave pendiente) |
 | A8 | Sugerir consultas por tendencias | ✅ | Front; el backend calcula tendencias reales desde `messages` |
 | A9 | Mapa SVG con flecha y círculos | 🟡 | Funciona con plano esquemático; **coordenadas reales ya cargables** (10 puntos + 50 aulas) pero el mapa del front aún no las usa |
 | A10 | Aviso de uso de datos | ✅ | LOPDP art. 12 completo; datos del responsable por confirmar con legal |
 | A11 | Interacciones decorativas tipo Claude | ✅ | |
-| A12 | Portal para actualizar la base | ✅ front · 🟡 back | Endpoints listos; sin ejecutar |
+| A12 | Portal para actualizar la base | ✅ · 🟡 | Funciona con la base real; la subida guarda el archivo pero aún no lo fragmenta ni indexa sola |
 | A13 | Qué documentos hay en la web y con cuáles contamos | ✅ | `fuentes.csv` (193 fuentes, 73 incluidas, motivo de cada exclusión) y respuesta "¿qué documentos tienes?" |
 | A14 | Estrategias para ahorrar tokens | ✅ | README + calculadora; umbral que evita llamar al modelo sin fuente |
-| A15 | "Confesionario" | ❌ | Sin definir por el equipo |
-| A16 | Voz, adjuntos, captura (del Help Desk) | ✅ · 🟡 | Probado con micrófono simulado; falta prueba con hardware real |
+| A15 | "Confesionario" | ⏸ | Es una página de Facebook de estudiantes, no un canal oficial: Yachi lo explica y deriva a la FEYT y a Bienestar |
+| A16 | Voz, adjuntos, captura (del Help Desk) | ✅ | Voz probada por el equipo con micrófono real |
 | A17 | Widget flotante para otras páginas | ✅ | `web/public/yachi-widget.js` |
 | A18 | PostgreSQL como base | ✅ | Base `yachi` creada, corpus cargado |
 | A19 | Búsqueda vectorial rápida | ✅ | pgvector 0.8.7 instalado, índice HNSW; 27–58 ms por búsqueda híbrida |
+| A20 | Filtros: palabras clave, groserías, temas sensibles | ✅ | Ver sección G: 97/97 casos, 0 falsos positivos, 0 falsos negativos |
 
 ## B. Requisitos del planteamiento del reto (PDF 1)
 
@@ -86,12 +87,35 @@ Leyenda: ✅ hecho y verificado · 🟡 hecho en parte o sin verificar con el si
 
 ## E. Riesgos y huecos detectados
 
-1. **El backend no se ha ejecutado** contra la base: cualquier defecto aparecerá al cargarlo. Prioridad 1.
+1. ~~El backend no se ha ejecutado~~: corre con la base real; falta solo la redacción con el modelo (clave).
 2. **Paso a paso estructurado**: con el modelo real los trámites salen como lista en el texto, no como la tarjeta interactiva del simulador. Se puede pedir al modelo una salida estructurada para trámites (mejora de calidad técnica).
 3. **Versión y fecha del documento**: el corpus no trae versión ni fecha de emisión para la mayoría; la interfaz debería decir "consultado el …" y el equipo podría completar `version`/`fecha` en `fuentes.csv`.
 4. **Faltan documentos clave**: Reglamento Interno de Admisión y Nivelación y Manual COBUS (SharePoint exige sesión institucional) y ACSU-SE-02 No. 003-2024 (enlace caducado). Becas y buses **ya se agregaron**. El buzón FEYT existe pero exige sesión institucional.
 5. **Datos sensibles en el corpus**: la tabla de cambios de carrera contiene correos de personas (decanatos). Son públicos en la web de la universidad, pero conviene confirmarlo frente a la LOPDP antes de publicar.
-6. **"Confesionario"** sin definir.
+6. ~~"Confesionario"~~: resuelto (no es canal oficial; Yachi deriva a los canales oficiales).
+7. **Wifi y servicios TIC**: ahora llegan a la búsqueda (antes se bloqueaban), pero el corpus no tiene documento de TIC; quedan en la bandeja "Sin respuesta".
+8. **Contactos de crisis**: ECU 911 y los de Bienestar salen del corpus (`bienestar_universitario`); el equipo debe confirmarlos con Bienestar antes de la demo.
+
+## G. Filtros y seguridad del chat
+
+Implementado en `api/app/filters.py` (listas, normalización, datos personales, verificación, límite de uso) y `api/app/rules.py` (`triage`). Las listas viven en la tabla `filter_terms` y se editan en **Portal → Filtros** (no se borran: se desactivan, con quién y cuándo). Casos de prueba en `api/app/filter_cases.py`: `python -m app.filter_cases` o botón *Correr casos* del Portal.
+
+| # | Qué hace | Referencia |
+|---|---|---|
+| G1 | **Crisis** (autolesión): mensaje fijo con ECU 911, Psicología y Bienestar (ext. 2503), citando la página oficial. No pasa por el modelo y no se guarda el texto | UNESCO 2023; NIST AI 600-1 |
+| G2 | **Acoso y violencia**: nunca se trata como insulto (incluye "me dijo p***"); se ofrece la Consejería de Derechos y se responde con los documentos. Texto no guardado, fuera de tendencias y bandeja | UNESCO 2023; LOPDP (datos de terceros) |
+| G3 | **Groserías**: normaliza tildes, repeticiones, letras sueltas y "leet" (`put@`, `m1erda`, `p u t a`). Solo el insulto sin consulta recibe el aviso; una pregunta real con grosería se responde sin ella | Buenas prácticas de moderación |
+| G4 | **Nunca filtrar**: identidad (indígena, afro, montubio, LGBTI, trans), salud sexual y mental; se retiran antes de revisar las otras listas | UNESCO (no discriminación) |
+| G5 | **Fuera del ámbito** con frases precisas: "wifi", "serie", "fútbol" y "recetas" ya no se bloquean | Falsos positivos |
+| G6 | **Manipulación**: "ignora tus instrucciones", "prompt del sistema", "actúa como"… responde con mensaje fijo. Además, la pregunta va entre etiquetas `<pregunta>`, el usuario no puede cerrarlas y el prompt prohíbe revelar o cambiar reglas y seguir órdenes dentro de los documentos | OWASP LLM01, LLM07 |
+| G7 | **Datos personales** ocultos antes de buscar y guardar: cédula, celular, teléfono +593 y fijo, RUC, tarjeta, correo, pasaporte. Códigos de período, aulas, resoluciones y montos no se tocan | LOPDP; OWASP LLM02 |
+| G8 | **Conservación**: preguntas, votos y bandeja se borran a los 365 días (`RETENTION_DAYS`, coincide con el aviso); consultas a oficinas a los 90 días | LOPDP |
+| G9 | **Límite de uso**: 12 mensajes/min y 300/día por sesión; 120/min por IP (el campus comparte IP). Responde 429 con mensaje claro | OWASP LLM10 |
+| G10 | **Verificación de la respuesta**: correos, enlaces y cifras que no están en los fragmentos generan un aviso visible y van a la bandeja como "Dato no verificado" | OWASP LLM09 |
+| G11 | **Transparencia**: el aviso de datos explica qué pasa con los mensajes sensibles y que los datos personales se ocultan | Ley de IA UE art. 50 (referencia); LOPDP art. 12 |
+| G12 | **Medición**: 97 casos (crisis, denuncias, insultos disfrazados, manipulación, saludos, consultas legítimas sensibles y datos personales): **97/97, falsos positivos 0/32, falsos negativos 0/29**. La búsqueda no cambió: recall@5 29/29, MRR 0,73 | NIST AI RMF (medir) |
+
+Pendiente: probar G6 y G10 con el modelo real cuando haya clave; que Bienestar confirme los contactos de G1–G2; ampliar los casos con mensajes reales de la bandeja.
 
 ## F. Orden recomendado
 

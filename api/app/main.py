@@ -1,5 +1,6 @@
 """API de Yachi. Mismo contrato que web/src/lib/types.ts: `uvicorn app.main:app --port 8000`."""
 
+import asyncio
 import json
 import re
 import secrets
@@ -9,22 +10,42 @@ from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import graph, rules
+from . import filters, graph, rules
 from .config import API_DIR, settings
 from .db import conn, open_pool
 from .search import vectors
+
+
+def purge() -> None:
+    """Conservación limitada (LOPDP): borra preguntas y votos viejos, y las consultas a oficinas vencidas."""
+    with conn() as c:
+        c.execute("DELETE FROM feedback WHERE created_at < now() - make_interval(days => %s)", (settings.retention_days,))
+        c.execute("DELETE FROM messages WHERE created_at < now() - make_interval(days => %s)", (settings.retention_days,))
+        c.execute("DELETE FROM unanswered WHERE last_at < now() - make_interval(days => %s) AND status <> 'convertida'", (settings.retention_days,))
+        c.execute("DELETE FROM inquiries WHERE delete_after < now()")
+
+
+async def _purge_loop() -> None:
+    while True:
+        try:
+            await asyncio.to_thread(purge)
+        except Exception as e:
+            print("Error al depurar datos vencidos:", repr(e))
+        await asyncio.sleep(6 * 3600)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     open_pool()
     vectors.load()
+    task = asyncio.create_task(_purge_loop())
     yield
+    task.cancel()
 
 
 app = FastAPI(title="Yachi API", version="0.1.0", lifespan=lifespan)
@@ -44,9 +65,20 @@ class ChatRequest(BaseModel):
     history: list[Turn] = []
 
 
+def client_ip(request: Request) -> str:
+    if settings.trust_proxy and (xff := request.headers.get("x-forwarded-for")):
+        return xff.split(",")[-1].strip().rsplit(":", 1)[0]
+    return request.client.host if request.client else "?"
+
+
 @app.post("/chat")
-async def chat(req: ChatRequest):
+async def chat(req: ChatRequest, request: Request):
     lang = req.lang if req.lang in ("es", "en", "qu") else "es"
+    ip = client_ip(request)
+    if not (filters.allow(f"ip:{ip}", settings.rate_ip_min, 60) and filters.allow(f"s:{req.sessionId}", settings.rate_session_min, 60)
+            and filters.allow(f"d:{req.sessionId}", settings.rate_session_day, 86_400)):
+        msg = "Estás enviando muchos mensajes seguidos. Espera un minuto y vuelve a intentarlo." if lang != "en" else "You are sending too many messages. Please wait a minute and try again."
+        raise HTTPException(429, msg, headers={"Retry-After": "60"})
 
     async def events():
         try:
@@ -86,10 +118,12 @@ def trends(lang: str = "es"):
         rows = c.execute(
             """SELECT m.question, count(*) AS n, (SELECT d.topic_id FROM documents d WHERE d.id = (array_agg(m.doc_ids[1]))[1]) AS topic
                FROM messages m WHERE m.kind IN ('respuesta','lugar') AND m.lang = %s AND m.created_at > now() - interval '7 days'
-               GROUP BY m.question ORDER BY n DESC LIMIT 6""",
+                 AND m.question NOT LIKE '%%omitid%%'
+               GROUP BY m.question HAVING count(DISTINCT m.session_id) >= 3 ORDER BY n DESC LIMIT 6""",
             (lang,),
         ).fetchall()
-    out = [{"query": r["question"], "topicId": r["topic"] or "tramites", "count": r["n"], "delta": 0} for r in rows if r["n"] >= 2]
+    # Tendencia = pregunta de al menos 3 personas distintas (k-anonimato básico): nunca se publica la pregunta de una sola persona.
+    out = [{"query": r["question"], "topicId": r["topic"] or "tramites", "count": r["n"], "delta": 0} for r in rows]
     for es, en, topic in FALLBACK_TRENDS:  # completa con preguntas frecuentes curadas mientras no haya uso real
         if len(out) >= 6:
             break
@@ -258,6 +292,64 @@ def admin_unanswered_patch(item_id: str, p: InboxPatch, _: str = Depends(admin))
     with conn() as c:
         c.execute("UPDATE unanswered SET status = coalesce(%s, status), control_id = coalesce(%s, control_id) WHERE id = %s", (p.status, p.controlId, item_id))
     return {"ok": True}
+
+
+# ------------------------------------------------------------------ filtros (editables por el equipo)
+
+FILTER_CATEGORIES = ("crisis", "denuncia", "manipulacion", "profanidad", "fuera_de_dominio", "permitido")
+
+
+@app.get("/admin/filters")
+def admin_filters(_: str = Depends(admin)):
+    with conn() as c:
+        rows = c.execute("SELECT category, term, active, note, updated_by, updated_at FROM filter_terms ORDER BY category, term").fetchall()
+    return [{"category": r["category"], "term": r["term"], "active": r["active"], "note": r["note"], "updatedBy": r["updated_by"],
+             "updatedAt": r["updated_at"].isoformat()} for r in rows]
+
+
+class FilterIn(BaseModel):
+    category: str
+    term: str = Field(min_length=2, max_length=80)
+    active: bool = True
+    note: str | None = Field(default=None, max_length=200)
+
+
+@app.post("/admin/filters")
+def admin_filter_upsert(f: FilterIn, who: str = Depends(admin)):
+    """Agrega o activa/desactiva un término. No se borran: desactivar deja el registro de quién y cuándo (trazabilidad)."""
+    if f.category not in FILTER_CATEGORIES:
+        raise HTTPException(400, "Categoría inválida")
+    term = " ".join(f.term.lower().split())
+    if filters._term_regex([term]) is None:
+        raise HTTPException(400, "Término vacío")
+    with conn() as c:
+        c.execute(
+            """INSERT INTO filter_terms (category, term, active, note, updated_by) VALUES (%s,%s,%s,%s,%s)
+               ON CONFLICT (category, term) DO UPDATE SET active = EXCLUDED.active, note = coalesce(EXCLUDED.note, filter_terms.note),
+                 updated_by = EXCLUDED.updated_by, updated_at = now()""",
+            (f.category, term, f.active, f.note, who),
+        )
+    filters.invalidate()
+    return {"ok": True, "term": term}
+
+
+class FilterCheck(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+
+
+@app.post("/admin/filters/check")
+def admin_filter_check(b: FilterCheck, _: str = Depends(admin)):
+    """Prueba una frase: qué ruta toma y qué término la activó (sin llamar al modelo)."""
+    t = rules.triage(b.text, "es")
+    v = filters.classify(filters.redact(b.text))
+    return {"route": t.route, "kind": t.kind, "matched": v.matched, "question": t.question, "sensitive": t.sensitive}
+
+
+@app.post("/admin/filters/test")
+def admin_filter_test(_: str = Depends(admin)):
+    """Corre los casos de prueba de filtros (app/filter_cases.py) con las listas activas."""
+    from .filter_cases import run
+    return run()
 
 
 class CaseIn(BaseModel):

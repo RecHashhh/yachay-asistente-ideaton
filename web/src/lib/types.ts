@@ -126,6 +126,8 @@ export type StreamEvent =
   | { type: 'clarify'; question: string; options: string[] }
   | { type: 'sources'; items: Source[] }
   | { type: 'suggestions'; items: string[] }
+  /** Aviso sobre la respuesta, p. ej. cifras o enlaces que no aparecen textualmente en los documentos citados. */
+  | { type: 'notice'; level: 'warn'; text: string }
   /** Botón de acción dentro de la respuesta, p. ej. abrir "Documentos disponibles". Solo rutas internas (#/...). */
   | { type: 'link'; label: string; href: string }
   | { type: 'done'; messageId: string; cached?: boolean; latencyMs?: number }

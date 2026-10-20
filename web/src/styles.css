@@ -240,6 +240,8 @@ td .t{font-weight:600}
 .progress{height:6px;border-radius:999px;background:var(--surface-2);overflow:hidden}
 .progress > i{display:block;height:100%;width:100%;background:var(--accent);border-radius:inherit;transform-origin:left;transition:transform .2s}
 .err{color:var(--crit);font-size:13.5px}
+.filter-terms{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.notice-warn{margin:8px 0 0;padding:8px 12px;border-radius:10px;background:var(--warm-soft);color:var(--warm-ink);font-size:13.5px;line-height:1.45}
 .bars{display:flex;flex-direction:column;gap:10px}
 .bar{display:grid;grid-template-columns:minmax(0,1fr) 60px 56px;gap:12px;align-items:center;font-size:14px}
 .bar .track{grid-column:1/-1;height:6px;border-radius:999px;background:var(--surface-2);overflow:hidden;margin-top:-4px}
@@ -295,6 +297,9 @@ td .t{font-weight:600}
   .composer-wrap{padding-inline:16px}
   .admin-main{padding:16px}
   .admin-top{padding-inline:16px}
+  /* 8 secciones no caben: la barra de pestañas baja a su propia fila y se desplaza en horizontal. */
+  .admin-top .tabs{order:10;flex:1 0 100%;max-width:100%;overflow-x:auto;scrollbar-width:none}
+  .admin-top .tabs button{flex:none}
 }
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}

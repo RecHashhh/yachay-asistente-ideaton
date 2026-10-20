@@ -4,7 +4,7 @@
  * solo para que la demo funcione entre el chat y el portal sin servidor.
  */
 
-export type InboxReason = 'sin_fuente' | 'fuera_de_dominio' | 'voto_negativo';
+export type InboxReason = 'sin_fuente' | 'fuera_de_dominio' | 'voto_negativo' | 'no_verificada';
 export type InboxStatus = 'nuevo' | 'convertida' | 'descartada';
 /** Motivo que elige el estudiante al marcar 👎. */
 export type FeedbackReason = 'incorrecta' | 'desactualizada' | 'no_responde' | 'confusa';

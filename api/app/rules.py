@@ -4,11 +4,8 @@ import re
 import unicodedata
 from dataclasses import dataclass
 
+from . import filters
 from .db import conn
-
-OUT_OF_DOMAIN = re.compile(
-    r"\b(clima|tiempo hara|futbol|receta|chiste|bitcoin|cripto|pelicula|serie|horoscopo|wifi|contrasena del wifi|weather|football|recipe|joke|movie|crypto|horoscope)\b"
-)
 
 CLARIFY = [
     (re.compile(r"(residenc|housing|dorm|residence)"),
@@ -40,10 +37,6 @@ THANKS = re.compile(
     r"^(muchas |mil )?(gracias|grax|thanks?( you)?|thx|ok|okay|okey|vale|listo|perfecto|genial|chevere|de acuerdo|entendido|yupaychani"
     r"|adios|chao|bye|hasta luego|nos vemos)( (muchas gracias|gracias|yachi|thanks|bye))*$"
 )
-PROFANITY = re.compile(
-    r"\b(chupa(la|lo|me|mela)|verga\w*|puta\w*|puto|mierda\w*|hijueputa|hdp|idiota|estupid\w*|imbecil\w*|pendej\w*|cabron\w*|marica|maricon\w*"
-    r"|carajo|culo|cojud\w*|huev[oa]n\w*|malparid\w*|fuck\w*|shit\w*|bitch\w*|asshole|stupid|idiot)\b"
-)
 GREET_PREFIX = re.compile(r"^(hola+|buen[oa]s?( (dias|tardes|noches))?|hey|hi|hello|imanalla|yachi)( yachi)? ")
 
 START_OPTIONS = [
@@ -59,9 +52,20 @@ SMALLTALK = {
                "en": "You're welcome! If you have another question about the university, I'm here."},
     "respeto": {"es": "Prefiero que mantengamos un trato respetuoso. Estoy para ayudarte con trámites, normativa, servicios y lugares de la universidad. ¿Qué necesitas?",
                 "en": "Let's keep it respectful. I'm here to help with university procedures, regulations, services and places. What do you need?"},
+    "manipulacion": {"es": "Solo respondo con los documentos oficiales de la universidad y no puedo cambiar estas reglas. ¿Qué trámite, norma o lugar necesitas?",
+                     "en": "I only answer from the university's official documents and cannot change these rules. Which procedure, rule or place do you need?"},
+    "confesionario": {"es": "El Confesionario es una página de Facebook de estudiantes, no un canal oficial de Yachay Tech: Yachi no publica ni lee confesiones. Si quieres plantear una queja, una sugerencia o una denuncia por un canal oficial, puedes hacerlo ante la FEYT o en Bienestar Universitario.",
+                      "en": "The Confesionario is a students' Facebook page, not an official Yachay Tech channel: Yachi does not post or read confessions. To raise a complaint, suggestion or report through an official channel, contact the FEYT or Student Wellbeing."},
     "vacio": {"es": "No entendí la consulta. ¿Sobre qué trámite, norma o lugar de la universidad quieres saber?",
               "en": "I didn't get that. Which university procedure, rule or place do you want to know about?"},
 }
+CONFESIONARIO = re.compile(r"\bconfesionario|\bconfesion(es)? anonimas?")
+CONFESIONARIO_OPTIONS = [
+    {"es": "¿Cómo presento una demanda estudiantil a la FEYT?", "en": "How do I submit a student request to the FEYT?"},
+    {"es": "¿Qué canales de participación estudiantil hay?", "en": "What student participation channels are there?"},
+    {"es": "¿Qué servicios ofrece Bienestar Universitario?", "en": "What services does Student Wellbeing offer?"},
+]
+
 STOP = {"de", "la", "el", "los", "las", "un", "una", "y", "o", "a", "en", "que", "por", "para", "con", "me", "mi", "se", "es", "lo", "al", "del",
         "the", "a", "an", "of", "to", "and", "or", "in", "on", "is", "it", "my", "i", "me", "you", "si", "no", "ya", "pues", "bueno", "eh", "ah", "mmm"}
 
@@ -74,31 +78,60 @@ def norm(s: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", s)).strip()
 
 
-def out_of_domain(q: str) -> bool:
-    return bool(OUT_OF_DOMAIN.search(norm(q)))
+def _chat_norm(q: str) -> str:
+    return re.sub(r"(.)\1{2,}", r"\1", norm(q))  # "hooolaaa" → "hola"; no toca "ll" ni "rr"
 
 
-def smalltalk(q: str, lang: str) -> dict | None:
-    """Saludo, despedida, insulto o texto sin contenido: respuesta fija con opciones para empezar (sin buscar ni gastar tokens)."""
-    n = norm(q)
-    if PROFANITY.search(n):
-        kind = "respeto"
-    elif not n or GREET.match(n):
-        kind = "saludo" if n else "vacio"
-    elif THANKS.match(n):
-        kind = "cierre"
-    elif not [w for w in n.split() if w not in STOP and (len(w) > 2 or w.isdigit())]:
-        kind = "vacio"
-    else:
-        return None
+def smalltalk(q: str, lang: str, kind: str | None = None) -> dict | None:
+    """Saludo, despedida, texto sin contenido o mensaje fijo de triage: respuesta sin buscar ni gastar tokens."""
+    n = _chat_norm(q)
+    if kind is None:
+        if not n:
+            kind = "vacio"
+        elif GREET.match(n):
+            kind = "saludo"
+        elif THANKS.match(n):
+            kind = "cierre"
+        elif CONFESIONARIO.search(n):
+            kind = "confesionario"
+        elif not [w for w in n.split() if w not in STOP and (len(w) > 2 or w.isdigit())]:
+            kind = "vacio"
+        else:
+            return None
     k = "en" if lang == "en" else "es"
-    opts = [] if kind == "cierre" else [o[k] for o in START_OPTIONS]
-    return {"kind": kind, "question": SMALLTALK[kind][k], "options": opts}
+    opts = {"cierre": [], "confesionario": CONFESIONARIO_OPTIONS}.get(kind, START_OPTIONS)
+    return {"kind": kind, "question": SMALLTALK[kind][k], "options": [o[k] for o in opts]}
+
+
+@dataclass
+class Triage:
+    route: str          # crisis, smalltalk, ood, denuncia, normal
+    question: str       # texto para buscar (sin saludo ni groserías, datos personales ocultos)
+    kind: str | None = None
+    sensitive: bool = False
+
+
+def triage(q: str, lang: str) -> Triage:
+    """Orden: datos personales → crisis → denuncia → manipulación → insulto → charla → fuera del ámbito → consulta."""
+    q = filters.redact(q)
+    v = filters.classify(q)
+    if v.kind == "crisis":
+        return Triage("crisis", q, "crisis", True)
+    if v.kind == "denuncia":
+        return Triage("denuncia", strip_greeting(v.clean), "denuncia", True)
+    if v.kind in ("manipulacion", "respeto"):
+        return Triage("smalltalk", q, v.kind, v.sensitive)
+    s = smalltalk(v.clean, lang)
+    if s:
+        return Triage("smalltalk", q, s["kind"])
+    if v.kind == "fuera_de_dominio":
+        return Triage("ood", q, "fuera_de_dominio")
+    return Triage("normal", strip_greeting(v.clean))
 
 
 def strip_greeting(q: str) -> str:
     """"Hola, ¿cómo cambio de carrera?" → "¿cómo cambio de carrera?" (el saludo no debe pesar en la búsqueda)."""
-    n = norm(q)
+    n = _chat_norm(q)
     m = GREET_PREFIX.match(n + " ")
     if not m or len(n.split()) <= len(m.group(0).split()):
         return q

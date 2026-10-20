@@ -19,6 +19,11 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
 export async function* streamChat(req: ChatRequest, signal?: AbortSignal): AsyncGenerator<StreamEvent> {
   if (MOCK) { yield* mock.mockChat(req, signal); return; }
   const r = await fetch(`${API}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify(req), signal });
+  if (r.status === 429) {
+    // Límite de mensajes por minuto: el servidor explica cuánto esperar.
+    const detail = await r.json().then((b: { detail?: string }) => b.detail).catch(() => undefined);
+    throw new Error(detail ?? 'Estás enviando muchos mensajes seguidos. Espera un minuto y vuelve a intentarlo.');
+  }
   if (!r.ok || !r.body) throw new Error(`El asistente no respondió (${r.status})`);
   const reader = r.body.pipeThrough(new TextDecoderStream()).getReader();
   let buf = '';
@@ -98,6 +103,21 @@ export async function adminLogin(email: string, password: string): Promise<Admin
   return { name: r.name, email: r.email };
 }
 export const adminLogout = () => { try { sessionStorage.removeItem(ADMIN_TOKEN_KEY); } catch { /* sin almacenamiento */ } };
+
+// ---------- Filtros del chat (crisis, denuncias, groserías, manipulación, fuera del ámbito, nunca filtrar) ----------
+
+export type FilterCategory = 'crisis' | 'denuncia' | 'manipulacion' | 'profanidad' | 'fuera_de_dominio' | 'permitido';
+export interface FilterTerm { category: FilterCategory; term: string; active: boolean; note: string | null; updatedBy: string; updatedAt: string }
+export interface FilterCheck { route: string; kind: string | null; matched: string | null; question: string; sensitive: boolean }
+export interface FilterTestRow { text: string; expect: string; got: string; ok: boolean; type: 'ruta' | 'datos' }
+export interface FilterTest { total: number; ok: number; falsosPositivos: number; consultasLegitimas: number; falsosNegativos: number; casosDeRiesgo: number; rows: FilterTestRow[] }
+
+const needsBackend = <T,>(): Promise<T> => Promise.reject(new Error('Los filtros se administran con el backend en funcionamiento.'));
+export const listFilters = (): Promise<FilterTerm[]> => (MOCK ? needsBackend() : json('/admin/filters'));
+export const saveFilter = (f: { category: FilterCategory; term: string; active: boolean; note?: string }): Promise<{ term: string }> =>
+  MOCK ? needsBackend() : json('/admin/filters', { method: 'POST', body: JSON.stringify(f) });
+export const checkFilter = (text: string): Promise<FilterCheck> => (MOCK ? needsBackend() : json('/admin/filters/check', { method: 'POST', body: JSON.stringify({ text }) }));
+export const testFilters = (): Promise<FilterTest> => (MOCK ? needsBackend() : json('/admin/filters/test', { method: 'POST' }));
 
 export const listDocs = (): Promise<DocMeta[]> => (MOCK ? Promise.resolve(mock.docs.map((d) => ({ ...d }))) : json('/admin/docs'));
 
