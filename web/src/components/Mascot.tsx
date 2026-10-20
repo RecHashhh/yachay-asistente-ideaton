@@ -33,7 +33,7 @@ export function Mascot({ size = 36, mood = 'idle', decorative }: { size?: number
         style={{ originX: '32px', originY: '56px' }}
       >
         {/* cuerpo */}
-        <path d="M32 6c14 0 24 10 24 25 0 15-10 27-24 27S8 46 8 31C8 16 18 6 32 6z" fill="#24618E" />
+        <path d="M32 6c14 0 24 10 24 25 0 15-10 27-24 27S8 46 8 31C8 16 18 6 32 6z" fill="#27618E" />
         <path d="M20 12c3-3 7-4.5 12-4.5" stroke="rgba(255,255,255,.35)" strokeWidth="3" strokeLinecap="round" fill="none" />
         {/* mejillas */}
         <circle cx="17" cy="38" r="3.4" fill="var(--warm)" opacity=".55" />

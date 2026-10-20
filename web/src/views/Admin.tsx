@@ -3,11 +3,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BRAND } from '../config';
 import { Mascot } from '../components/Mascot';
 import { IcArrowLeft, IcMoon, IcSun, IcTrash, IcUpload } from '../components/icons';
-import { Cost, Validation } from './AdminExtras';
+import { Cost, Inbox, Validation } from './AdminExtras';
 import { adminLogin, adminLogout, createTopic, deleteDoc, getTopics, getTrends, listDocs, uploadDoc, type Admin as AdminUser } from '../lib/api';
 import type { DocMeta, Topic, Trend } from '../lib/types';
 
-type Tab = 'docs' | 'upload' | 'topics' | 'trends' | 'validation' | 'cost';
+type Tab = 'docs' | 'upload' | 'topics' | 'trends' | 'inbox' | 'validation' | 'cost';
 const ACCEPT = '.pdf,.xlsx,.csv';
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -45,7 +45,7 @@ export function Admin({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggleT
         <h1 className="admin-h">Base de conocimiento</h1>
         <span className="sp" />
         <nav className="tabs" aria-label="Secciones">
-          {([['docs', 'Documentos'], ['upload', 'Subir'], ['topics', 'Temas'], ['trends', 'Tendencias'], ['validation', 'Validación'], ['cost', 'Costo']] as [Tab, string][]).map(([k, l]) => (
+          {([['docs', 'Documentos'], ['upload', 'Subir'], ['topics', 'Temas'], ['trends', 'Tendencias'], ['inbox', 'Sin respuesta'], ['validation', 'Validación'], ['cost', 'Costo']] as [Tab, string][]).map(([k, l]) => (
             <button key={k} aria-pressed={tab === k} onClick={() => { setTab(k); if (k !== 'upload') setReplacing(null); }}>{l}</button>
           ))}
         </nav>
@@ -62,6 +62,7 @@ export function Admin({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggleT
           {tab === 'trends' && <Trends trends={trends} topicName={topicName} />}
           {tab === 'validation' && <Validation />}
           {tab === 'cost' && <Cost />}
+          {tab === 'inbox' && <Inbox docs={docs} onUpload={() => { setReplacing(null); setTab('upload'); }} onValidate={() => setTab('validation')} />}
         </motion.main>
       </AnimatePresence>
     </div>

@@ -1,4 +1,5 @@
 import { findPlace, placeName } from './campus';
+import { recordUnanswered } from './inbox';
 import type { ChatRequest, DocMeta, Procedure, PublicDoc, Source, StreamEvent, Topic, Trend, Unknown, UploadInput } from './types';
 
 /**
@@ -282,6 +283,8 @@ export async function* mockChat(req: ChatRequest, signal?: AbortSignal): AsyncGe
   if (a.unknown) {
     yield { type: 'status', label: en ? 'Checking relevance' : 'Comprobando relevancia' };
     await wait(300, signal);
+    // Toda pregunta sin respuesta entra a la bandeja del portal (Admin → Sin respuesta).
+    recordUnanswered(req.message, req.lang, a.unknown.reason);
     yield { type: 'unknown', item: a.unknown };
     yield { type: 'suggestions', items: a.follow };
     yield { type: 'done', messageId: crypto.randomUUID(), latencyMs: Math.round(performance.now() - t0) };
@@ -342,6 +345,21 @@ export const controlSet: ControlCase[] = [
   { id: 'C19', q: '¿Puedo llevar mascotas a la residencia?', lang: 'es', expect: 'no_se' },
   { id: 'C20', q: '¿Cuánto cuesta el parqueadero?', lang: 'es', expect: 'no_se' },
 ];
+
+// Preguntas de control creadas desde la bandeja "Sin respuesta" (en el simulador se guardan en el navegador).
+const EXTRA_KEY = 'yt-mock-control-extra';
+try { controlSet.push(...(JSON.parse(localStorage.getItem(EXTRA_KEY) ?? '[]') as ControlCase[])); } catch { /* sin almacenamiento */ }
+
+export function addControlCase(c: Omit<ControlCase, 'id'>): ControlCase {
+  const n = controlSet.reduce((m, x) => Math.max(m, Number(x.id.replace(/\D/g, '')) || 0), 0) + 1;
+  const item = { ...c, id: `C${String(n).padStart(2, '0')}` };
+  controlSet.push(item);
+  try {
+    const extra = JSON.parse(localStorage.getItem(EXTRA_KEY) ?? '[]') as ControlCase[];
+    localStorage.setItem(EXTRA_KEY, JSON.stringify([...extra, item]));
+  } catch { /* sin almacenamiento */ }
+  return item;
+}
 
 export interface ControlResult extends ControlCase {
   got: string;

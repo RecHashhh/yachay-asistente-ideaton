@@ -18,11 +18,11 @@
   var host = (me && me.dataset.host) || (me ? new URL(me.src).origin : location.origin);
   var lang = (me && me.dataset.lang) || ((navigator.language || 'es').toLowerCase().indexOf('en') === 0 ? 'en' : 'es');
   var greet = me && me.dataset.greet !== undefined ? me.dataset.greet : lang === 'en' ? 'Hi! Need help with a procedure?' : '¡Hola! ¿Te ayudo con algún trámite?';
-  var BLUE = '#24618E';
+  var BLUE = '#27618E';
 
   var css = '' +
     '.yw-btn{position:fixed;right:20px;bottom:20px;width:60px;height:60px;border-radius:50%;border:0;background:' + BLUE + ';box-shadow:0 6px 20px rgba(20,22,40,.25);cursor:pointer;z-index:2147483000;display:grid;place-items:center;transition:transform .2s cubic-bezier(.2,.8,.2,1)}' +
-    '.yw-btn:hover{transform:scale(1.06)}.yw-btn:focus-visible{outline:3px solid #EF9B00;outline-offset:3px}' +
+    '.yw-btn:hover{transform:scale(1.06)}.yw-btn:focus-visible{outline:3px solid #06B0EE;outline-offset:3px}' +
     '.yw-btn svg{width:44px;height:44px;transition:transform .25s,opacity .2s}' +
     '.yw-btn .yw-x{position:absolute;opacity:0;transform:rotate(-90deg);width:24px;height:24px}' +
     '.yw-open .yw-btn .yw-face{opacity:0;transform:scale(.5)}.yw-open .yw-btn .yw-x{opacity:1;transform:none}' +
@@ -31,11 +31,11 @@
     '.yw-panel iframe{width:100%;height:100%;border:0;display:block}' +
     '.yw-greet{position:fixed;right:90px;bottom:34px;max-width:240px;background:#fff;color:#14161f;font:500 14px/1.4 system-ui,sans-serif;padding:10px 14px;border-radius:14px 14px 4px 14px;box-shadow:0 6px 20px rgba(20,22,40,.18);z-index:2147483000;cursor:pointer;opacity:0;transform:translateY(6px);transition:opacity .3s,transform .3s}' +
     '.yw-greet.show{opacity:1;transform:none}.yw-open .yw-greet{display:none}' +
-    '.yw-dot{position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;background:#EF9B00;border:2px solid #fff}.yw-open .yw-dot,.yw-seen .yw-dot{display:none}' +
+    '.yw-dot{position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;background:#06B0EE;border:2px solid #fff}.yw-open .yw-dot,.yw-seen .yw-dot{display:none}' +
     '@media (max-width:520px){.yw-panel{right:0;bottom:0;width:100vw;height:100dvh;border-radius:0}.yw-open .yw-btn{display:none}}' +
     '@media (prefers-reduced-motion:reduce){.yw-btn,.yw-panel,.yw-greet{transition:none}}';
 
-  var face = '<svg class="yw-face" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 8c13 0 22 9 22 23 0 14-9 25-22 25S10 45 10 31C10 17 19 8 32 8z" fill="#fff" opacity=".14"/><ellipse cx="23" cy="29" rx="4.2" ry="5.2" fill="#fff"/><ellipse cx="41" cy="29" rx="4.2" ry="5.2" fill="#fff"/><circle cx="24" cy="30" r="2.1" fill="#0b1020"/><circle cx="42" cy="30" r="2.1" fill="#0b1020"/><circle cx="17" cy="38" r="3.2" fill="#EF9B00" opacity=".7"/><circle cx="47" cy="38" r="3.2" fill="#EF9B00" opacity=".7"/><path d="M26 40 Q32 42 38 40 Q32 48 26 40Z" fill="#0b1020"/></svg>';
+  var face = '<svg class="yw-face" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 8c13 0 22 9 22 23 0 14-9 25-22 25S10 45 10 31C10 17 19 8 32 8z" fill="#fff" opacity=".14"/><ellipse cx="23" cy="29" rx="4.2" ry="5.2" fill="#fff"/><ellipse cx="41" cy="29" rx="4.2" ry="5.2" fill="#fff"/><circle cx="24" cy="30" r="2.1" fill="#0b1020"/><circle cx="42" cy="30" r="2.1" fill="#0b1020"/><circle cx="17" cy="38" r="3.2" fill="#06B0EE" opacity=".7"/><circle cx="47" cy="38" r="3.2" fill="#06B0EE" opacity=".7"/><path d="M26 40 Q32 42 38 40 Q32 48 26 40Z" fill="#0b1020"/></svg>';
   var x = '<svg class="yw-x" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
   var root = document.createElement('div');

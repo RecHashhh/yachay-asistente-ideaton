@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
-import { useMemo, useState } from 'react';
-import { controlSize, replaceControlSet, runControl, type ControlResult } from '../lib/api';
+import { useEffect, useMemo, useState } from 'react';
+import { addControlCase, controlSize, listInbox, replaceControlSet, runControl, updateInbox, type ControlResult, type InboxItem } from '../lib/api';
+import type { DocMeta } from '../lib/types';
 
 // ---------------------------------------------------------------------------
 // Validación: set de preguntas de control con respuesta conocida
@@ -229,6 +230,99 @@ export function Cost() {
         </table>
       </div>
       <p className="small muted">Precios de la API de Anthropic por millón de tokens, consultados el 20-10-2026: Haiku 5.5 $0.10 entrada / $0.50 salida / $0.01 lectura de caché (prompts de hasta 100K tokens); Sonnet 5.5 $2 / $10 / $0.10. La escritura de caché (5 min) cuesta 1,25× la entrada y el prefijo mínimo cacheable es de 512 tokens. Fuente: platform.claude.com/docs/en/about-claude/pricing. Servidor: DigitalOcean Droplet Basic 4 vCPU / 8 GB, $48 al mes (digitalocean.com/pricing/droplets, consultado el 20-10-2026); alternativa con base de datos administrada: Droplet 2 vCPU / 4 GB $24 + PostgreSQL administrado $15,15.</p>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Bandeja "Sin respuesta": lo que el asistente no supo responder o recibió voto negativo
+// ---------------------------------------------------------------------------
+
+const REASON: Record<InboxItem['reason'], string> = { sin_fuente: 'Sin fuente', fuera_de_dominio: 'Fuera del ámbito', voto_negativo: 'Voto negativo' };
+
+/**
+ * Cierra el ciclo de mejora: pregunta sin respuesta → falta un documento (subirlo) → pregunta de control → Validación.
+ * Así el set de control crece con preguntas reales de estudiantes, no inventadas.
+ */
+export function Inbox({ docs, onUpload, onValidate }: { docs: DocMeta[]; onUpload: () => void; onValidate: () => void }) {
+  const [items, setItems] = useState<InboxItem[]>([]);
+  const [filter, setFilter] = useState<'nuevo' | 'todos'>('nuevo');
+  const [converting, setConverting] = useState<string | null>(null);
+  const [expect, setExpect] = useState('no_se');
+  const [msg, setMsg] = useState<string | null>(null);
+  const load = () => void listInbox().then(setItems);
+  useEffect(load, []);
+
+  const shown = items.filter((x) => filter === 'todos' || x.status === 'nuevo').sort((a, b) => b.count - a.count || b.lastAt.localeCompare(a.lastAt));
+  const count = (r: InboxItem['reason']) => items.filter((x) => x.reason === r && x.status === 'nuevo').length;
+
+  const convert = async (x: InboxItem) => {
+    const c = await addControlCase({ q: x.q, lang: x.lang === 'en' ? 'en' : 'es', expect });
+    await updateInbox(x.id, { status: 'convertida', controlId: c.id });
+    setConverting(null); setExpect('no_se');
+    setMsg(`Se creó la pregunta de control ${c.id}. Ya forma parte del set de Validación.`);
+    load();
+  };
+  const discard = async (x: InboxItem) => { await updateInbox(x.id, { status: 'descartada' }); load(); };
+  const fmt = (iso: string) => new Date(iso).toLocaleString('es-EC', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <>
+      <header>
+        <div><h2>Sin respuesta</h2><p>Preguntas que el asistente no pudo responder con documentos oficiales o que recibieron un voto negativo. Revísalas: si falta un documento, súbelo; luego conviértelas en preguntas de control.</p></div>
+      </header>
+      <div className="kpis">
+        <div className="kpi"><b>{count('sin_fuente')}</b><span>sin fuente (posible documento faltante)</span></div>
+        <div className="kpi"><b>{count('voto_negativo')}</b><span>con voto negativo</span></div>
+        <div className="kpi"><b>{count('fuera_de_dominio')}</b><span>fuera del ámbito</span></div>
+        <div className="kpi"><b>{items.filter((x) => x.status === 'convertida').length}</b><span>convertidas en preguntas de control</span></div>
+      </div>
+      <div className="row">
+        <button className="chip" aria-pressed={filter === 'nuevo'} onClick={() => setFilter('nuevo')}>Pendientes</button>
+        <button className="chip" aria-pressed={filter === 'todos'} onClick={() => setFilter('todos')}>Todas</button>
+        <span className="sp" />
+        <button className="btn sm" onClick={onUpload}>Subir documento</button>
+        <button className="btn sm" onClick={onValidate}>Ir a Validación</button>
+      </div>
+      {msg && <p className="small" role="status">{msg}</p>}
+      <div className="table-wrap">
+        <table>
+          <thead><tr><th>Pregunta</th><th>Motivo</th><th>Veces</th><th>Última vez</th><th>Estado</th><th><span className="sr">Acciones</span></th></tr></thead>
+          <tbody>
+            {shown.map((x) => (
+              <tr key={x.id}>
+                <td><span className="t">{x.q}</span> <span className="tag mono">{x.lang.toUpperCase()}</span>
+                  {converting === x.id && (
+                    <div className="row" style={{ marginTop: 8 }}>
+                      <label className="field" style={{ minWidth: 260 }}><span>Respuesta correcta esperada</span>
+                        <select className="inp" value={expect} onChange={(e) => setExpect(e.target.value)}>
+                          <option value="no_se">«Sin información oficial» es lo correcto</option>
+                          {docs.map((d) => <option key={d.id} value={d.id}>Debe citar: {d.title} ({d.version})</option>)}
+                        </select>
+                      </label>
+                      <button className="btn sm primary" style={{ alignSelf: 'flex-end' }} onClick={() => void convert(x)}>Crear pregunta de control</button>
+                      <button className="btn sm ghost" style={{ alignSelf: 'flex-end' }} onClick={() => setConverting(null)}>Cancelar</button>
+                    </div>
+                  )}
+                </td>
+                <td>{REASON[x.reason]}</td>
+                <td className="mono">{x.count}</td>
+                <td className="small">{fmt(x.lastAt)}</td>
+                <td><span className={`st ${x.status === 'nuevo' ? 'procesando' : x.status === 'convertida' ? 'indexado' : 'error'}`}>{x.status === 'nuevo' ? 'Pendiente' : x.status === 'convertida' ? `Convertida (${x.controlId})` : 'Descartada'}</span></td>
+                <td>
+                  {x.status === 'nuevo' && converting !== x.id && (
+                    <div className="row" style={{ flexWrap: 'nowrap', justifyContent: 'flex-end' }}>
+                      <button className="btn sm" onClick={() => { setConverting(x.id); setExpect('no_se'); }}>Convertir</button>
+                      <button className="btn sm ghost" onClick={() => void discard(x)}>Descartar</button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {!shown.length && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 32 }}>No hay preguntas pendientes. Cuando el asistente no encuentre información oficial, aparecerán aquí.</td></tr>}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }

@@ -47,6 +47,8 @@ Aparece un botón con la mascota abajo a la derecha; al tocarlo se abre un chat 
 | **Abrir documento** desde cada fuente citada (en PDF, directo en la página) | `Chat.tsx`, `ProcedureCard.tsx` |
 | Aviso de privacidad con lo que exige el art. 12 de la LOPDP (Ecuador), divulgación de que es una IA, revocar consentimiento y borrar datos del navegador; "Cómo funciona" (bilingües) | `src/components/ConsentDialog.tsx`, `Chat.tsx` → `AboutDialog` |
 | Portal: documentos, subir con metadatos, nueva versión, temas, tendencias | `src/views/Admin.tsx` |
+| Portal → **Sin respuesta**: bandeja de preguntas sin fuente, fuera del ámbito o con 👎, agrupadas con conteo; convertir en pregunta de control o subir el documento que falta | `src/views/AdminExtras.tsx` → `Inbox`, `src/lib/inbox.ts` |
+| Botón **Enviar consulta a la dependencia** en la respuesta sin información: correo, pregunta y autorización (LOPDP); devuelve código de seguimiento | `ProcedureCard.tsx` → `InquiryForm` |
 | Portal → **Validación**: set de preguntas de control y métricas (exactitud, citación correcta, "sin información" correcto, alucinaciones; importar el set y exportar resultados en CSV, ES/EN, latencia p50/p95) | `src/views/AdminExtras.tsx`, `controlSet` en `mock.ts` |
 | Portal → **Costo**: calculadora con supuestos explícitos, fórmula paso a paso y escenarios de carga | `src/views/AdminExtras.tsx` |
 | Widget para otras páginas | `public/yachi-widget.js`, `public/demo-sitio.html` |
@@ -75,6 +77,10 @@ Aparece un botón con la mascota abajo a la derecha; al tocarlo se abre un chat 
 | POST | `/admin/login` | Devuelve un token. Sugerido: Microsoft Entra ID con el tenant de la universidad |
 | GET/POST/DELETE | `/admin/docs` | Listar, subir (multipart con metadatos) y quitar documentos |
 | POST | `/admin/topics` | Crear un tema |
+| POST | `/inquiries` | Consulta enviada a la dependencia desde una respuesta sin información (`office`, `email`, `question`, `lang`) → código de seguimiento |
+| POST | `/feedback` | Voto 👍/👎 de una respuesta; los 👎 entran a la bandeja |
+| GET/PATCH | `/admin/unanswered` | Bandeja "Sin respuesta": preguntas sin fuente, fuera del ámbito o con 👎, agrupadas y con conteo; estado nuevo, convertida o descartada |
+| POST | `/admin/validation/cases` | Agregar una pregunta de control (desde la bandeja o el CSV) |
 
 ## Backend propuesto (LangChain + LangGraph)
 
@@ -94,6 +100,19 @@ entrada → caché semántica ──(acierto)───────────�
 - La recuperación filtra por `is_current=true` y por el tema que detecta el router, y combina BM25 con vectores.
 - La herramienta `mostrar_en_mapa(destino, origen?, resaltar?)` solo acepta los `id` de `campus.ts`. El modelo nunca ve coordenadas.
 - Si ningún fragmento pasa el umbral de relevancia, el asistente dice que no lo sabe en vez de inventar.
+
+## Búsqueda híbrida (especificación para el backend)
+
+Los reglamentos tienen numeración ("art. 42", "literal b") y siglas ("F-SG-03") que la búsqueda por vectores encuentra mal; la búsqueda por palabras clave las encuentra exacto, pero falla con sinónimos ("cambiarme de carrera" frente a "cambio de carrera"). Se combinan las dos:
+
+1. **Fragmentación por estructura.** Los PDF se parten por artículo o sección (no por número fijo de caracteres); cada fragmento guarda su encabezado ("Art. 42 – Cambio de carrera"). Los XLSX/CSV, por grupos de filas con los nombres de columna.
+2. **Dos índices en la misma base.** PostgreSQL con `pgvector` (embeddings multilingües, coseno) y búsqueda de texto completo (`tsvector` en español e inglés, o BM25 con `pg_search`). Ambos filtran por `is_current = true` y por el tema que detecta el router.
+3. **Fusión por rango recíproco (RRF).** Se toman los 20 mejores de cada índice y se combinan con `score = Σ 1 / (60 + rango)`. No requiere calibrar pesos entre índices.
+4. **Reordenamiento.** Un reordenador (cross-encoder multilingüe o el mismo Haiku con una instrucción corta) deja los 4 fragmentos que van al modelo.
+5. **Umbral de "sin información".** Si el mejor fragmento reordenado no supera el umbral, no se llama al modelo de respuesta: se devuelve el evento `unknown` (más barato y sin riesgo de inventar).
+6. **Citas armadas por el servidor.** El modelo solo devuelve el `id` del fragmento que usa; el backend completa documento, versión, fecha, página y enlace. Una cita inventada es imposible por construcción.
+
+Para el paper: correr el set de control con tres modos (solo vectores, solo palabras clave, híbrido) y reportar exactitud y citación correcta de cada uno en la pestaña Validación.
 
 ## Estrategias para gastar menos tokens
 

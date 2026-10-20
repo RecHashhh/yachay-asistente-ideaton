@@ -45,18 +45,18 @@ export function CampusMap({ action, scrollIntoView }: { action: MapAction; scrol
             initial={{ opacity: 0, scale: 0.4 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 + i * 0.1 }} style={{ originX: `${p.x}px`, originY: `${p.y}px` }} />
         ))}
         {path && (
-          <g stroke="var(--warm)" strokeWidth={5} fill="none" strokeLinecap="round" strokeLinejoin="round">
+          <g stroke="var(--brand-2)" strokeWidth={5} fill="none" strokeLinecap="round" strokeLinejoin="round">
             <motion.path d={path} strokeDasharray="0 1" initial={{ pathLength: reduce ? 1 : 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.1, ease: [0.2, 0.8, 0.2, 1], delay: 0.2 }} />
             <motion.path d={head} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: reduce ? 0 : 1.2 }} />
           </g>
         )}
-        {from && <circle cx={from.x} cy={from.y} r={9} fill="var(--surface)" stroke="var(--warm)" strokeWidth={4} />}
+        {from && <circle cx={from.x} cy={from.y} r={9} fill="var(--surface)" stroke="var(--brand-2)" strokeWidth={4} />}
         {!reduce && (
-          <motion.circle cx={dest.x} cy={dest.y} r={22} fill="var(--warm)"
+          <motion.circle cx={dest.x} cy={dest.y} r={22} fill="var(--brand-2)"
             initial={{ opacity: 0.35, scale: 0.6 }} animate={{ opacity: 0, scale: 2.2 }} transition={{ duration: 1.8, repeat: Infinity, delay: 1.2, ease: 'easeOut' }}
             style={{ originX: `${dest.x}px`, originY: `${dest.y}px` }} />
         )}
-        <motion.circle cx={dest.x} cy={dest.y} r={22} fill="none" stroke="var(--warm)" strokeWidth={5}
+        <motion.circle cx={dest.x} cy={dest.y} r={22} fill="none" stroke="var(--brand-2)" strokeWidth={5}
           initial={{ scale: reduce ? 1 : 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 14, delay: reduce ? 0 : 1.1 }}
           style={{ originX: `${dest.x}px`, originY: `${dest.y}px` }} />
       </svg>
@@ -83,7 +83,7 @@ function CampusBase({ activeId, lang }: { activeId: string; lang: string }) {
       </g>
       {PLACES.map((p) => (
         <g key={p.id}>
-          <rect x={p.x - 42} y={p.y - 26} width={84} height={52} rx={8} fill="var(--map-bldg)" stroke={p.id === activeId ? 'var(--warm)' : 'var(--map-bldg-line)'} strokeWidth={p.id === activeId ? 2.5 : 1.5} />
+          <rect x={p.x - 42} y={p.y - 26} width={84} height={52} rx={8} fill="var(--map-bldg)" stroke={p.id === activeId ? 'var(--brand-2)' : 'var(--map-bldg-line)'} strokeWidth={p.id === activeId ? 2.5 : 1.5} />
           <text x={p.x} y={p.y + 46} textAnchor="middle" className={p.id === activeId ? 'map-label' : 'map-label dim'}>{placeName(p, lang)}</text>
         </g>
       ))}

@@ -1,3 +1,4 @@
+import * as inbox from './inbox';
 import * as mock from './mock';
 import type { ChatRequest, DocMeta, PublicDoc, StreamEvent, Topic, Trend, UploadInput } from './types';
 
@@ -40,10 +41,32 @@ export const getTrends = (lang: 'es' | 'en' | 'qu' = 'es'): Promise<Trend[]> =>
   MOCK ? Promise.resolve(mock.trends.map((t) => ({ ...t, query: lang === 'en' ? mock.trendsEn[t.query] ?? t.query : t.query }))) : json(`/trends?lang=${lang}`);
 
 /** Voto de utilidad de una respuesta; alimenta la revisión semanal de respuestas marcadas como no útiles. */
-export function sendFeedback(messageId: string, vote: 'up' | 'down'): Promise<void> {
-  if (MOCK) return Promise.resolve();
+export function sendFeedback(messageId: string, vote: 'up' | 'down', ctx?: { question: string; lang: 'es' | 'en' | 'qu' }): Promise<void> {
+  if (MOCK) {
+    // Un voto negativo también llega a la bandeja "Sin respuesta" para revisarlo.
+    if (vote === 'down' && ctx) inbox.recordUnanswered(ctx.question, ctx.lang, 'voto_negativo');
+    return Promise.resolve();
+  }
   return fetch(`${API}/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messageId, vote }) }).then(() => undefined);
 }
+
+export type { InboxItem, InboxStatus, Inquiry } from './inbox';
+
+/** Envía la pregunta sin respuesta a la dependencia responsable. Devuelve el código de seguimiento. */
+export function sendInquiry(i: Omit<inbox.Inquiry, 'code' | 'at'>): Promise<inbox.Inquiry> {
+  if (MOCK) return new Promise((r) => setTimeout(() => r(inbox.createInquiry(i)), 600));
+  return json('/inquiries', { method: 'POST', body: JSON.stringify(i) });
+}
+
+// ---------- Bandeja "Sin respuesta" (administración) ----------
+export const listInbox = (): Promise<inbox.InboxItem[]> => (MOCK ? Promise.resolve(inbox.listInbox()) : json('/admin/unanswered'));
+export function updateInbox(id: string, patch: Partial<Pick<inbox.InboxItem, 'status' | 'controlId'>>): Promise<void> {
+  if (MOCK) { inbox.updateInbox(id, patch); return Promise.resolve(); }
+  return json(`/admin/unanswered/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+}
+/** Agrega una pregunta al set de control (Validación). */
+export const addControlCase = (c: Omit<import('./mock').ControlCase, 'id'>): Promise<import('./mock').ControlCase> =>
+  MOCK ? Promise.resolve(mock.addControlCase(c)) : json('/admin/validation/cases', { method: 'POST', body: JSON.stringify(c) });
 
 export type { ControlResult } from './mock';
 /** Corre el set de preguntas de control contra el asistente y devuelve cada resultado. */

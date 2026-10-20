@@ -1,12 +1,13 @@
-/* Estructura de tokens del Help Desk de RIPCON con los colores de yachaytech.edu.ec: azul #24618E y ámbar #EF9B00. */
+/* Estructura de tokens del Help Desk de RIPCON con los colores de yachaytech.edu.ec: azul #27618E y celeste #06B0EE (el ámbar queda solo para advertencias). */
 :root{
   --bg:#f6f7fb; --surface:#ffffff; --surface-2:#eef0f6; --ink:#14161f; --muted:#5b6072; --line:#e1e4ec; --line-hi:#c7ccdc;
-  --accent:#24618e; --accent-ink:#ffffff; --accent-soft:#e6eff6;
-  --warm:#ef9b00; --warm-ink:#8a5300; --warm-soft:#fdf1dc; --ok:#15803d; --ok-soft:#e6f3ea; --crit:#b91c1c; --crit-soft:#f9e6e6;
+  --accent:#27618e; --accent-ink:#ffffff; --accent-soft:#e6eff6;
+  --brand-2:#0587bc; --brand-2-soft:#e2f4fc;
+  --warm:#d98a00; --warm-ink:#8a5300; --warm-soft:#fdf1dc; --ok:#15803d; --ok-soft:#e6f3ea; --crit:#b91c1c; --crit-soft:#f9e6e6;
   --map-ground:#eef1ea; --map-path:#d9dccf; --map-bldg:#ffffff; --map-bldg-line:#c9cdbf; --map-green:#dfe8d3;
   --shadow:0 1px 2px rgba(20,22,40,.04),0 2px 8px rgba(20,22,40,.06);
   --shadow-lg:0 2px 4px rgba(20,22,40,.04),0 12px 32px rgba(20,22,40,.10);
-  --f-body:"Manrope","Inter","Segoe UI",system-ui,sans-serif;
+  --f-body:"Inter","Segoe UI",system-ui,sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
   --r:6px; --r-lg:10px; --r-xl:22px; --rail:260px; --col:760px;
   --ease:cubic-bezier(.2,.8,.2,1);
@@ -14,12 +15,14 @@
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   --bg:#0a0c0f; --surface:#111318; --surface-2:#191c23; --ink:#e8eaf0; --muted:#9aa1b5; --line:#2a2f3a; --line-hi:#3d4455;
   --accent:#7fb6e0; --accent-ink:#0a0c0f; --accent-soft:#132433;
+  --brand-2:#36c3f5; --brand-2-soft:#0b2a36;
   --warm:#f5b13d; --warm-ink:#f5b13d; --warm-soft:#33240a; --ok:#4ade80; --ok-soft:#10291a; --crit:#f87171; --crit-soft:#341616;
   --map-ground:#14171c; --map-path:#252a33; --map-bldg:#1b1f27; --map-bldg-line:#323846; --map-green:#16211a;
   --shadow:0 1px 3px rgba(0,0,0,.5),0 4px 16px rgba(0,0,0,.3); --shadow-lg:0 12px 40px rgba(0,0,0,.5); color-scheme:dark }}
 :root[data-theme="dark"]{
   --bg:#0a0c0f; --surface:#111318; --surface-2:#191c23; --ink:#e8eaf0; --muted:#9aa1b5; --line:#2a2f3a; --line-hi:#3d4455;
   --accent:#7fb6e0; --accent-ink:#0a0c0f; --accent-soft:#132433;
+  --brand-2:#36c3f5; --brand-2-soft:#0b2a36;
   --warm:#f5b13d; --warm-ink:#f5b13d; --warm-soft:#33240a; --ok:#4ade80; --ok-soft:#10291a; --crit:#f87171; --crit-soft:#341616;
   --map-ground:#14171c; --map-path:#252a33; --map-bldg:#1b1f27; --map-bldg-line:#323846; --map-green:#16211a;
   --shadow:0 1px 3px rgba(0,0,0,.5),0 4px 16px rgba(0,0,0,.3); --shadow-lg:0 12px 40px rgba(0,0,0,.5); color-scheme:dark }
@@ -193,7 +196,7 @@ a.btn{text-decoration:none}
 .map-card{border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;background:var(--map-ground)}
 .map-card > svg{display:block;width:100%;height:auto}
 .map-card figcaption{display:flex;align-items:center;gap:8px;padding:9px 14px;font-size:13px;background:var(--surface);border-top:1px solid var(--line)}
-.map-card figcaption .dot{width:10px;height:10px;border-radius:50%;background:var(--warm);flex:none}
+.map-card figcaption .dot{width:10px;height:10px;border-radius:50%;background:var(--brand-2);flex:none}
 .map-label{font:600 15px var(--f-body);fill:var(--ink);paint-order:stroke;stroke:var(--map-ground);stroke-width:5px;stroke-linejoin:round}
 .map-label.dim{font-weight:500;font-size:13px;fill:var(--muted)}
 
@@ -326,3 +329,11 @@ select option{background:var(--surface);color:var(--ink)}
 
 .kichwa-note{font-size:13px;color:var(--muted);background:var(--surface-2);border-radius:var(--r-lg);padding:8px 12px;margin:0}
 .hello h1 .hello-main{display:block;color:var(--ink);font-weight:700}
+
+/* Formulario "Enviar consulta a la dependencia" */
+.inq{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
+.inq textarea{resize:vertical}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:13.5px}
+.check input{margin-top:3px;flex:none}
+.inq-done{display:flex;gap:8px;align-items:flex-start;color:var(--ok);font-weight:500;margin-top:4px}
+.inq-done svg{flex:none;margin-top:3px}

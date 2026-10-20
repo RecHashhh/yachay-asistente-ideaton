@@ -315,7 +315,7 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
             <div className="scroll">
               <div className="thread">
                 <AnimatePresence initial={false}>
-                  {msgs.map((m) => m.role === 'user'
+                  {msgs.map((m, i) => m.role === 'user'
                     ? (
                       <motion.div key={m.id} className="msg-user" initial={{ opacity: 0, y: 10, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 30 }}>
                         {m.files && <div className="msg-files">{m.files.map((f, i) => f.type.startsWith('image/') ? <img key={i} src={f.url} alt={f.name} /> : <span key={i} className="tag mono">PDF · {f.name}</span>)}</div>}
@@ -323,7 +323,8 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
                       </motion.div>
                     )
                     : <AssistantMsg key={m.id} m={m}
-                        onVote={(v) => { patch(m.id, () => ({ vote: v })); if (m.serverId) void sendFeedback(m.serverId, v); }}
+                        onVote={(v) => { patch(m.id, () => ({ vote: v })); if (m.serverId) void sendFeedback(m.serverId, v, { question: msgs[i - 1]?.text ?? '', lang }); }}
+                        question={msgs[i - 1]?.text}
                         onRetry={() => retry(m.id)} onAsk={(q) => void send(q)}
                         onShowMap={(placeId) => patch(m.id, () => ({ map: { destino: placeId, origen: 'entrada' } }))} />)}
                 </AnimatePresence>
@@ -349,7 +350,7 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
   );
 }
 
-function AssistantMsg({ m, onVote, onRetry, onAsk, onShowMap }: { m: Msg; onVote: (v: 'up' | 'down') => void; onRetry: () => void; onAsk: (q: string) => void; onShowMap: (placeId: string) => void }) {
+function AssistantMsg({ m, question, onVote, onRetry, onAsk, onShowMap }: { m: Msg; question?: string; onVote: (v: 'up' | 'down') => void; onRetry: () => void; onAsk: (q: string) => void; onShowMap: (placeId: string) => void }) {
   const { t, lang } = useT();
   const [copied, setCopied] = useState(false);
   const [openSrc, setOpenSrc] = useState<string | null>(null);
@@ -372,7 +373,7 @@ function AssistantMsg({ m, onVote, onRetry, onAsk, onShowMap }: { m: Msg; onVote
         {m.map && !mapAfter && <CampusMap action={m.map} />}
         {m.text && <Markdown text={m.text} animate={!!m.streaming} />}
         {m.procedure && <ProcedureCard p={m.procedure} onShowMap={onShowMap} />}
-        {m.unknown && <UnknownCard u={m.unknown} onShowMap={onShowMap} />}
+        {m.unknown && <UnknownCard u={m.unknown} question={question} onShowMap={onShowMap} />}
         {m.map && mapAfter && <CampusMap action={m.map} scrollIntoView />}
         {m.error && <p className="err" role="alert">{m.error}</p>}
 
