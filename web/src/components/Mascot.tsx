@@ -7,7 +7,7 @@ export type MascotMood = 'idle' | 'thinking' | 'talking' | 'happy';
  * Mascota PROVISIONAL dibujada en SVG. Al tener el arte oficial de la mascota de Yachay Tech,
  * conserva los grupos `eyes`, `mouth` y `body` (o sus equivalentes) para que las animaciones sigan funcionando.
  */
-export function Mascot({ size = 36, mood = 'idle' }: { size?: number; mood?: MascotMood }) {
+export function Mascot({ size = 36, mood = 'idle', decorative }: { size?: number; mood?: MascotMood; decorative?: boolean }) {
   const reduce = useReducedMotion();
   const [blink, setBlink] = useState(false);
 
@@ -26,7 +26,7 @@ export function Mascot({ size = 36, mood = 'idle' }: { size?: number; mood?: Mas
   const eyeScale = blink ? 0.1 : mood === 'happy' ? 0.55 : 1;
 
   return (
-    <svg className="mascot" width={size} height={size} viewBox="0 0 64 64" role="img" aria-label="Mascota de Yachay Tech">
+    <svg className="mascot" width={size} height={size} viewBox="0 0 64 64" {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': 'Mascota de Yachay Tech' })}>
       <motion.g
         animate={reduce ? undefined : mood === 'thinking' ? { y: [0, -2.5, 0], rotate: [0, -3, 0] } : mood === 'talking' ? { y: [0, -1, 0] } : { y: [0, -1.2, 0] }}
         transition={{ duration: mood === 'thinking' ? 1.1 : mood === 'talking' ? 0.5 : 3.2, repeat: Infinity, ease: 'easeInOut' }}

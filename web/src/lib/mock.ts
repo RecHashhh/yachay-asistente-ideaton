@@ -1,5 +1,5 @@
-import { findPlace } from './campus';
-import type { ChatRequest, DocMeta, Procedure, Source, StreamEvent, Topic, Trend, Unknown, UploadInput } from './types';
+import { findPlace, placeName } from './campus';
+import type { ChatRequest, DocMeta, Procedure, PublicDoc, Source, StreamEvent, Topic, Trend, Unknown, UploadInput } from './types';
 
 /**
  * Simulador del backend para trabajar el frontend sin servidor.
@@ -12,12 +12,12 @@ type L = { es: string; en: string };
 const pick = (l: L, lang: Lang) => (lang === 'en' ? l.en : l.es);
 
 export const topics: Topic[] = [
-  { id: 'tramites', name: 'Trámites académicos', description: 'Cambio de carrera, inasistencias, certificados, homologaciones' },
-  { id: 'academico', name: 'Calendario académico', description: 'Semestres, exámenes, feriados' },
-  { id: 'becas', name: 'Becas y ayudas', description: 'Tipos de beca, requisitos, renovación' },
-  { id: 'campus', name: 'Campus y ubicaciones', description: 'Aulas, laboratorios, salas de estudio, residencias' },
-  { id: 'representacion', name: 'Representación estudiantil', description: 'Consejos, representantes, canales de participación' },
-  { id: 'admision', name: 'Admisión y matrícula', description: 'Requisitos, fechas, valores' },
+  { id: 'tramites', name: 'Trámites académicos', description: 'Cambio de carrera, inasistencias, certificados, homologaciones', nameEn: 'Academic procedures', descriptionEn: 'Change of major, absences, certificates, course transfers' },
+  { id: 'academico', name: 'Calendario académico', description: 'Semestres, exámenes, feriados', nameEn: 'Academic calendar', descriptionEn: 'Terms, exams, holidays' },
+  { id: 'becas', name: 'Becas y ayudas', description: 'Tipos de beca, requisitos, renovación', nameEn: 'Scholarships and aid', descriptionEn: 'Scholarship types, requirements, renewal' },
+  { id: 'campus', name: 'Campus y ubicaciones', description: 'Aulas, laboratorios, salas de estudio, residencias', nameEn: 'Campus and locations', descriptionEn: 'Classrooms, labs, study rooms, residences' },
+  { id: 'representacion', name: 'Representación estudiantil', description: 'Consejos, representantes, canales de participación', nameEn: 'Student representation', descriptionEn: 'Councils, representatives, participation channels' },
+  { id: 'admision', name: 'Admisión y matrícula', description: 'Requisitos, fechas, valores', nameEn: 'Admission and enrollment', descriptionEn: 'Requirements, dates, fees' },
 ];
 
 const now = () => new Date().toISOString();
@@ -27,11 +27,11 @@ export const docs: DocMeta[] = [
   { id: 'd2', title: 'Reglamento de becas', topicId: 'becas', kind: 'pdf', version: '2025-3', docDate: '2025-11-20', origin: 'web', url: 'https://yachaytech.edu.ec/normativa/', uploadedAt: '2026-01-09T15:20:00Z', uploadedBy: 'bienestar@yachaytech.edu.ec', status: 'indexado', chunks: 64, sizeKb: 890 },
   { id: 'd3', title: 'Aranceles y valores de matrícula', topicId: 'admision', kind: 'xlsx', version: 'v1', docDate: '2026-07-01', origin: 'interno', uploadedAt: '2026-07-03T09:00:00Z', uploadedBy: 'financiero@yachaytech.edu.ec', status: 'indexado', chunks: 12, sizeKb: 96 },
   { id: 'd4', title: 'Horarios y ubicaciones de servicios', topicId: 'campus', kind: 'csv', version: 'v4', docDate: '2026-09-28', origin: 'interno', uploadedAt: '2026-09-29T08:30:00Z', uploadedBy: 'admin@yachaytech.edu.ec', status: 'indexado', chunks: 9, sizeKb: 14 },
-  { id: 'd5', title: 'Guía de trámites estudiantiles', topicId: 'tramites', kind: 'pdf', version: 'v1', docDate: '2026-03-15', origin: 'web', uploadedAt: '2026-03-20T11:00:00Z', uploadedBy: 'secretaria@yachaytech.edu.ec', status: 'indexado', chunks: 27, sizeKb: 350 },
+  { id: 'd5', title: 'Guía de trámites estudiantiles', topicId: 'tramites', kind: 'pdf', version: 'v1', docDate: '2026-03-15', origin: 'web', url: 'https://yachaytech.edu.ec/normativa/', uploadedAt: '2026-03-20T11:00:00Z', uploadedBy: 'secretaria@yachaytech.edu.ec', status: 'indexado', chunks: 27, sizeKb: 350 },
   { id: 'd6', title: 'Reglamento de régimen académico', topicId: 'tramites', kind: 'pdf', version: '2026-1', docDate: '2026-02-10', origin: 'web', url: 'https://yachaytech.edu.ec/normativa/', uploadedAt: '2026-02-12T09:00:00Z', uploadedBy: 'secretaria@yachaytech.edu.ec', status: 'indexado', chunks: 112, sizeKb: 1480 },
-  { id: 'd7', title: 'Reglamento de residencias universitarias', topicId: 'campus', kind: 'pdf', version: 'v3', docDate: '2026-05-04', origin: 'web', uploadedAt: '2026-05-06T10:00:00Z', uploadedBy: 'bienestar@yachaytech.edu.ec', status: 'indexado', chunks: 31, sizeKb: 420 },
+  { id: 'd7', title: 'Reglamento de residencias universitarias', topicId: 'campus', kind: 'pdf', version: 'v3', docDate: '2026-05-04', origin: 'web', url: 'https://yachaytech.edu.ec/normativa/', uploadedAt: '2026-05-06T10:00:00Z', uploadedBy: 'bienestar@yachaytech.edu.ec', status: 'indexado', chunks: 31, sizeKb: 420 },
   { id: 'd8', title: 'Procedimiento de uso y reserva de laboratorios', topicId: 'campus', kind: 'pdf', version: 'v2', docDate: '2026-04-18', origin: 'interno', uploadedAt: '2026-04-20T14:00:00Z', uploadedBy: 'laboratorios@yachaytech.edu.ec', status: 'indexado', chunks: 18, sizeKb: 210 },
-  { id: 'd9', title: 'Representantes estudiantiles 2026', topicId: 'representacion', kind: 'xlsx', version: 'v1', docDate: '2026-09-01', origin: 'web', uploadedAt: '2026-09-02T12:00:00Z', uploadedBy: 'secretaria@yachaytech.edu.ec', status: 'indexado', chunks: 6, sizeKb: 22 },
+  { id: 'd9', title: 'Representantes estudiantiles 2026', topicId: 'representacion', kind: 'xlsx', version: 'v1', docDate: '2026-09-01', origin: 'web', url: 'https://yachaytech.edu.ec/normativa/', uploadedAt: '2026-09-02T12:00:00Z', uploadedBy: 'secretaria@yachaytech.edu.ec', status: 'indexado', chunks: 6, sizeKb: 22 },
 ];
 
 export const trends: Trend[] = [
@@ -61,10 +61,11 @@ const wait = (ms: number, signal?: AbortSignal) => new Promise<void>((res, rej) 
 
 const src = (id: string, locator: string, snippet: string): Source => {
   const d = docs.find((x) => x.id === id)!;
-  return { docId: d.id, title: d.title, version: d.version, docDate: d.docDate, locator, snippet };
+  const page = Number(locator.match(/p[áa]g\. (\d+)/)?.[1]) || undefined;
+  return { docId: d.id, title: d.title, version: d.version, docDate: d.docDate, locator, snippet, url: d.url, page: d.kind === 'pdf' ? page : undefined, origin: d.origin };
 };
 
-interface Proc { title: L; summary: L; office: string; placeId?: string; duration?: L; documents: L[]; steps: { title: L; detail?: L }[]; doc: string; locator: string; snippet: string }
+interface Proc { title: L; summary: L; office: L; placeId?: string; duration?: L; documents: L[]; steps: { title: L; detail?: L }[]; doc: string; locator: string; snippet: string }
 
 interface Entry {
   id: string;
@@ -76,7 +77,7 @@ interface Entry {
   follow: L[];
 }
 
-const SECRETARIA = { office: 'Secretaría General', email: 'secretaria@yachaytech.edu.ec', placeId: 'admisiones' };
+const secretaria = (lang: Lang) => ({ office: lang === 'en' ? "Registrar's Office" : 'Secretaría General', email: 'secretaria@yachaytech.edu.ec', placeId: 'admisiones' });
 
 /** Base de conocimiento de ejemplo. Orden = prioridad. */
 const KB: Entry[] = [
@@ -86,7 +87,7 @@ const KB: Entry[] = [
     procedure: {
       title: { es: 'Cambio de carrera', en: 'Change of major' },
       summary: { es: 'Pasar de tu carrera actual a otra carrera de grado de la universidad, con homologación de materias aprobadas.', en: 'Move from your current major to another undergraduate program, transferring the courses you passed.' },
-      office: 'Secretaría General', placeId: 'admisiones',
+      office: { es: 'Secretaría General', en: "Registrar's Office" }, placeId: 'admisiones',
       duration: { es: '10 a 15 días hábiles', en: '10 to 15 business days' },
       documents: [
         { es: 'Solicitud de cambio de carrera (formulario F-SG-03)', en: 'Change of major request (form F-SG-03)' },
@@ -110,7 +111,7 @@ const KB: Entry[] = [
     procedure: {
       title: { es: 'Justificación de inasistencia', en: 'Absence justification' },
       summary: { es: 'Validar faltas por enfermedad, calamidad doméstica o representación institucional.', en: 'Excuse absences due to illness, family emergency or institutional representation.' },
-      office: 'Bienestar Estudiantil', placeId: 'enfermeria',
+      office: { es: 'Bienestar Estudiantil', en: "Student Welfare Office" }, placeId: 'enfermeria',
       duration: { es: '3 días hábiles', en: '3 business days' },
       documents: [
         { es: 'Certificado médico o documento que respalde la causa', en: 'Medical certificate or supporting document' },
@@ -132,7 +133,7 @@ const KB: Entry[] = [
     procedure: {
       title: { es: 'Solicitud de residencia', en: 'Student housing application' },
       summary: { es: 'Postular a un cupo en las residencias universitarias del campus.', en: 'Apply for a place in the on-campus residences.' },
-      office: 'Bienestar Estudiantil', placeId: 'residencias',
+      office: { es: 'Bienestar Estudiantil', en: "Student Welfare Office" }, placeId: 'residencias',
       duration: { es: 'Resultados en 2 semanas', en: 'Results in 2 weeks' },
       documents: [
         { es: 'Formulario de postulación', en: 'Application form' },
@@ -155,7 +156,7 @@ const KB: Entry[] = [
     procedure: {
       title: { es: 'Reserva de laboratorio', en: 'Lab booking' },
       summary: { es: 'Usar un laboratorio fuera del horario de clases para prácticas o proyectos.', en: 'Use a lab outside class hours for practice or projects.' },
-      office: 'Coordinación de Laboratorios', placeId: 'laboratorios',
+      office: { es: 'Coordinación de Laboratorios', en: "Lab Coordination Office" }, placeId: 'laboratorios',
       duration: { es: 'Respuesta en 24 horas', en: 'Answer within 24 hours' },
       documents: [
         { es: 'Formulario de reserva con aval del docente', en: 'Booking form approved by a professor' },
@@ -210,6 +211,7 @@ export interface Answer {
   procedure?: Procedure;
   unknown?: Unknown;
   map?: string;
+  link?: { label: string; href: string };
   follow: string[];
 }
 
@@ -220,6 +222,23 @@ export function answerFor(q: string, lang: Lang): Answer {
   if (OUT_OF_DOMAIN.test(t)) {
     return { entryId: null, text: '', sources: [], unknown: { reason: 'fuera_de_dominio' }, follow: topTrends(lang, 3) };
   }
+  if (/(qu[ée] documentos|cu[áa]les (son los )?documentos|qu[ée] informaci[óo]n tienes|qu[ée] sabes|what documents|which documents|what do you know|documentos (disponibles|tienes|hay))/.test(t)) {
+    const list = publicDocs();
+    const web = list.filter((d) => d.origin === 'web').length;
+    const head = isEn
+      ? `I answer from **${list.length} official documents** (${web} published on the university website, ${list.length - web} internal):`
+      : `Respondo con **${list.length} documentos oficiales** (${web} publicados en la página web de la universidad y ${list.length - web} internos):`;
+    const lines = topics
+      .map((tp) => ({ tp, n: list.filter((d) => d.topicId === tp.id).length }))
+      .filter((x) => x.n > 0)
+      .map(({ tp, n }) => `- ${isEn ? tp.nameEn ?? tp.name : tp.name}: ${n}`)
+      .join('\n');
+    return {
+      entryId: 'inventario', text: `${head}\n\n${lines}`, sources: [],
+      link: { label: isEn ? 'See all documents' : 'Ver todos los documentos', href: '#/documentos' },
+      follow: topTrends(lang, 2),
+    };
+  }
   for (const e of KB) {
     if (!e.match.test(t)) continue;
     const sources = e.doc ? [src(e.doc, e.locator!, e.snippet!)] : [];
@@ -229,7 +248,7 @@ export function answerFor(q: string, lang: Lang): Answer {
       const s = src(p.doc, p.locator, p.snippet);
       sources.push(s);
       procedure = {
-        title: pick(p.title, lang), summary: pick(p.summary, lang), office: p.office, placeId: p.placeId,
+        title: pick(p.title, lang), summary: pick(p.summary, lang), office: pick(p.office, lang), placeId: p.placeId,
         duration: p.duration && pick(p.duration, lang), documents: p.documents.map((d) => pick(d, lang)),
         steps: p.steps.map((x) => ({ title: pick(x.title, lang), detail: x.detail && pick(x.detail, lang) })), source: s,
       };
@@ -240,13 +259,13 @@ export function answerFor(q: string, lang: Lang): Answer {
   if (place && /(dónde|donde|llegar|ubica|queda|hay|mapa|where|how do i get|find|located)/.test(t)) {
     return {
       entryId: `lugar:${place.id}`,
-      text: isEn ? `**${place.name}** is marked on the map. From the main gate, follow the footpath and the arrow to the building.` : `**${place.name}** está marcada en el mapa. Desde la entrada principal, sigue el camino peatonal y la flecha hasta el edificio.`,
+      text: isEn ? `**${placeName(place, 'en')}** is marked on the map. From the main gate, follow the footpath and the arrow to the building.` : `**${place.name}** está marcada en el mapa. Desde la entrada principal, sigue el camino peatonal y la flecha hasta el edificio.`,
       sources: [src('d4', 'hoja Ubicaciones, fila 4', `${place.name}: lunes a viernes, 08:00 a 18:00.`)],
       map: place.id,
       follow: topTrends(lang, 2),
     };
   }
-  return { entryId: null, text: '', sources: [], unknown: { reason: 'sin_fuente', contact: SECRETARIA }, follow: topTrends(lang, 3) };
+  return { entryId: null, text: '', sources: [], unknown: { reason: 'sin_fuente', contact: secretaria(lang) }, follow: topTrends(lang, 3) };
 }
 
 const topTrends = (lang: Lang, n: number) => trends.slice(0, n).map((x) => (lang === 'en' ? trendsEn[x.query] ?? x.query : x.query));
@@ -282,6 +301,7 @@ export async function* mockChat(req: ChatRequest, signal?: AbortSignal): AsyncGe
     await wait(22 + Math.random() * 30, signal);
   }
   if (a.procedure) yield { type: 'procedure', item: a.procedure };
+  if (a.link) yield { type: 'link', ...a.link };
   if (a.sources.length) yield { type: 'sources', items: dedupe(a.sources) };
   yield { type: 'suggestions', items: a.follow };
   yield { type: 'done', messageId: crypto.randomUUID(), latencyMs: Math.round(performance.now() - t0) };
@@ -316,6 +336,7 @@ export const controlSet: ControlCase[] = [
   { id: 'C13', q: '¿Dónde quedan las residencias?', lang: 'es', expect: 'd4' },
   { id: 'C14', q: '¿Qué becas hay?', lang: 'es', expect: 'd2' },
   { id: 'C15', q: 'When does the next semester start?', lang: 'en', expect: 'd1' },
+  { id: 'C21', q: '¿Qué documentos tienes?', lang: 'es', expect: 'inventario' },
   { id: 'C16', q: '¿Cuál es el sueldo del rector?', lang: 'es', expect: 'no_se' },
   { id: 'C17', q: '¿Qué clima hará mañana en Urcuquí?', lang: 'es', expect: 'no_se' },
   { id: 'C18', q: 'Tell me a joke', lang: 'en', expect: 'no_se' },
@@ -337,13 +358,17 @@ export async function runControl(onProgress?: (done: number) => void): Promise<C
     const t0 = performance.now();
     const a = answerFor(c.q, c.lang);
     await wait(60);
-    const got = a.unknown ? 'no_se' : a.sources.map((s) => s.docId).join(',');
-    const ok = c.expect === 'no_se' ? !!a.unknown : a.sources.some((s) => s.docId === c.expect);
-    out.push({ ...c, got, ok, hallucination: !a.unknown && a.sources.length === 0, ms: Math.round(performance.now() - t0) + 620 });
+    const got = a.unknown ? 'no_se' : a.entryId === 'inventario' ? 'inventario' : a.sources.map((s) => s.docId).join(',');
+    const ok = c.expect === 'no_se' ? !!a.unknown : c.expect === 'inventario' ? a.entryId === 'inventario' : a.sources.some((s) => s.docId === c.expect);
+    out.push({ ...c, got, ok, hallucination: !a.unknown && a.sources.length === 0 && a.entryId !== 'inventario', ms: Math.round(performance.now() - t0) + 620 });
     onProgress?.(out.length);
   }
   return out;
 }
+
+/** Lo que cualquier usuario puede ver: solo documentos indexados y vigentes, sin quién los subió. */
+export const publicDocs = (): PublicDoc[] =>
+  docs.filter((d) => d.status === 'indexado').map(({ id, title, topicId, kind, version, docDate, origin, url }) => ({ id, title, topicId, kind, version, docDate, origin, url }));
 
 export async function mockUpload(input: UploadInput, onProgress: (p: number) => void): Promise<DocMeta> {
   for (let p = 0; p <= 100; p += 10) { onProgress(p); await wait(90); }

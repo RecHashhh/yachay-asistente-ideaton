@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef } from 'react';
-import { PLACES, VIEWBOX, placeById } from '../lib/campus';
+import { PLACES, VIEWBOX, placeById, placeName } from '../lib/campus';
+import { useT } from '../lib/i18n';
 import type { MapAction } from '../lib/types';
 import { IcMap } from './icons';
 
@@ -10,6 +11,7 @@ import { IcMap } from './icons';
  */
 export function CampusMap({ action, scrollIntoView }: { action: MapAction; scrollIntoView?: boolean }) {
   const reduce = useReducedMotion();
+  const { lang } = useT();
   const ref = useRef<HTMLElement>(null);
   useEffect(() => { if (scrollIntoView) ref.current?.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' }); }, [scrollIntoView, reduce, action.destino]);
   const dest = placeById(action.destino);
@@ -36,8 +38,8 @@ export function CampusMap({ action, scrollIntoView }: { action: MapAction; scrol
 
   return (
     <motion.figure ref={ref} className="map-card" style={{ margin: 0 }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-      <svg viewBox={`0 0 ${VIEWBOX.w} ${VIEWBOX.h}`} role="img" aria-label={`Mapa del campus: ${from ? `de ${from.name} a ` : ''}${dest.name}`}>
-        <CampusBase activeId={dest.id} />
+      <svg viewBox={`0 0 ${VIEWBOX.w} ${VIEWBOX.h}`} role="img" aria-label={lang === 'en' ? `Campus map: ${from ? `from ${from.nameEn} to ` : ''}${dest.nameEn}` : `Mapa del campus: ${from ? `de ${from.name} a ` : ''}${dest.name}`}>
+        <CampusBase activeId={dest.id} lang={lang} />
         {extra.map((p, i) => p && (
           <motion.circle key={p.id} cx={p.x} cy={p.y} r={22} fill="none" stroke="var(--accent)" strokeWidth={3} strokeDasharray="6 5"
             initial={{ opacity: 0, scale: 0.4 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 + i * 0.1 }} style={{ originX: `${p.x}px`, originY: `${p.y}px` }} />
@@ -58,13 +60,13 @@ export function CampusMap({ action, scrollIntoView }: { action: MapAction; scrol
           initial={{ scale: reduce ? 1 : 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 14, delay: reduce ? 0 : 1.1 }}
           style={{ originX: `${dest.x}px`, originY: `${dest.y}px` }} />
       </svg>
-      <figcaption><span className="dot" /> <b>{dest.name}</b>{from && <span className="muted">desde {from.name}</span>}<span className="sp" /><IcMap width={16} height={16} className="muted" /></figcaption>
+      <figcaption><span className="dot" /> <b>{placeName(dest, lang)}</b>{from && <span className="muted">{lang === 'en' ? 'from' : 'desde'} {placeName(from, lang)}</span>}<span className="sp" /><IcMap width={16} height={16} className="muted" /></figcaption>
     </motion.figure>
   );
 }
 
 /** Plano esquemático PROVISIONAL. Reemplázalo por el SVG oficial del campus (ver lib/campus.ts). */
-function CampusBase({ activeId }: { activeId: string }) {
+function CampusBase({ activeId, lang }: { activeId: string; lang: string }) {
   return (
     <g>
       <rect width={VIEWBOX.w} height={VIEWBOX.h} fill="var(--map-ground)" />
@@ -82,7 +84,7 @@ function CampusBase({ activeId }: { activeId: string }) {
       {PLACES.map((p) => (
         <g key={p.id}>
           <rect x={p.x - 42} y={p.y - 26} width={84} height={52} rx={8} fill="var(--map-bldg)" stroke={p.id === activeId ? 'var(--warm)' : 'var(--map-bldg-line)'} strokeWidth={p.id === activeId ? 2.5 : 1.5} />
-          <text x={p.x} y={p.y + 46} textAnchor="middle" className={p.id === activeId ? 'map-label' : 'map-label dim'}>{p.name}</text>
+          <text x={p.x} y={p.y + 46} textAnchor="middle" className={p.id === activeId ? 'map-label' : 'map-label dim'}>{placeName(p, lang)}</text>
         </g>
       ))}
     </g>

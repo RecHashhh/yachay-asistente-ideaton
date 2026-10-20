@@ -137,8 +137,8 @@ export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy
       </form>
       <AnimatePresence>
         {zoom && (
-          <motion.div className="scrim" onClick={() => setZoom(null)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <motion.img className="lightbox" src={zoom} alt="" initial={{ scale: 0.95 }} animate={{ scale: 1 }} />
+          <motion.div className="scrim" role="dialog" aria-modal="true" aria-label="Vista previa" tabIndex={-1} ref={(el) => el?.focus()} onKeyDown={(e) => e.key === 'Escape' && setZoom(null)} onClick={() => setZoom(null)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.img className="lightbox" src={zoom} alt="Vista previa del adjunto" initial={{ scale: 0.95 }} animate={{ scale: 1 }} />
           </motion.div>
         )}
       </AnimatePresence>

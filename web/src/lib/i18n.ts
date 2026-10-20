@@ -42,6 +42,21 @@ const es = {
   langAuto: 'Detecté que escribes en {lang}. ¿Cambiar el idioma?',
   change: 'Cambiar',
   open: 'Abrir asistente', close: 'Cerrar',
+  docsNav: 'Documentos disponibles',
+  docsTitle: 'Documentos disponibles',
+  docsSub: 'Todo lo que {name} usa para responder. Solo se usa la versión vigente de cada documento.',
+  docsSearch: 'Buscar por título',
+  allTopics: 'Todos',
+  originWeb: 'Página web', originInternal: 'Interno',
+  openDoc: 'Abrir documento', openDocAt: 'Abrir en {loc}',
+  viewRecord: 'Ver en Documentos disponibles',
+  internalNote: 'Documento interno: no está publicado, pero puedes pedirlo en la dependencia responsable.',
+  askAbout: 'Preguntar sobre este documento',
+  askAboutQ: '¿Qué dice el documento «{title}»?',
+  backChat: 'Volver al chat',
+  docsCount: '{n} documentos',
+  noDocs: 'No hay documentos que coincidan.',
+  page: 'pág.',
 };
 export type Dict = typeof es;
 
@@ -78,6 +93,21 @@ const en: Dict = {
   langAuto: 'Looks like you are writing in {lang}. Switch language?',
   change: 'Switch',
   open: 'Open assistant', close: 'Close',
+  docsNav: 'Available documents',
+  docsTitle: 'Available documents',
+  docsSub: 'Everything {name} uses to answer. Only the current version of each document is used.',
+  docsSearch: 'Search by title',
+  allTopics: 'All',
+  originWeb: 'Website', originInternal: 'Internal',
+  openDoc: 'Open document', openDocAt: 'Open at {loc}',
+  viewRecord: 'See in Available documents',
+  internalNote: 'Internal document: not published online, but you can request it from the office in charge.',
+  askAbout: 'Ask about this document',
+  askAboutQ: 'What does the document "{title}" say?',
+  backChat: 'Back to chat',
+  docsCount: '{n} documents',
+  noDocs: 'No matching documents.',
+  page: 'page',
 };
 
 const qu: Dict = { ...es, hello: '¡Imanalla! Ñuka shutika {name}.' };
@@ -97,6 +127,9 @@ export function makeT(lang: Lang) {
     return s;
   };
 }
+
+/** Nombre de un tema en el idioma de la interfaz (cae a español si falta la traducción). */
+export const topicLabel = (t: { name: string; nameEn?: string } | undefined, lang: Lang) => (t ? (lang === 'en' ? t.nameEn ?? t.name : t.name) : '');
 
 /** Detección simple por palabras frecuentes. El backend vuelve a detectar con el modelo; esto solo sugiere el cambio en la interfaz. */
 export function detectLang(text: string): Lang | null {

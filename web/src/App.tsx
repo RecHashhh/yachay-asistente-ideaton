@@ -1,7 +1,9 @@
+import { MotionConfig } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
 import { LangContext, makeT, type Lang } from './lib/i18n';
 import { Admin } from './views/Admin';
 import { Chat } from './views/Chat';
+import { Docs } from './views/Docs';
 
 type Theme = 'light' | 'dark';
 const THEME_KEY = 'yt-theme';
@@ -20,8 +22,14 @@ const initialLang = (): Lang => {
   return navigator.language.toLowerCase().startsWith('en') ? 'en' : 'es';
 };
 
-/** Rutas por hash: `#/` chat, `#/embed` chat compacto para el widget, `#/admin` portal. */
-const route = () => (location.hash.startsWith('#/admin') ? 'admin' : location.hash.startsWith('#/embed') ? 'embed' : 'chat');
+/** Rutas por hash: `#/` chat, `#/embed` chat compacto para el widget, `#/documentos` documentos públicos, `#/admin` portal. */
+const route = () => {
+  const h = location.hash;
+  if (h.startsWith('#/admin')) return 'admin';
+  if (h.startsWith('#/embed')) return 'embed';
+  if (h.startsWith('#/documentos')) return 'docs';
+  return 'chat';
+};
 
 export function App() {
   const [page, setPage] = useState(route);
@@ -45,9 +53,13 @@ export function App() {
 
   return (
     <LangContext.Provider value={ctx}>
+      <MotionConfig reducedMotion="user">
       {page === 'admin'
         ? <Admin theme={theme} toggleTheme={toggleTheme} />
+        : page === 'docs'
+        ? <Docs setLang={setLang} />
         : <Chat theme={theme} toggleTheme={toggleTheme} setLang={setLang} embed={page === 'embed'} />}
+      </MotionConfig>
     </LangContext.Provider>
   );
 }

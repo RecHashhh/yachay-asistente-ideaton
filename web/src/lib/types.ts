@@ -32,6 +32,9 @@ export interface Topic {
   id: string;
   name: string;
   description: string;
+  /** Traducción al inglés (la escribe el administrador al crear el tema). */
+  nameEn?: string;
+  descriptionEn?: string;
 }
 
 export interface Trend {
@@ -51,6 +54,22 @@ export interface Source {
   /** Página (PDF), hoja y fila (xlsx/csv). */
   locator?: string;
   snippet: string;
+  /** Enlace al original publicado. Si es PDF y hay `page`, se abre en esa página (#page=N). */
+  url?: string;
+  page?: number;
+  origin?: 'web' | 'interno';
+}
+
+/** Documento tal como lo ve cualquier usuario en "Documentos disponibles" (sin datos de quién lo subió). */
+export interface PublicDoc {
+  id: string;
+  title: string;
+  topicId: string;
+  kind: FileKind;
+  version: string;
+  docDate: string;
+  origin: 'web' | 'interno';
+  url?: string;
 }
 
 /** Lugares del mapa del campus. Los ids deben coincidir con los `id` del SVG real (ver campus.ts). */
@@ -92,6 +111,8 @@ export type StreamEvent =
   | { type: 'unknown'; item: Unknown }
   | { type: 'sources'; items: Source[] }
   | { type: 'suggestions'; items: string[] }
+  /** Botón de acción dentro de la respuesta, p. ej. abrir "Documentos disponibles". Solo rutas internas (#/...). */
+  | { type: 'link'; label: string; href: string }
   | { type: 'done'; messageId: string; cached?: boolean; latencyMs?: number }
   | { type: 'error'; message: string };
 

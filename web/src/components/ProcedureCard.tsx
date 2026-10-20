@@ -1,35 +1,36 @@
 import { motion } from 'motion/react';
 import { useState } from 'react';
-import { placeById } from '../lib/campus';
+import { placeById, placeName } from '../lib/campus';
+import { docHref } from '../lib/api';
 import { useT } from '../lib/i18n';
 import type { Procedure, Unknown } from '../lib/types';
 import { IcCheck, IcMap } from './icons';
 
 /** Guía paso a paso: qué es, qué documentos, en qué orden y dónde. El estudiante puede ir marcando los pasos. */
 export function ProcedureCard({ p, onShowMap }: { p: Procedure; onShowMap: (placeId: string) => void }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [done, setDone] = useState<number[]>([]);
   const toggle = (i: number) => setDone((d) => (d.includes(i) ? d.filter((x) => x !== i) : [...d, i]));
   const place = p.placeId ? placeById(p.placeId) : undefined;
   return (
     <motion.section className="proc" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} aria-label={p.title}>
       <header>
-        <h3>{p.title}</h3>
+        <h2>{p.title}</h2>
         <p className="muted">{p.summary}</p>
         <dl className="proc-meta">
           <div><dt>{t('office')}</dt><dd>{p.office}</dd></div>
           {p.duration && <div><dt>{t('time')}</dt><dd>{p.duration}</dd></div>}
-          {place && <div><dt>{t('where')}</dt><dd><button className="linkish" onClick={() => onShowMap(place.id)}><IcMap width={14} height={14} />{place.name}</button></dd></div>}
+          {place && <div><dt>{t('where')}</dt><dd><button className="linkish" onClick={() => onShowMap(place.id)}><IcMap width={14} height={14} />{placeName(place, lang)}</button></dd></div>}
         </dl>
       </header>
 
       <div className="proc-block">
-        <h4>{t('docs')}</h4>
+        <h3>{t('docs')}</h3>
         <ul className="proc-docs">{p.documents.map((d) => <li key={d}>{d}</li>)}</ul>
       </div>
 
       <div className="proc-block">
-        <h4>{t('steps')} <span className="muted small mono">{done.length}/{p.steps.length}</span></h4>
+        <h3>{t('steps')} <span className="muted small mono">{done.length}/{p.steps.length}</span></h3>
         <ol className="proc-steps">
           {p.steps.map((s, i) => (
             <motion.li key={i} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + i * 0.06 }}>
@@ -41,7 +42,13 @@ export function ProcedureCard({ p, onShowMap }: { p: Procedure; onShowMap: (plac
           ))}
         </ol>
       </div>
-      <footer className="small muted">{p.source.title} · {t('version')} {p.source.version} · {p.source.locator}</footer>
+      <footer className="small muted row">
+        <span>{p.source.title} · {t('version')} {p.source.version} · {p.source.locator}</span>
+        <span className="sp" />
+        {p.source.url
+          ? <a href={docHref(p.source.url, p.source.page)} target="_blank" rel="noreferrer">{t('openDoc')}<span className="sr"> (nueva pestaña)</span></a>
+          : <a href={`#/documentos?doc=${p.source.docId}`} target="_blank" rel="noreferrer">{t('viewRecord')}</a>}
+      </footer>
     </motion.section>
   );
 }

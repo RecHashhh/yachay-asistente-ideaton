@@ -1,5 +1,5 @@
 import * as mock from './mock';
-import type { ChatRequest, DocMeta, StreamEvent, Topic, Trend, UploadInput } from './types';
+import type { ChatRequest, DocMeta, PublicDoc, StreamEvent, Topic, Trend, UploadInput } from './types';
 
 const API = ((import.meta.env.VITE_API_URL as string | undefined) ?? '').replace(/\/$/, '');
 /** Sin VITE_API_URL el frontend funciona con el simulador (mock.ts). */
@@ -51,6 +51,12 @@ export const runControl = (onProgress?: (n: number) => void) =>
   MOCK ? mock.runControl(onProgress) : json<import('./mock').ControlResult[]>('/admin/validation/run', { method: 'POST' });
 export const controlSize = () => mock.controlSet.length;
 export const getTopics = (): Promise<Topic[]> => (MOCK ? Promise.resolve([...mock.topics]) : json('/topics'));
+
+/** Documentos vigentes visibles para cualquier usuario (vista "Documentos disponibles"). */
+export const listPublicDocs = (): Promise<PublicDoc[]> => (MOCK ? Promise.resolve(mock.publicDocs()) : json('/docs'));
+
+/** Enlace al original: en un PDF, directo a la página citada. */
+export const docHref = (url: string, page?: number) => (page ? `${url}#page=${page}` : url);
 
 // ---------- Administración (requiere token) ----------
 

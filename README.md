@@ -17,6 +17,7 @@ npm run dev          # http://localhost:5180
 ```
 
 - Chat público: `http://localhost:5180/`
+- Documentos disponibles (público): `http://localhost:5180/#/documentos`
 - Widget incrustado en otra página (estilo Messenger): `http://localhost:5180/demo-sitio.html`
 - Portal de administración: `http://localhost:5180/#/admin`. En modo de ejemplo entra cualquier correo `@yachaytech.edu.ec` con una contraseña de 4 caracteres o más.
 
@@ -38,10 +39,12 @@ Aparece un botón con la mascota abajo a la derecha; al tocarlo se abre un chat 
 | Composer (igual que el Help Desk de RIPCON): dictado por voz, adjuntar imagen o PDF, capturar pantalla, pegar con Ctrl+V y preguntas parecidas mientras escribes | `src/components/Composer.tsx` |
 | Guía paso a paso de cada trámite: qué es, qué documentos, pasos en orden (se pueden marcar), responsable, tiempo y lugar | `src/components/ProcedureCard.tsx` |
 | "No sé" explícito con la dependencia de contacto; rechazo de preguntas fuera del dominio | `ProcedureCard.tsx` → `UnknownCard` |
-| Español e inglés con selector y detección automática; saludo en kichwa (beta, por validar) | `src/lib/i18n.ts` |
+| Español e inglés con selector y detección automática, incluidos temas, oficinas y lugares del mapa; saludo en kichwa (beta, por validar) | `src/lib/i18n.ts` |
 | Mascota animada: parpadea, piensa y habla según el estado | `src/components/Mascot.tsx` |
-| Texto que aparece palabra por palabra al estilo Claude, y estado "Buscando en los documentos…" con brillo | `src/components/Markdown.tsx`, `.shimmer` en `styles.css` |
+| Texto que aparece palabra por palabra al estilo Claude, y estado "Buscando en los documentos…" con pulso | `src/components/Markdown.tsx`, `.working` en `styles.css` |
 | Mapa del campus con flecha y círculos: aulas, laboratorios, salas de estudio, residencias, representación estudiantil | `src/components/CampusMap.tsx`, `src/lib/campus.ts` |
+| **Documentos disponibles**: lista pública por tema con versión, fecha y origen (web o interno); el chat responde "¿qué documentos tienes?" | `src/views/Docs.tsx` |
+| **Abrir documento** desde cada fuente citada (en PDF, directo en la página) y ficha en Documentos disponibles | `Chat.tsx`, `ProcedureCard.tsx` |
 | Aviso de uso de datos y "Cómo funciona" (bilingües) | `src/components/ConsentDialog.tsx`, `Chat.tsx` → `AboutDialog` |
 | Portal: documentos, subir con metadatos, nueva versión, temas, tendencias | `src/views/Admin.tsx` |
 | Portal → **Validación**: set de preguntas de control y métricas (exactitud, citación correcta, "no sé" correcto, alucinaciones, ES/EN, latencia p50/p95) | `src/views/AdminExtras.tsx`, `controlSet` en `mock.ts` |
@@ -53,11 +56,11 @@ Aparece un botón con la mascota abajo a la derecha; al tocarlo se abre un chat 
 
 | Criterio | Dónde se ve en el prototipo | Falta (fuera del frontend) |
 |---|---|---|
-| Calidad técnica | Prototipo navegable, trámites paso a paso, representación, ubicaciones, widget | Backend real con los documentos del Día 1; repositorio público en GitHub |
-| Mitigación de alucinaciones | Fuente con versión, fecha y fragmento citado; "no sé" con contacto; pestaña Validación | Correr el set de control (≥100 preguntas) contra el modelo real |
-| UX y bilingüismo | Sin instrucciones previas, ES/EN con detección, voz, adjuntos, accesible por teclado, movimiento reducido | Validar kichwa con un hablante nativo |
+| Calidad técnica | Prototipo navegable, trámites paso a paso, representación, ubicaciones, widget, repositorio público | Backend real con los documentos del Día 1 |
+| Mitigación de alucinaciones | Fuente con versión, fecha, fragmento citado y enlace al original; Documentos disponibles; "no sé" con contacto; pestaña Validación | Correr el set de control (≥100 preguntas) contra el modelo real |
+| UX y bilingüismo | Sin instrucciones previas, ES/EN con detección, voz, adjuntos; WCAG 2.2 AA verificado con axe-core (0 violaciones), teclado, lector de pantalla, movimiento reducido | Validar kichwa con un hablante nativo |
 | Costo computacional | Pestaña Costo con fórmula, supuestos y escenarios | Cotización real del servidor |
-| Uso documentado de IA | `docs/DECLARACION-IA.md` (plantilla) y aviso en "Cómo funciona" | Completar la declaración |
+| Uso documentado de IA | `docs/DECLARACION-IA.md` y aviso en "Cómo funciona" | Completar las filas del equipo (paper, pitch, revisores) |
 | Rigor científico y pitch | — | Paper IEEE y presentación |
 
 **Provisional, falta reemplazar:** el nombre y el arte de la mascota (`src/config.ts`, `Mascot.tsx`), el SVG oficial del campus (`CampusMap.tsx` → `CampusBase`, y las coordenadas en `campus.ts`) y el texto legal del aviso de datos.
@@ -66,7 +69,8 @@ Aparece un botón con la mascota abajo a la derecha; al tocarlo se abre un chat 
 
 | Método | Ruta | Uso |
 |---|---|---|
-| POST | `/chat` | `ChatRequest` → `text/event-stream` con `StreamEvent` (`status`, `token`, `tool`, `sources`, `suggestions`, `done`, `error`) |
+| POST | `/chat` | `ChatRequest` → `text/event-stream` con `StreamEvent` (`status`, `token`, `tool`, `procedure`, `unknown`, `sources`, `suggestions`, `link`, `done`, `error`) |
+| GET | `/docs` | Documentos vigentes visibles para cualquier usuario |
 | GET | `/trends` | Consultas más frecuentes de los últimos 7 días |
 | GET | `/topics` | Temas consultables |
 | POST | `/admin/login` | Devuelve un token. Sugerido: Microsoft Entra ID con el tenant de la universidad |

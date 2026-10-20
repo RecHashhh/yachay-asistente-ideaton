@@ -3,13 +3,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { BRAND } from '../config';
 import { CampusMap } from '../components/CampusMap';
 import { Composer } from '../components/Composer';
-import { ConsentDialog, hasConsent } from '../components/ConsentDialog';
+import { ConsentDialog, hasConsent, trapFocus } from '../components/ConsentDialog';
 import { Markdown } from '../components/Markdown';
 import { Mascot } from '../components/Mascot';
 import { ProcedureCard, UnknownCard } from '../components/ProcedureCard';
-import { IcChat, IcCheck, IcClose, IcCopy, IcDown, IcExpand, IcGlobe, IcInfo, IcLock, IcMenu, IcMoon, IcPlus, IcRetry, IcShield, IcSun, IcTrend, IcUp } from '../components/icons';
-import { MOCK, getTopics, getTrends, sendFeedback, streamChat } from '../lib/api';
-import { LANGS, detectLang, useT, type Lang } from '../lib/i18n';
+import { IcBook, IcExternal, IcChat, IcCheck, IcClose, IcCopy, IcDown, IcExpand, IcGlobe, IcInfo, IcLock, IcMenu, IcMoon, IcPlus, IcRetry, IcShield, IcSun, IcTrend, IcUp } from '../components/icons';
+import { MOCK, docHref, getTopics, getTrends, sendFeedback, streamChat } from '../lib/api';
+import { LANGS, detectLang, topicLabel, useT, type Lang } from '../lib/i18n';
 import type { Attachment, ChatTurn, MapAction, Procedure, Source, Topic, Trend, Unknown } from '../lib/types';
 
 interface Msg {
@@ -23,6 +23,7 @@ interface Msg {
   procedure?: Procedure;
   unknown?: Unknown;
   suggestions?: string[];
+  link?: { label: string; href: string };
   streaming?: boolean;
   error?: string;
   vote?: 'up' | 'down';
@@ -62,6 +63,10 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
   const abort = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const busy = msgs.some((m) => m.streaming);
+  const modalOpen = !consent || dialog !== null;
+  // Lo que oye un lector de pantalla: el estado al empezar y la respuesta completa al terminar, no cada palabra del stream.
+  const lastAi = [...msgs].reverse().find((m) => m.role === 'assistant');
+  const announce = !lastAi ? '' : lastAi.streaming ? t('thinking') + '…' : lastAi.unknown ? t(lastAi.unknown.reason === 'fuera_de_dominio' ? 'outOfDomain' : 'unknownTitle') : [lastAi.text.replaceAll('**', ''),lastAi.procedure?.title].filter(Boolean).join('. ');
 
   useEffect(() => { void getTrends(lang).then(setTrends); }, [lang]);
   useEffect(() => { void getTopics().then(setTopics); }, []);
@@ -114,6 +119,7 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
         else if (ev.type === 'unknown') patch(ai.id, () => ({ unknown: ev.item, status: undefined }));
         else if (ev.type === 'sources') patch(ai.id, () => ({ sources: ev.items }));
         else if (ev.type === 'suggestions') patch(ai.id, () => ({ suggestions: ev.items }));
+        else if (ev.type === 'link' && ev.href.startsWith('#/')) patch(ai.id, () => ({ link: { label: ev.label, href: ev.href } }));
         else if (ev.type === 'done') patch(ai.id, () => ({ serverId: ev.messageId, latencyMs: ev.latencyMs }));
         else if (ev.type === 'error') patch(ai.id, () => ({ error: ev.message }));
       }
@@ -133,7 +139,13 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
     if (q?.role === 'user') void send(q.text, msgs.slice(0, i - 1), q.files ?? []);
   };
 
-  const topicName = useMemo(() => Object.fromEntries(topics.map((x) => [x.id, x.name])), [topics]);
+  const topicName = useMemo(() => Object.fromEntries(topics.map((x) => [x.id, topicLabel(x, lang)])), [topics, lang]);
+
+  // "Preguntar sobre este documento" llega como #/?ask=...: se precarga la pregunta y el usuario decide si la envía.
+  useEffect(() => {
+    const ask = new URLSearchParams(location.hash.split('?')[1] ?? '').get('ask');
+    if (ask) { setInput(ask); history.replaceState(null, '', `${location.pathname}${location.search}#/`); }
+  }, []);
   const empty = msgs.length === 0;
 
   const composer = (
@@ -163,7 +175,9 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
   );
 
   return (
-    <div className={`app${embed ? ' embed' : ''}${railOpen ? '' : ' rail-closed'}${mobileRail ? ' rail-open-mobile' : ''}`}>
+    <>
+    <div className={`app${embed ? ' embed' : ''}${railOpen ? '' : ' rail-closed'}${mobileRail ? ' rail-open-mobile' : ''}`} inert={modalOpen || undefined}>
+      <div className="sr" role="status" aria-live="polite">{announce}</div>
       {!embed && (
         <aside className="rail" aria-label={t('recent')}>
           <div className="brand"><Mascot size={30} /><div><b>{BRAND.mascotName}</b><small>{BRAND.tagline} · {BRAND.university}</small></div></div>
@@ -171,6 +185,7 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
           {chats.length > 0 && <h4>{t('recent')}</h4>}
           {chats.map((c) => <button key={c.id} className="item" aria-current={c.id === chatId} onClick={() => openChat(c)} title={c.title}><IcChat />{c.title}</button>)}
           <div className="foot">
+            <a className="item" href="#/documentos" style={{ textDecoration: 'none' }}><IcBook />{t('docsNav')}</a>
             <button className="item" onClick={() => setDialog('about')}><IcInfo />{t('about')}</button>
             <button className="item" onClick={() => setDialog('notice')}><IcShield />{t('notice')}</button>
             <button className="item" onClick={toggleTheme}>{theme === 'dark' ? <IcSun /> : <IcMoon />}{theme === 'dark' ? t('themeLight') : t('themeDark')}</button>
@@ -185,7 +200,7 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
           {embed ? <Mascot size={28} mood={busy ? 'thinking' : 'idle'} /> : (
             <button className="icon-btn" aria-label={t('recent')} onClick={() => (window.matchMedia('(max-width: 820px)').matches ? setMobileRail(true) : setRailOpen((o) => !o))}><IcMenu /></button>
           )}
-          <span className="title">{BRAND.mascotName}</span>
+          <h1 className="title">{BRAND.mascotName}</h1>
           {MOCK && <span className="badge-demo" title="Sin backend: respuestas simuladas con datos de ejemplo">{t('demo')}</span>}
           <span className="sp" />
           {langSelect}
@@ -204,7 +219,7 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
             {langBanner}
             {trends.length > 0 && (
               <div className="suggest">
-                <h3><IcTrend width={15} height={15} />{t('trending')}</h3>
+                <h2><IcTrend width={15} height={15} />{t('trending')}</h2>
                 <div className="suggest-grid">
                   {trends.slice(0, embed ? 3 : 4).map((x, i) => (
                     <motion.button key={x.query} className="suggest-card" onClick={() => void send(x.query)}
@@ -220,7 +235,7 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
         ) : (
           <>
             <div className="scroll">
-              <div className="thread" aria-live="polite">
+              <div className="thread">
                 <AnimatePresence initial={false}>
                   {msgs.map((m) => m.role === 'user'
                     ? (
@@ -247,9 +262,10 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
       </main>
 
       <AnimatePresence>{toastMsg && <motion.div className="toast" role="status" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>{toastMsg}</motion.div>}</AnimatePresence>
-      <ConsentDialog open={!consent || dialog === 'notice'} onAccept={() => { setConsent(true); setDialog(null); }} onClose={consent ? () => setDialog(null) : undefined} />
-      <AboutDialog open={dialog === 'about'} onClose={() => setDialog(null)} />
     </div>
+      <ConsentDialog open={!consent || dialog === 'notice'} onAccept={() => { setConsent(true); setDialog(null); setTimeout(() => document.getElementById('ask')?.focus(), 50); }} onClose={consent ? () => setDialog(null) : undefined} />
+      <AboutDialog open={dialog === 'about'} onClose={() => setDialog(null)} />
+    </>
   );
 }
 
@@ -264,12 +280,12 @@ function AssistantMsg({ m, onVote, onRetry, onAsk, onShowMap }: { m: Msg; onVote
   const mapAfter = !!(m.procedure || m.unknown);
   return (
     <motion.div className="msg-ai" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-      <Mascot size={36} mood={mood} />
+      <Mascot size={36} mood={mood} decorative />
       <div className="body">
         <AnimatePresence mode="wait">
           {m.status && (
             <motion.span key={m.status} className="status" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.2 }}>
-              <span className="shimmer">{m.status}…</span>
+              <span className="working">{m.status}…</span>
             </motion.span>
           )}
         </AnimatePresence>
@@ -278,7 +294,8 @@ function AssistantMsg({ m, onVote, onRetry, onAsk, onShowMap }: { m: Msg; onVote
         {m.procedure && <ProcedureCard p={m.procedure} onShowMap={onShowMap} />}
         {m.unknown && <UnknownCard u={m.unknown} onShowMap={onShowMap} />}
         {m.map && mapAfter && <CampusMap action={m.map} scrollIntoView />}
-        {m.error && <p className="err">{m.error}</p>}
+        {m.link && !m.streaming && <a className="btn sm action-link" href={m.link.href} target="_blank" rel="noreferrer"><IcBook width={15} height={15} />{m.link.label}</a>}
+        {m.error && <p className="err" role="alert">{m.error}</p>}
 
         {!m.streaming && m.sources && m.sources.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -295,6 +312,15 @@ function AssistantMsg({ m, onVote, onRetry, onAsk, onShowMap }: { m: Msg; onVote
                   <b>{src.title}</b>
                   <span className="mono small">{t('version')} {src.version} · {t('docOf')} {src.docDate}{src.locator ? ` · ${src.locator}` : ''}</span>
                   <span>“{src.snippet}”</span>
+                  <span className="row" style={{ marginTop: 4 }}>
+                    {src.url && (
+                      <a className="btn sm" href={docHref(src.url, src.page)} target="_blank" rel="noreferrer">
+                        {src.page ? t('openDocAt', { loc: `${t('page')} ${src.page}` }) : t('openDoc')}<IcExternal width={14} height={14} /><span className="sr"> (nueva pestaña)</span>
+                      </a>
+                    )}
+                    <a className="btn sm ghost" href={`#/documentos?doc=${src.docId}`} target="_blank" rel="noreferrer">{t('viewRecord')}</a>
+                  </span>
+                  {!src.url && <span className="small">{t('internalNote')}</span>}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -331,7 +357,7 @@ function AboutDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
     <AnimatePresence>
       {open && (
         <motion.div className="scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
-          <motion.div className="dialog" role="dialog" aria-modal="true" aria-labelledby="about-title" onClick={(e) => e.stopPropagation()}
+          <motion.div className="dialog" role="dialog" aria-modal="true" aria-labelledby="about-title" onClick={(e) => e.stopPropagation()} onKeyDown={trapFocus} ref={(el) => el?.querySelector<HTMLElement>('.btn.primary')?.focus()}
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}>
             <div className="row" style={{ gap: 10 }}><Mascot size={32} /><h2 id="about-title">{en ? `How ${BRAND.mascotName} works` : `Cómo funciona ${BRAND.mascotName}`}</h2></div>
             <ul>

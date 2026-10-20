@@ -42,7 +42,7 @@ export function Admin({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggleT
       <header className="admin-top">
         <a className="icon-btn" href="#/" aria-label="Volver al chat"><IcArrowLeft /></a>
         <Mascot size={28} />
-        <b>Base de conocimiento</b>
+        <h1 className="admin-h">Base de conocimiento</h1>
         {MOCK && <span className="badge-demo">Datos de ejemplo</span>}
         <span className="sp" />
         <nav className="tabs" aria-label="Secciones">
@@ -75,17 +75,17 @@ function Login({ onLogin }: { onLogin: (u: AdminUser) => void }) {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   return (
-    <div className="login">
+    <main className="login">
       <motion.form className="card" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
         onSubmit={async (e) => { e.preventDefault(); setBusy(true); setErr(null); try { onLogin(await adminLogin(email.trim(), pw)); } catch (x) { setErr((x as Error).message); } finally { setBusy(false); } }}>
-        <div className="row" style={{ gap: 12 }}><Mascot size={44} /><div><h2 style={{ fontSize: 20 }}>Portal de administración</h2><p className="small muted">{BRAND.university} · base de conocimiento de {BRAND.mascotName}</p></div></div>
+        <div className="row" style={{ gap: 12 }}><Mascot size={44} /><div><h1 style={{ fontSize: 20 }}>Portal de administración</h1><p className="small muted">{BRAND.university} · base de conocimiento de {BRAND.mascotName}</p></div></div>
         <label className="field"><span>Correo institucional</span><input className="inp" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nombre@yachaytech.edu.ec" required /></label>
         <label className="field"><span>Contraseña</span><input className="inp" type="password" autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} required /></label>
         {err && <p className="err">{err}</p>}
         <button className="btn primary" disabled={busy}>{busy ? 'Entrando…' : 'Entrar'}</button>
         <a className="small muted" href="#/">Volver al chat</a>
       </motion.form>
-    </div>
+    </main>
   );
 }
 
@@ -106,7 +106,7 @@ function Docs({ docs, topicName, onNew, onReplace, onDelete }: { docs: DocMeta[]
       <input className="inp" style={{ maxWidth: 320 }} placeholder="Buscar por título o tema" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar documentos" />
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Documento</th><th>Tema</th><th>Versión</th><th>Fecha del documento</th><th>Origen</th><th>Estado</th><th aria-label="Acciones" /></tr></thead>
+          <thead><tr><th>Documento</th><th>Tema</th><th>Versión</th><th>Fecha del documento</th><th>Origen</th><th>Estado</th><th><span className="sr">Acciones</span></th></tr></thead>
           <tbody>
             {shown.map((d) => (
               <tr key={d.id}>
@@ -189,6 +189,8 @@ function Upload({ topics, docs, replacing, onDone }: { topics: Topic[]; docs: Do
 function Topics({ topics, docs, onCreate }: { topics: Topic[]; docs: DocMeta[]; onCreate: (t: Omit<Topic, 'id'>) => Promise<void> }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [nameEn, setNameEn] = useState('');
+  const [descriptionEn, setDescriptionEn] = useState('');
   return (
     <>
       <header><div><h2>Temas</h2><p>Los temas que se pueden consultar. Cada documento pertenece a uno; el asistente filtra por tema antes de buscar.</p></div></header>
@@ -198,11 +200,13 @@ function Topics({ topics, docs, onCreate }: { topics: Topic[]; docs: DocMeta[]; 
           <tbody>{topics.map((t) => <tr key={t.id}><td className="t">{t.name}</td><td className="muted">{t.description}</td><td className="mono">{docs.filter((d) => d.topicId === t.id).length}</td></tr>)}</tbody>
         </table>
       </div>
-      <form className="card" onSubmit={async (e) => { e.preventDefault(); if (!name.trim()) return; await onCreate({ name: name.trim(), description: description.trim() }); setName(''); setDescription(''); }}>
+      <form className="card" onSubmit={async (e) => { e.preventDefault(); if (!name.trim()) return; await onCreate({ name: name.trim(), description: description.trim(), nameEn: nameEn.trim() || undefined, descriptionEn: descriptionEn.trim() || undefined }); setName(''); setDescription(''); setNameEn(''); setDescriptionEn(''); }}>
         <b>Agregar tema</b>
         <div className="form-grid">
           <label className="field"><span>Nombre</span><input className="inp" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Investigación" /></label>
           <label className="field"><span>Descripción</span><input className="inp" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Qué preguntas cubre" /></label>
+          <label className="field"><span>Nombre en inglés</span><input className="inp" lang="en" value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="E.g. Research" /></label>
+          <label className="field"><span>Descripción en inglés</span><input className="inp" lang="en" value={descriptionEn} onChange={(e) => setDescriptionEn(e.target.value)} placeholder="Which questions it covers" /></label>
         </div>
         <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn primary" disabled={!name.trim()}>Agregar</button></div>
       </form>
