@@ -14,6 +14,20 @@ export function Markdown({ text, animate }: { text: string; animate: boolean }) 
         const start = offset;
         offset += block.length + 2;
         const lines = block.split('\n');
+        // Tabla: todas las líneas empiezan con "|" (horarios, puntajes, costos de los documentos oficiales).
+        if (lines.length >= 2 && lines.every((l) => l.trim().startsWith('|'))) {
+          const cells = (l: string) => l.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+          const rows = lines.filter((l) => !/^\s*\|?\s*:?-{2,}/.test(l)).map(cells);
+          const [head, ...body] = rows;
+          return (
+            <div key={bi} className="md-table" role="region" aria-label="Tabla" tabIndex={0}>
+              <table>
+                <thead><tr>{head!.map((c, i) => <th key={i} scope="col">{inline(c, start + i, false)}</th>)}</tr></thead>
+                <tbody>{body.map((r, ri) => <tr key={ri}>{r.map((c, ci) => <td key={ci}>{inline(c, start + ri * 50 + ci, animate)}</td>)}</tr>)}</tbody>
+              </table>
+            </div>
+          );
+        }
         const ul = lines.every((l) => /^\s*[-*] /.test(l));
         const ol = lines.every((l) => /^\s*\d+\. /.test(l));
         if (ul || ol) {

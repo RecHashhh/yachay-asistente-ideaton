@@ -73,9 +73,7 @@ a.btn{text-decoration:none}
 
 /* ---------- Shell del chat ---------- */
 .app{display:grid;grid-template-columns:var(--rail) 1fr;height:100%;height:100dvh;transition:grid-template-columns .3s var(--ease)}
-.app.rail-closed{grid-template-columns:0 1fr}
 .rail{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:6px;padding:14px 10px;overflow:hidden;min-width:0}
-.app.rail-closed .rail{border-right:0;padding-inline:0}
 .rail .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 12px;white-space:nowrap}
 .rail .brand b{font-size:15px}
 .rail .brand small{display:block;font-size:11px;color:var(--muted);font-weight:500}
@@ -133,8 +131,8 @@ a.btn{text-decoration:none}
 .lang-banner{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted);background:var(--accent-soft);border-radius:var(--r-lg);padding:6px 6px 6px 12px}
 .lang-banner .btn{margin-left:auto}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:var(--r-lg);font-size:13.5px;box-shadow:var(--shadow-lg);z-index:70;max-width:calc(100vw - 32px)}
-.send{width:38px;height:38px;border-radius:999px;border:0;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);flex:none;transition:transform .15s var(--ease),opacity .15s}
-.send:disabled{background:var(--surface-2);color:var(--muted);cursor:default}
+.send{width:38px;height:38px;border-radius:999px;border:0;display:grid;place-items:center;background:#27618e;color:#fff;flex:none;transition:transform .15s var(--ease),opacity .15s}
+.send:disabled{opacity:.45;cursor:default}
 .send:not(:disabled):hover{transform:scale(1.06)}
 .send svg{width:18px;height:18px}
 .disclaimer{text-align:center;font-size:12px;color:var(--muted);margin-top:8px}
@@ -277,6 +275,18 @@ td .t{font-weight:600}
 .app.embed .msg-ai{grid-template-columns:28px 1fr;gap:10px}
 .app.embed .msg-ai > .mascot{width:28px;height:28px}
 
+/* En escritorio el lateral se contrae a iconos, conservando el orden y el pie. */
+@media (min-width: 821px){
+  .app.rail-closed{grid-template-columns:64px minmax(0,1fr)}
+  .app.rail-closed .rail{padding-inline:10px}
+  .app.rail-closed .rail .brand{justify-content:center;padding-inline:0}
+  .app.rail-closed .rail .brand > div,
+  .app.rail-closed .rail .rail-label,
+  .app.rail-closed .rail .ellipsis,
+  .app.rail-closed .rail .chat-more{display:none}
+  .app.rail-closed .rail h4{visibility:hidden}
+  .app.rail-closed .rail .item{justify-content:center;gap:0;padding-inline:0}
+}
 @media (max-width: 820px){
   .app{grid-template-columns:0 1fr}
   .app .rail{position:fixed;inset:0 auto 0 0;width:min(var(--rail),85vw);z-index:40;transform:translateX(-100%);transition:transform .3s var(--ease);padding:14px 10px;border-right:1px solid var(--line)}
@@ -391,3 +401,9 @@ select option{background:var(--surface);color:var(--ink)}
 .voice-prefs .field{min-width:150px}
 @media (max-width: 640px){ .voice-orb{width:170px;height:170px} .voice-status{font-size:18px} }
 .voice-orb .mascot{position:relative;z-index:1}
+
+/* Tablas dentro de las respuestas (horarios, puntajes, costos) */
+.md-table{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-lg);margin:10px 0}
+.md-table table{font-size:14px}
+.md-table th{background:var(--surface-2);color:var(--ink)}
+.md-table td,.md-table th{padding:8px 12px}

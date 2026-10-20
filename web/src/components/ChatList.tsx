@@ -37,7 +37,7 @@ export function ChatList({ chats, currentId, onOpen, onRename, onDelete }: {
             ? <RenameField key={c.id} initial={c.title} onDone={(v) => { if (v && v !== c.title) onRename(c.id, v); setEditing(null); }} />
             : (
               <div key={c.id} className={`chat-row${menu?.id === c.id ? ' menu-open' : ''}`} aria-current={c.id === currentId}>
-                <button className="item" onClick={() => onOpen(c.id)} title={c.title} aria-current={c.id === currentId}>
+                <button className="item" onClick={() => onOpen(c.id)} title={c.title} aria-label={c.title} aria-current={c.id === currentId}>
                   <IcChat /><span className="ellipsis">{c.title}</span>
                 </button>
                 <button className="icon-btn chat-more" aria-label={`${t('options')}: ${c.title}`} aria-haspopup="menu" aria-expanded={menu?.id === c.id}

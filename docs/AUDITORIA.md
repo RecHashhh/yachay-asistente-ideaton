@@ -4,7 +4,9 @@ Contrasta tres cosas: **(A)** lo que el equipo pidió al inicio, **(B)** lo que 
 
 Leyenda: ✅ hecho y verificado · 🟡 hecho en parte o sin verificar con el sistema real · ❌ pendiente · ⏸ fuera de alcance (decidido)
 
-> **Estado de la plataforma.** El frontend está completo y verificado (axe-core sin violaciones, pruebas en navegador). El backend (FastAPI + LangGraph + PostgreSQL + pgvector + Claude Haiku 5.5) está **escrito y subido, pero aún no se ha ejecutado contra la base**: falta crear la base (necesita la contraseña de `postgres`) y la clave de Anthropic. Toda métrica de este documento proviene del **simulador** hasta que eso ocurra.
+> **Estado de la plataforma (actualizado).** Backend **en funcionamiento** con PostgreSQL 18 + pgvector 0.8.7 (índice HNSW): 75 documentos, 1.446 fragmentos con embeddings, 10 lugares y 50 aulas con coordenadas reales, frontend conectado. Falta solo la **clave de Anthropic**: sin ella, Yachi responde en modo extractivo (muestra el fragmento oficial más relevante, sin redactar).
+>
+> **Métricas reales de búsqueda** (40 preguntas de control, corpus real): documento correcto entre los 5 que recibe el modelo **29/29 = 100 %** (recall@5), en primer lugar 16/29 (MRR 0,73); reglas exactas (aulas, lugares, aclaración, fuera de ámbito) **11/11**; tiempo de búsqueda **27–58 ms**. La única falla inicial («otra universidad» vs. «cambio de IES») se resolvió con expansión de sinónimos.
 
 ---
 
@@ -29,8 +31,8 @@ Leyenda: ✅ hecho y verificado · 🟡 hecho en parte o sin verificar con el si
 | A15 | "Confesionario" | ❌ | Sin definir por el equipo |
 | A16 | Voz, adjuntos, captura (del Help Desk) | ✅ · 🟡 | Probado con micrófono simulado; falta prueba con hardware real |
 | A17 | Widget flotante para otras páginas | ✅ | `web/public/yachi-widget.js` |
-| A18 | PostgreSQL como base | 🟡 | Esquema completo con pgvector; base pendiente de crear |
-| A19 | Búsqueda vectorial rápida | 🟡 | pgvector 0.8.7 compilado para PG 18 + índice HNSW; pendiente de instalar (requiere permiso de administrador) |
+| A18 | PostgreSQL como base | ✅ | Base `yachi` creada, corpus cargado |
+| A19 | Búsqueda vectorial rápida | ✅ | pgvector 0.8.7 instalado, índice HNSW; 27–58 ms por búsqueda híbrida |
 
 ## B. Requisitos del planteamiento del reto (PDF 1)
 

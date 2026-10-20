@@ -1,4 +1,4 @@
-# Instala pgvector en PostgreSQL 18 y crea la base "yachi" con su usuario (contraseña tomada de api/.env).
+﻿# Instala pgvector en PostgreSQL 18 y crea la base "yachi" con su usuario (contraseña tomada de api/.env).
 # Necesita permisos de administrador (para copiar pgvector a Program Files) y la contraseña del superusuario postgres.
 $ErrorActionPreference = 'Stop'
 $api = Split-Path -Parent $PSScriptRoot

@@ -265,16 +265,16 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
     <div className={`app${embed ? ' embed' : ''}${railOpen ? '' : ' rail-closed'}${mobileRail ? ' rail-open-mobile' : ''}`} inert={modalOpen || undefined}>
       <div className="sr" role="status" aria-live="polite">{announce}</div>
       {!embed && (
-        <aside className="rail" aria-label={t('recent')}>
+        <aside id="chat-sidebar" className="rail" aria-label={t('recent')}>
           <div className="brand"><Mascot size={30} /><div><b>{BRAND.mascotName}</b><small>{BRAND.university}</small></div></div>
-          <button className="item" onClick={newChat}><IcPlus />{t('newChat')}</button>
+          <button className="item" onClick={newChat} title={t('newChat')} aria-label={t('newChat')}><IcPlus /><span className="rail-label">{t('newChat')}</span></button>
           <nav className="chat-list" aria-label={t('recent')}>
             <ChatList chats={chats} currentId={chatId} onOpen={(id) => { const c = chats.find((x) => x.id === id); if (c) openChat(c); }} onRename={renameChat} onDelete={deleteChat} />
           </nav>
           <div className="foot">
-            <button className="item" onClick={() => setDialog('about')}><IcInfo />{t('about')}</button>
-            <button className="item" onClick={() => setDialog('notice')}><IcShield />{t('notice')}</button>
-            <a className="item" href="#/admin" style={{ textDecoration: 'none' }}><IcLock />{t('admin')}</a>
+            <button className="item" onClick={() => setDialog('about')} title={t('about')} aria-label={t('about')}><IcInfo /><span className="rail-label">{t('about')}</span></button>
+            <button className="item" onClick={() => setDialog('notice')} title={t('notice')} aria-label={t('notice')}><IcShield /><span className="rail-label">{t('notice')}</span></button>
+            <a className="item" href="#/admin" title={t('admin')} aria-label={t('admin')} style={{ textDecoration: 'none' }}><IcLock /><span className="rail-label">{t('admin')}</span></a>
           </div>
         </aside>
       )}
@@ -283,7 +283,7 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
       <main className="chat">
         <header className="topbar">
           {embed ? <Mascot size={28} mood={busy ? 'thinking' : 'idle'} /> : (
-            <button className="icon-btn" aria-label={t('recent')} onClick={() => (window.matchMedia('(max-width: 820px)').matches ? setMobileRail(true) : setRailOpen((o) => !o))}><IcMenu /></button>
+            <button className="icon-btn" aria-label={t('recent')} aria-controls="chat-sidebar" aria-expanded={window.matchMedia('(max-width: 820px)').matches ? mobileRail : railOpen} onClick={() => (window.matchMedia('(max-width: 820px)').matches ? setMobileRail(true) : setRailOpen((o) => !o))}><IcMenu /></button>
           )}
           <h1 className="title">{BRAND.mascotName}</h1>
           <span className="sp" />
@@ -425,7 +425,7 @@ function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAs
               {src && (
                 <motion.div className="src-detail" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
                   <b>{src.title}</b>
-                  <span className="mono small">{t('version')} {src.version} · {t('docOf')} {src.docDate}{src.locator ? ` · ${locatorLabel(src.locator, lang)}` : ''}</span>
+                  <span className="mono small">{t('version')} {src.version}{src.periodo && src.periodo !== src.version ? ` · ${src.periodo}` : ''} · {src.dateKind === 'consulta' ? t('consultedOn') : t('docOf')} {src.docDate}{src.locator ? ` · ${locatorLabel(src.locator, lang)}` : ''}</span>
                   <span lang="es">“{src.snippet}”{t('originalQuote') && <span className="small" lang={lang}> ({t('originalQuote')})</span>}</span>
                   <span className="row" style={{ marginTop: 4 }}>
                     {src.url && (
@@ -434,6 +434,7 @@ function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAs
                       </a>
                     )}
                   </span>
+                  {src.url && src.acceso === 'institucional' && <span className="small">{t('institutional')}</span>}
                   {!src.url && <span className="small">{t('internalNote')}</span>}
                 </motion.div>
               )}

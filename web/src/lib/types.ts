@@ -58,6 +58,11 @@ export interface Source {
   url?: string;
   page?: number;
   origin?: 'web' | 'interno';
+  /** 'consulta': la fecha es de cuándo se descargó la fuente, no de emisión del documento. */
+  dateKind?: 'consulta' | 'documento';
+  /** 'institucional': el enlace abre solo con la cuenta de la universidad (SharePoint). */
+  acceso?: 'publico' | 'institucional' | 'interno';
+  periodo?: string | null;
 }
 
 /** Documento tal como lo ve cualquier usuario en "Documentos disponibles" (sin datos de quién lo subió). */
@@ -82,6 +87,12 @@ export interface MapAction {
   /** Otros lugares que se marcan con un círculo. */
   resaltar?: PlaceId[];
   nota?: string;
+  /** Coordenadas reales (backend): lugar de los Excel de la universidad. */
+  lat?: number;
+  lon?: number;
+  nombre?: string;
+  horario?: string | null;
+  mapsUrl?: string | null;
 }
 
 /** Guía paso a paso de un trámite: qué es, qué se necesita, en qué orden y dónde. Sale de un documento fuente, nunca del modelo solo. */

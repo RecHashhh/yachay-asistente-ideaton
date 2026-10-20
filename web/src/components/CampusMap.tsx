@@ -16,6 +16,7 @@ export function CampusMap({ action, scrollIntoView }: { action: MapAction; scrol
   useEffect(() => { if (scrollIntoView) ref.current?.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' }); }, [scrollIntoView, reduce, action.destino]);
   const dest = placeById(action.destino);
   const from = action.origen ? placeById(action.origen) : undefined;
+  if (!dest && action.lat !== undefined && action.lon !== undefined) return <RealPlace action={action} />;
   const extra = (action.resaltar ?? []).map(placeById).filter((p) => p && p.id !== dest?.id);
   if (!dest) return null;
 
@@ -88,5 +89,21 @@ function CampusBase({ activeId, lang }: { activeId: string; lang: string }) {
         </g>
       ))}
     </g>
+  );
+}
+
+/** Lugar real (coordenadas de los Excel de la universidad): nombre, horario y enlace a Google Maps. */
+function RealPlace({ action }: { action: MapAction }) {
+  const { t } = useT();
+  const href = action.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${action.lat},${action.lon}`;
+  return (
+    <motion.figure className="map-card real-place" style={{ margin: 0 }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+      <figcaption>
+        <span className="dot" />
+        <span><b>{action.nombre ?? action.destino}</b>{action.horario && <span className="muted"> · {t('hours')}: {action.horario}</span>}</span>
+        <span className="sp" />
+        <a className="btn sm" href={href} target="_blank" rel="noreferrer"><IcMap width={14} height={14} />{t('openMaps')}<span className="sr"> (nueva pestaña)</span></a>
+      </figcaption>
+    </motion.figure>
   );
 }

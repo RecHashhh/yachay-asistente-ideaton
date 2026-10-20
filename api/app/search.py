@@ -85,8 +85,25 @@ def _fts(text: str, k: int) -> list[tuple[str, float]]:
     return [(r["id"], float(r["r"])) for r in rows]
 
 
+# Cómo pregunta un estudiante → cómo lo escriben los documentos (expansión de la consulta, solo para la búsqueda de texto).
+SYNONYMS = [
+    (re.compile(r"otra universidad|otra ies|otra instituci[oó]n|de universidad|other university|transfer from"), "cambio de IES institución de educación superior"),
+    (re.compile(r"pasarme|cambiarme"), "cambio"),
+    (re.compile(r"retirarme|darme de baja|dejar la carrera"), "retiro"),
+    (re.compile(r"notas?|calificaci"), "calificaciones récord académico"),
+    (re.compile(r"pagar|cuesta|costo|precio"), "valor arancel pago"),
+    (re.compile(r"volver a la universidad|regresar a estudiar"), "reingreso"),
+]
+
+
+def expand(text: str) -> str:
+    low = text.lower()
+    extra = " ".join(rep for pat, rep in SYNONYMS if pat.search(low))
+    return f"{text} {extra}" if extra else text
+
+
 def hybrid(text: str, k: int = 4, topic: str | None = None) -> list[Hit]:
-    fts = _fts(text, TOP_EACH)
+    fts = _fts(expand(text), TOP_EACH)
     vec = vectors.search(text, TOP_EACH)
     fused: dict[str, float] = {}
     for rank, (cid, _) in enumerate(fts):

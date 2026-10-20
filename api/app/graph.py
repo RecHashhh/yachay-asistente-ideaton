@@ -171,7 +171,10 @@ async def generate(state: State) -> State:
     if client is None:
         # Sin clave de API: modo extractivo (muestra el fragmento más relevante, sin redactar). Útil para probar la búsqueda.
         h = hits[0]
-        body = h.texto.split("\n\n", 1)[-1].strip()[:700]
+        body = h.texto.split("\n\n", 1)[-1].strip()
+        if len(body) > 900:  # corta en un salto de línea para no dejar filas de tabla a medias
+            cut = body.rfind("\n", 0, 900)
+            body = body[:cut].rstrip() if cut > 200 else body[:900]
         intro = _t(lang, "Esto dice el documento oficial más relevante:\n\n", "This is what the most relevant official document says:\n\n")
         for part in re.findall(r"\S+\s*", intro + body):
             w({"type": "token", "text": part})
