@@ -1,6 +1,6 @@
 # Yachi — backend (RAG)
 
-FastAPI + LangGraph + PostgreSQL + Claude Haiku 5.5. Usa el corpus que preparó el equipo (`docs/fuentes/rag/`, **confidencial, fuera del repositorio**).
+FastAPI + LangGraph + PostgreSQL + Claude Haiku 5.5. Usa el corpus que preparó el equipo (`docs/rag/rag/`, **confidencial, fuera del repositorio**).
 
 ## Puesta en marcha (Windows, PostgreSQL 18 local)
 

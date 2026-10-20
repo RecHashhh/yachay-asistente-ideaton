@@ -22,7 +22,7 @@ class Settings:
     database_url: str = field(default_factory=lambda: _req("DATABASE_URL"))
     anthropic_model: str = field(default_factory=lambda: os.environ.get("ANTHROPIC_MODEL", "claude-haiku-5-5"))
     has_anthropic_key: bool = field(default_factory=lambda: bool(os.environ.get("ANTHROPIC_API_KEY", "").strip()))
-    rag_dir: Path = field(default_factory=lambda: (API_DIR / os.environ.get("RAG_DIR", "../docs/fuentes/rag")).resolve())
+    rag_dir: Path = field(default_factory=lambda: (API_DIR / os.environ.get("RAG_DIR", "../docs/rag/rag")).resolve())
     embedding_model: str = field(default_factory=lambda: os.environ.get("EMBEDDING_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"))
     admin_emails: tuple[str, ...] = field(default_factory=lambda: tuple(e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()))
     admin_password: str = field(default_factory=lambda: os.environ.get("ADMIN_PASSWORD", ""))
