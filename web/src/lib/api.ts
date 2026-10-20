@@ -50,6 +50,8 @@ export type { ControlResult } from './mock';
 export const runControl = (onProgress?: (n: number) => void) =>
   MOCK ? mock.runControl(onProgress) : json<import('./mock').ControlResult[]>('/admin/validation/run', { method: 'POST' });
 export const controlSize = () => mock.controlSet.length;
+/** Reemplaza el set de control (importado desde CSV en el portal). */
+export const replaceControlSet = (cases: import('./mock').ControlCase[]) => { mock.controlSet.splice(0, mock.controlSet.length, ...cases); };
 export const getTopics = (): Promise<Topic[]> => (MOCK ? Promise.resolve([...mock.topics]) : json('/topics'));
 
 /** Documentos vigentes visibles para cualquier usuario (vista "Documentos disponibles"). */

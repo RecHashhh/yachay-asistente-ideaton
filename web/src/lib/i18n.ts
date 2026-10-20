@@ -6,7 +6,7 @@ export type Lang = 'es' | 'en' | 'qu';
 export const LANGS: { id: Lang; label: string; short: string; speech: string }[] = [
   { id: 'es', label: 'Español', short: 'ES', speech: 'es-EC' },
   { id: 'en', label: 'English', short: 'EN', speech: 'en-US' },
-  { id: 'qu', label: 'Kichwa (beta)', short: 'KI', speech: 'es-EC' },
+  { id: 'qu', label: 'Kichwa (Ecuador) · beta', short: 'KI', speech: 'es-EC' },
 ];
 
 const es = {
@@ -35,13 +35,22 @@ const es = {
   version: 'Versión', docOf: 'documento del',
   steps: 'Pasos', docs: 'Qué necesitas', where: 'Dónde', time: 'Tiempo estimado', office: 'Responsable',
   showMap: 'Ver en el mapa', done: 'Hecho',
-  unknownTitle: 'No tengo esa información en los documentos oficiales',
-  unknownBody: 'Prefiero no adivinar. Te dejo el contacto de quien sí puede responderte:',
-  outOfDomain: 'Esa pregunta está fuera de lo que puedo responder',
+  unknownTitle: 'Sin información oficial sobre este tema',
+  unknownBody: 'No encontramos este tema en los documentos oficiales disponibles. Para no darte un dato inexacto, te sugerimos consultar con:',
+  outOfDomain: 'Consulta fuera del ámbito institucional',
+  outOfDomainBody: 'Este asistente responde solo sobre trámites, normativa, servicios y ubicaciones de la universidad.',
+  options: 'Opciones', rename: 'Renombrar', delete: 'Eliminar', deleted: 'Conversación eliminada', undo: 'Deshacer',
+  today: 'Hoy', yesterday: 'Ayer', older: 'Anteriores',
+  forYou: 'Para continuar con tus consultas',
+  piiTitle: 'Tu mensaje parece incluir datos personales',
+  piiBody: 'Detectamos {what}. No son necesarios para responderte y es mejor no compartirlos.',
+  piiRemove: 'Quitar y enviar', piiEdit: 'Editar mensaje',
+  piiId: 'un número de cédula o teléfono', piiEmail: 'un correo electrónico',
   typingHints: 'Preguntas parecidas',
   langAuto: 'Detecté que escribes en {lang}. ¿Cambiar el idioma?',
   change: 'Cambiar',
   open: 'Abrir asistente', close: 'Cerrar',
+  kichwaNote: 'Kichwa en preparación: por ahora solo el saludo está en kichwa y está pendiente de revisión por un hablante nativo. El resto se muestra en español.',
   docsNav: 'Documentos disponibles',
   docsTitle: 'Documentos disponibles',
   docsSub: 'Todo lo que {name} usa para responder. Solo se usa la versión vigente de cada documento.',
@@ -57,6 +66,7 @@ const es = {
   docsCount: '{n} documentos',
   noDocs: 'No hay documentos que coincidan.',
   page: 'pág.',
+  originalQuote: '',
 };
 export type Dict = typeof es;
 
@@ -86,13 +96,22 @@ const en: Dict = {
   version: 'Version', docOf: 'document dated',
   steps: 'Steps', docs: 'What you need', where: 'Where', time: 'Estimated time', office: 'Office in charge',
   showMap: 'Show on map', done: 'Done',
-  unknownTitle: "I don't have that in the official documents",
-  unknownBody: "I'd rather not guess. Here is who can answer you:",
-  outOfDomain: "That question is outside what I can answer",
+  unknownTitle: 'No official information on this topic',
+  unknownBody: 'We could not find this topic in the available official documents. To avoid giving you inaccurate information, please contact:',
+  outOfDomain: 'Outside the institutional scope',
+  outOfDomainBody: 'This assistant only answers about university procedures, regulations, services and locations.',
+  options: 'Options', rename: 'Rename', delete: 'Delete', deleted: 'Conversation deleted', undo: 'Undo',
+  today: 'Today', yesterday: 'Yesterday', older: 'Earlier',
+  forYou: 'Continue where you left off',
+  piiTitle: 'Your message seems to include personal data',
+  piiBody: 'We detected {what}. It is not needed to answer you and it is better not to share it.',
+  piiRemove: 'Remove and send', piiEdit: 'Edit message',
+  piiId: 'an ID or phone number', piiEmail: 'an email address',
   typingHints: 'Similar questions',
   langAuto: 'Looks like you are writing in {lang}. Switch language?',
   change: 'Switch',
   open: 'Open assistant', close: 'Close',
+  kichwaNote: 'Kichwa in progress: only the greeting is in Kichwa for now, pending review by a native speaker. Everything else is shown in Spanish.',
   docsNav: 'Available documents',
   docsTitle: 'Available documents',
   docsSub: 'Everything {name} uses to answer. Only the current version of each document is used.',
@@ -108,6 +127,7 @@ const en: Dict = {
   docsCount: '{n} documents',
   noDocs: 'No matching documents.',
   page: 'page',
+  originalQuote: 'original quote in Spanish',
 };
 
 const qu: Dict = { ...es, hello: '¡Imanalla! Ñuka shutika {name}.' };
@@ -127,6 +147,11 @@ export function makeT(lang: Lang) {
     return s;
   };
 }
+
+/** Ubicación dentro del documento ("pág. 5, art. 8", "hoja X, fila 4") en el idioma de la interfaz. */
+const LOCATOR_EN: [RegExp, string][] = [[/pág\./g, 'p.'], [/\bhoja\b/g, 'sheet'], [/\bfilas\b/g, 'rows'], [/\bfila\b/g, 'row'], [/\bsección\b/g, 'section'], [/ a /g, ' to ']];
+export const locatorLabel = (loc: string | undefined, lang: Lang) =>
+  !loc || lang !== 'en' ? loc ?? '' : LOCATOR_EN.reduce((s, [re, to]) => s.replace(re, to), loc);
 
 /** Nombre de un tema en el idioma de la interfaz (cae a español si falta la traducción). */
 export const topicLabel = (t: { name: string; nameEn?: string } | undefined, lang: Lang) => (t ? (lang === 'en' ? t.nameEn ?? t.name : t.name) : '');

@@ -96,7 +96,7 @@ export interface Procedure {
   source: Source;
 }
 
-/** Respuesta explícita de "no sé": no hay fragmento con relevancia suficiente o la pregunta está fuera del dominio. */
+/** Respuesta explícita "sin información oficial": no hay fragmento con relevancia suficiente o la pregunta está fuera del dominio. */
 export interface Unknown {
   reason: 'sin_fuente' | 'fuera_de_dominio';
   contact?: { office: string; email?: string; placeId?: PlaceId };

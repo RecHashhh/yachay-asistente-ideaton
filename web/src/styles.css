@@ -27,6 +27,10 @@
 *{box-sizing:border-box}
 html,body,#root{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+/* Pantallas grandes: la columna del chat y el texto crecen, como en Gemini o ChatGPT. */
+@media (min-width: 1440px){ :root{--col:880px} body{font-size:16px} }
+@media (min-width: 1800px){ :root{--col:1000px;--rail:280px} body{font-size:17px} .hello h1{font-size:42px} }
+@media (min-width: 2400px){ :root{--col:1160px} body{font-size:18px} }
 h1,h2,h3{font-weight:700;letter-spacing:-.015em;text-wrap:balance;margin:0}
 p{margin:0}
 a{color:var(--accent)}
@@ -92,7 +96,7 @@ a.btn{text-decoration:none}
 .hello .greet{display:flex;align-items:center;gap:16px}
 .hello h1{font-size:clamp(26px,4vw,36px);line-height:1.15;letter-spacing:-.025em}
 .hello h1 span{color:var(--muted);font-weight:600;display:block}
-.suggest h3{font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.suggest h2{font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px}
 .suggest-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
 .suggest-card{border:1px solid var(--line);background:var(--surface);border-radius:var(--r-lg);padding:12px 14px;text-align:left;display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:500;transition:border-color .2s,box-shadow .2s,transform .2s var(--ease)}
 .suggest-card:hover{border-color:var(--accent);box-shadow:var(--shadow);transform:translateY(-2px)}
@@ -290,3 +294,35 @@ h1.title,h1.admin-h{font-size:15px;font-weight:700;margin:0;letter-spacing:0}
   .composer,.card,.proc,.unknown,.src,.chip,.suggest-card{border:1px solid CanvasText}
   .step-check[aria-pressed="true"]{background:Highlight;color:HighlightText}
 }
+
+/* Lista de conversaciones */
+.chat-list{display:flex;flex-direction:column;gap:2px;overflow-y:auto;min-height:0;flex:1}
+.chat-group h4{margin:12px 10px 4px}
+.chat-row{position:relative;display:flex;align-items:center;border-radius:var(--r)}
+.chat-row .item{padding-right:36px}
+.ellipsis{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.chat-row[aria-current="true"] .item{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.chat-more{position:absolute;right:4px;width:28px;height:28px;opacity:0}
+.chat-more svg{width:16px;height:16px}
+.chat-row:hover .chat-more,.chat-row:focus-within .chat-more,.chat-row.menu-open .chat-more{opacity:1}
+@media (hover: none){ .chat-more{opacity:1} }
+.row-menu{position:fixed;z-index:60;width:168px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-lg);padding:4px;display:flex;flex-direction:column}
+.row-menu button{display:flex;align-items:center;gap:10px;border:0;background:none;padding:8px 10px;border-radius:var(--r);font-size:13.5px;text-align:left;color:var(--ink)}
+.row-menu button svg{width:16px;height:16px;color:var(--muted)}
+.row-menu button:hover,.row-menu button:focus-visible{background:var(--surface-2);outline:none}
+.row-menu button.danger,.row-menu button.danger svg{color:var(--crit)}
+/* Opciones de los <select> legibles en tema oscuro (la lista desplegable la pinta el sistema) */
+select option{background:var(--surface);color:var(--ink)}
+.inp.rename{margin:2px 0;font-size:13.5px;padding:6px 10px}
+/* Aviso de datos personales */
+.pii-banner{display:flex;flex-direction:column;gap:6px;background:var(--warm-soft);border:1px solid var(--warm);border-radius:var(--r-lg);padding:10px 14px;font-size:14px}
+.pii-banner b{color:var(--warm-ink)}
+/* Aviso de privacidad completo */
+.privacy{border:1px solid var(--line);border-radius:var(--r-lg);padding:8px 12px;font-size:13.5px}
+.privacy summary{cursor:pointer;font-weight:600;color:var(--accent)}
+.privacy dl{margin:10px 0 2px;display:flex;flex-direction:column;gap:8px}
+.privacy dt{font-weight:600}
+.privacy dd{margin:0;color:var(--muted)}
+
+.kichwa-note{font-size:13px;color:var(--muted);background:var(--surface-2);border-radius:var(--r-lg);padding:8px 12px;margin:0}
+.hello h1 .hello-main{display:block;color:var(--ink);font-weight:700}

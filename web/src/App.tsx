@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { LangContext, makeT, type Lang } from './lib/i18n';
 import { Admin } from './views/Admin';
 import { Chat } from './views/Chat';
-import { Docs } from './views/Docs';
 
 type Theme = 'light' | 'dark';
 const THEME_KEY = 'yt-theme';
@@ -22,12 +21,11 @@ const initialLang = (): Lang => {
   return navigator.language.toLowerCase().startsWith('en') ? 'en' : 'es';
 };
 
-/** Rutas por hash: `#/` chat, `#/embed` chat compacto para el widget, `#/documentos` documentos públicos, `#/admin` portal. */
+/** Rutas por hash: `#/` chat, `#/embed` chat compacto para el widget, `#/admin` portal (la lista de documentos solo la ven los administradores). */
 const route = () => {
   const h = location.hash;
   if (h.startsWith('#/admin')) return 'admin';
   if (h.startsWith('#/embed')) return 'embed';
-  if (h.startsWith('#/documentos')) return 'docs';
   return 'chat';
 };
 
@@ -45,7 +43,8 @@ export function App() {
     document.documentElement.dataset.theme = theme;
     try { localStorage.setItem(THEME_KEY, theme); } catch { /* sin almacenamiento */ }
   }, [theme]);
-  useEffect(() => { document.documentElement.lang = lang === 'qu' ? 'qu' : lang; }, [lang]);
+  // En kichwa casi todo sigue en español; el saludo lleva lang="qu-EC".
+  useEffect(() => { document.documentElement.lang = lang === 'qu' ? 'es' : lang; }, [lang]);
 
   const setLang = (l: Lang) => { setLangState(l); try { localStorage.setItem(LANG_KEY, l); } catch { /* sin almacenamiento */ } };
   const ctx = useMemo(() => ({ lang, t: makeT(lang) }), [lang]);
@@ -56,8 +55,6 @@ export function App() {
       <MotionConfig reducedMotion="user">
       {page === 'admin'
         ? <Admin theme={theme} toggleTheme={toggleTheme} />
-        : page === 'docs'
-        ? <Docs setLang={setLang} />
         : <Chat theme={theme} toggleTheme={toggleTheme} setLang={setLang} embed={page === 'embed'} />}
       </MotionConfig>
     </LangContext.Provider>

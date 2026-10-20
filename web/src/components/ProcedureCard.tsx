@@ -2,7 +2,7 @@ import { motion } from 'motion/react';
 import { useState } from 'react';
 import { placeById, placeName } from '../lib/campus';
 import { docHref } from '../lib/api';
-import { useT } from '../lib/i18n';
+import { locatorLabel, useT } from '../lib/i18n';
 import type { Procedure, Unknown } from '../lib/types';
 import { IcCheck, IcMap } from './icons';
 
@@ -43,17 +43,15 @@ export function ProcedureCard({ p, onShowMap }: { p: Procedure; onShowMap: (plac
         </ol>
       </div>
       <footer className="small muted row">
-        <span>{p.source.title} · {t('version')} {p.source.version} · {p.source.locator}</span>
+        <span>{p.source.title} · {t('version')} {p.source.version} · {locatorLabel(p.source.locator, lang)}</span>
         <span className="sp" />
-        {p.source.url
-          ? <a href={docHref(p.source.url, p.source.page)} target="_blank" rel="noreferrer">{t('openDoc')}<span className="sr"> (nueva pestaña)</span></a>
-          : <a href={`#/documentos?doc=${p.source.docId}`} target="_blank" rel="noreferrer">{t('viewRecord')}</a>}
+        {p.source.url && <a href={docHref(p.source.url, p.source.page)} target="_blank" rel="noreferrer">{t('openDoc')}<span className="sr"> (nueva pestaña)</span></a>}
       </footer>
     </motion.section>
   );
 }
 
-/** "No sé" explícito: nunca se inventa una respuesta sin fuente. */
+/** Respuesta "sin información oficial": nunca se inventa una respuesta sin fuente. */
 export function UnknownCard({ u, onShowMap }: { u: Unknown; onShowMap: (placeId: string) => void }) {
   const { t } = useT();
   const place = u.contact?.placeId ? placeById(u.contact.placeId) : undefined;
@@ -69,7 +67,7 @@ export function UnknownCard({ u, onShowMap }: { u: Unknown; onShowMap: (placeId:
             {place && <button className="btn sm" onClick={() => onShowMap(place.id)}><IcMap width={14} height={14} />{t('showMap')}</button>}
           </div>
         </>
-      ) : null}
+      ) : <p className="muted">{t('outOfDomainBody')}</p>}
     </motion.div>
   );
 }

@@ -7,9 +7,11 @@ import { ConsentDialog, hasConsent, trapFocus } from '../components/ConsentDialo
 import { Markdown } from '../components/Markdown';
 import { Mascot } from '../components/Mascot';
 import { ProcedureCard, UnknownCard } from '../components/ProcedureCard';
-import { IcBook, IcExternal, IcChat, IcCheck, IcClose, IcCopy, IcDown, IcExpand, IcGlobe, IcInfo, IcLock, IcMenu, IcMoon, IcPlus, IcRetry, IcShield, IcSun, IcTrend, IcUp } from '../components/icons';
-import { MOCK, docHref, getTopics, getTrends, sendFeedback, streamChat } from '../lib/api';
-import { LANGS, detectLang, topicLabel, useT, type Lang } from '../lib/i18n';
+import { IcExternal, IcSpark, IcCheck, IcClose, IcCopy, IcDown, IcExpand, IcGlobe, IcInfo, IcLock, IcShield, IcMenu, IcMoon, IcPlus, IcRetry, IcSun, IcTrend, IcUp } from '../components/icons';
+import { docHref, getTopics, getTrends, sendFeedback, streamChat } from '../lib/api';
+import { LANGS, detectLang, locatorLabel, topicLabel, useT, type Lang } from '../lib/i18n';
+import { placeById, placeName } from '../lib/campus';
+import { ChatList } from '../components/ChatList';
 import type { Attachment, ChatTurn, MapAction, Procedure, Source, Topic, Trend, Unknown } from '../lib/types';
 
 interface Msg {
@@ -30,7 +32,7 @@ interface Msg {
   serverId?: string;
   latencyMs?: number;
 }
-interface Conversation { id: string; title: string; msgs: Msg[]; at: number }
+interface Conversation { id: string; title: string; msgs: Msg[]; at: number; renamed?: boolean }
 
 /** Turnos que viajan al backend. El resto lo resume el servidor (ver README, ahorro de tokens). */
 const HISTORY_TURNS = 6;
@@ -40,6 +42,22 @@ const loadChats = (): Conversation[] => { try { return JSON.parse(localStorage.g
 // Los adjuntos no se guardan en el navegador: pesan y pueden tener datos personales.
 const saveChats = (c: Conversation[]) => { try { localStorage.setItem(CHATS_KEY, JSON.stringify(c.slice(0, 20).map((x) => ({ ...x, msgs: x.msgs.map(({ files: _f, ...m }) => m) })))); } catch { /* sin almacenamiento */ } };
 const uid = (): string => crypto.randomUUID();
+
+/** Título automático según lo consultado: el trámite o lugar que respondió, si no, la pregunta limpia y corta. */
+function autoTitle(msgs: Msg[], lang: Lang): string {
+  const ai = msgs.find((m) => m.role === 'assistant' && (m.procedure || m.map));
+  if (ai?.procedure) return ai.procedure.title;
+  if (ai?.map) { const p = placeById(ai.map.destino); if (p) return placeName(p, lang); }
+  const q = (msgs.find((m) => m.role === 'user')?.text ?? '').replace(/[¿?¡!]/g, '').trim();
+  if (!q) return lang === 'en' ? 'Conversation' : 'Conversación';
+  const short = q.length > 42 ? `${q.slice(0, 42).replace(/\s+\S*$/, '')}…` : q;
+  return short.charAt(0).toUpperCase() + short.slice(1);
+}
+
+/** Datos personales que no hace falta enviar (LOPDP, minimización): cédula/teléfono de 10 dígitos o correo. */
+const PII_ID = /\b\d{10}\b/;
+const PII_EMAIL = /[\w.+-]+@[\w-]+\.[\w.]+/;
+const redact = (s: string) => s.replace(new RegExp(PII_ID.source, 'g'), '[dato omitido]').replace(new RegExp(PII_EMAIL.source, 'g'), '[dato omitido]');
 
 const words = (s: string) => new Set(s.toLowerCase().normalize('NFD').replace(/[^a-z\s]/g, '').split(/\s+/).filter((w) => w.length > 3));
 
@@ -60,6 +78,9 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
   const [mobileRail, setMobileRail] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [suggestLang, setSuggestLang] = useState<Lang | null>(null);
+  const [pii, setPii] = useState<{ text: string; base: Msg[]; att: Attachment[] } | null>(null);
+  const [undo, setUndo] = useState<{ chat: Conversation; index: number } | null>(null);
+  useEffect(() => { if (!undo) return; const x = setTimeout(() => setUndo(null), 6000); return () => clearTimeout(x); }, [undo]);
   const abort = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const busy = msgs.some((m) => m.streaming);
@@ -84,11 +105,19 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
   useEffect(() => {
     if (!msgs.length || busy || embed) return;
     setChats((prev) => {
-      const title = msgs.find((m) => m.role === 'user')?.text.slice(0, 60) || 'Conversación';
-      const next = [{ id: chatId, title, msgs, at: Date.now() }, ...prev.filter((c) => c.id !== chatId)];
+      const old = prev.find((c) => c.id === chatId);
+      const title = old?.renamed ? old.title : autoTitle(msgs, lang);
+      // Sin mensajes nuevos (solo se abrió, se marcó un paso o se votó): se actualiza en su lugar, sin reordenar.
+      if (old && old.msgs.length === msgs.length) {
+        const same = prev.map((c) => (c.id === chatId ? { ...c, title, msgs } : c));
+        saveChats(same);
+        return same;
+      }
+      const next = [{ id: chatId, title, msgs, at: Date.now(), renamed: old?.renamed }, ...prev.filter((c) => c.id !== chatId)];
       saveChats(next);
       return next;
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [busy, msgs, chatId, embed]);
 
   const patch = (id: string, fn: (m: Msg) => Partial<Msg>) => setMsgs((all) => all.map((m) => (m.id === id ? { ...m, ...fn(m) } : m)));
@@ -100,9 +129,14 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
     return trends.map((x) => ({ q: x.query, n: [...words(x.query)].filter((y) => [...w].some((z) => y.startsWith(z.slice(0, 5)))).length })).filter((x) => x.n > 0).sort((a, b) => b.n - a.n).slice(0, 3).map((x) => x.q);
   }, [input, trends]);
 
-  async function send(raw: string, base: Msg[] = msgs, att: Attachment[] = files) {
-    const text = raw.trim();
+  async function send(raw: string, base: Msg[] = msgs, att: Attachment[] = files, piiMode?: 'skip') {
+    let text = raw.trim();
     if ((!text && !att.length) || busy || !consent) return;
+    if (piiMode !== 'skip' && (PII_ID.test(text) || PII_EMAIL.test(text))) {
+      setPii({ text, base, att }); setInput(text); return;
+    }
+    if (piiMode === 'skip') text = redact(text);
+    setPii(null);
     setInput(''); setFiles([]);
     const user: Msg = { id: uid(), role: 'user', text, files: att.length ? att : undefined };
     const ai: Msg = { id: uid(), role: 'assistant', text: '', streaming: true, status: t('thinking') };
@@ -131,8 +165,23 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
   }
 
   const stop = () => abort.current?.abort();
-  const newChat = () => { stop(); setChatId(uid()); setMsgs([]); setMobileRail(false); };
-  const openChat = (c: Conversation) => { stop(); setChatId(c.id); setMsgs(c.msgs); setMobileRail(false); };
+  const newChat = () => { stop(); setChatId(uid()); setMsgs([]); setMobileRail(false); setPii(null); };
+  const openChat = (c: Conversation) => { stop(); setChatId(c.id); setMsgs(c.msgs); setMobileRail(false); setPii(null); };
+  const persist = (fn: (c: Conversation[]) => Conversation[]) => setChats((prev) => { const next = fn(prev); saveChats(next); return next; });
+  const renameChat = (id: string, title: string) => persist((cs) => cs.map((c) => (c.id === id ? { ...c, title, renamed: true } : c)));
+  const deleteChat = (id: string) => {
+    const i = chats.findIndex((c) => c.id === id);
+    const removed = chats[i];
+    if (!removed) return;
+    persist((cs) => cs.filter((c) => c.id !== id));
+    if (id === chatId) newChat();
+    setUndo({ chat: removed, index: i });
+  };
+  const undoDelete = () => {
+    if (!undo) return;
+    persist((cs) => { const n = [...cs]; n.splice(undo.index, 0, undo.chat); return n; });
+    setUndo(null);
+  };
   const retry = (aiId: string) => {
     const i = msgs.findIndex((m) => m.id === aiId);
     const q = msgs[i - 1];
@@ -147,6 +196,28 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
     if (ask) { setInput(ask); history.replaceState(null, '', `${location.pathname}${location.search}#/`); }
   }, []);
   const empty = msgs.length === 0;
+
+  const piiBanner = pii && (
+    <div className="pii-banner" role="alert">
+      <b>{t('piiTitle')}</b>
+      <span>{t('piiBody', { what: PII_ID.test(pii.text) ? t('piiId') : t('piiEmail') })}</span>
+      <span className="row">
+        <button className="btn sm primary" onClick={() => void send(pii.text, pii.base, pii.att, 'skip')}>{t('piiRemove')}</button>
+        <button className="btn sm ghost" onClick={() => { setPii(null); document.getElementById('ask')?.focus(); }}>{t('piiEdit')}</button>
+      </span>
+    </div>
+  );
+
+  // Sugerencias personalizadas: lo que el asistente propuso seguir en tus últimas conversaciones y aún no preguntaste.
+  const forYou = useMemo(() => {
+    const asked = new Set(chats.flatMap((c) => c.msgs.filter((m) => m.role === 'user').map((m) => m.text)));
+    const out: string[] = [];
+    for (const c of chats.slice(0, 5)) {
+      const last = [...c.msgs].reverse().find((m) => m.role === 'assistant' && m.suggestions?.length);
+      for (const q of last?.suggestions ?? []) if (!asked.has(q) && !out.includes(q)) out.push(q);
+    }
+    return out.slice(0, 3);
+  }, [chats]);
 
   const composer = (
     <Composer value={input} onChange={setInput} files={files} onFiles={setFiles} onSend={() => void send(input)} onStop={stop} busy={busy}
@@ -180,15 +251,14 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
       <div className="sr" role="status" aria-live="polite">{announce}</div>
       {!embed && (
         <aside className="rail" aria-label={t('recent')}>
-          <div className="brand"><Mascot size={30} /><div><b>{BRAND.mascotName}</b><small>{BRAND.tagline} · {BRAND.university}</small></div></div>
+          <div className="brand"><Mascot size={30} /><div><b>{BRAND.mascotName}</b><small>{BRAND.university}</small></div></div>
           <button className="item" onClick={newChat}><IcPlus />{t('newChat')}</button>
-          {chats.length > 0 && <h4>{t('recent')}</h4>}
-          {chats.map((c) => <button key={c.id} className="item" aria-current={c.id === chatId} onClick={() => openChat(c)} title={c.title}><IcChat />{c.title}</button>)}
+          <nav className="chat-list" aria-label={t('recent')}>
+            <ChatList chats={chats} currentId={chatId} onOpen={(id) => { const c = chats.find((x) => x.id === id); if (c) openChat(c); }} onRename={renameChat} onDelete={deleteChat} />
+          </nav>
           <div className="foot">
-            <a className="item" href="#/documentos" style={{ textDecoration: 'none' }}><IcBook />{t('docsNav')}</a>
             <button className="item" onClick={() => setDialog('about')}><IcInfo />{t('about')}</button>
             <button className="item" onClick={() => setDialog('notice')}><IcShield />{t('notice')}</button>
-            <button className="item" onClick={toggleTheme}>{theme === 'dark' ? <IcSun /> : <IcMoon />}{theme === 'dark' ? t('themeLight') : t('themeDark')}</button>
             <a className="item" href="#/admin" style={{ textDecoration: 'none' }}><IcLock />{t('admin')}</a>
           </div>
         </aside>
@@ -201,9 +271,9 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
             <button className="icon-btn" aria-label={t('recent')} onClick={() => (window.matchMedia('(max-width: 820px)').matches ? setMobileRail(true) : setRailOpen((o) => !o))}><IcMenu /></button>
           )}
           <h1 className="title">{BRAND.mascotName}</h1>
-          {MOCK && <span className="badge-demo" title="Sin backend: respuestas simuladas con datos de ejemplo">{t('demo')}</span>}
           <span className="sp" />
           {langSelect}
+          {!embed && <button className="icon-btn" aria-label={theme === 'dark' ? t('themeLight') : t('themeDark')} title={theme === 'dark' ? t('themeLight') : t('themeDark')} onClick={toggleTheme}>{theme === 'dark' ? <IcSun /> : <IcMoon />}</button>}
           {!empty && <button className="icon-btn" aria-label={t('newChat')} onClick={newChat}><IcPlus /></button>}
           {embed && <a className="icon-btn" href={`${location.origin}${location.pathname}#/`} target="_blank" rel="noreferrer" aria-label="Abrir en pantalla completa"><IcExpand /></a>}
           {embed && <button className="icon-btn" aria-label={t('close')} onClick={() => window.parent.postMessage({ type: 'yachi:close' }, '*')}><IcClose /></button>}
@@ -213,10 +283,18 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
           <motion.section className="hello" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}>
             <div className="greet">
               <Mascot size={embed ? 48 : 64} mood={input ? 'thinking' : 'idle'} />
-              <h1>{t('hello', { name: BRAND.mascotName })}<span>{t('helloSub', { uni: BRAND.university })}</span></h1>
+              <h1><span lang={lang === 'qu' ? 'qu-EC' : undefined} className="hello-main">{t('hello', { name: BRAND.mascotName })}</span><span>{t('helloSub', { uni: BRAND.university })}</span></h1>
             </div>
+            {lang === 'qu' && <p className="kichwa-note" role="note">{t('kichwaNote')}</p>}
+            {piiBanner}
             {composer}
             {langBanner}
+            {forYou.length > 0 && !embed && (
+              <div className="suggest">
+                <h2><IcSpark width={15} height={15} />{t('forYou')}</h2>
+                <div className="follow">{forYou.map((q) => <button key={q} className="chip" onClick={() => void send(q)}>{q}</button>)}</div>
+              </div>
+            )}
             {trends.length > 0 && (
               <div className="suggest">
                 <h2><IcTrend width={15} height={15} />{t('trending')}</h2>
@@ -225,7 +303,7 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
                     <motion.button key={x.query} className="suggest-card" onClick={() => void send(x.query)}
                       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 + i * 0.06 }}>
                       {x.query}
-                      <small>{topicName[x.topicId] ?? x.topicId}<span className={x.delta >= 0 ? 'up' : 'down'}>{x.delta >= 0 ? '▲' : '▼'} {Math.abs(x.delta)} %</span></small>
+                      <small>{topicName[x.topicId] ?? x.topicId}</small>
                     </motion.button>
                   ))}
                 </div>
@@ -254,6 +332,7 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
             </div>
             <div className="composer-wrap">
               {langBanner}
+              {piiBanner}
               {composer}
               <p className="disclaimer">{t('disclaimer', { name: BRAND.mascotName })} · <button onClick={() => setDialog('notice')}>{t('notice')}</button></p>
             </div>
@@ -262,6 +341,7 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
       </main>
 
       <AnimatePresence>{toastMsg && <motion.div className="toast" role="status" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>{toastMsg}</motion.div>}</AnimatePresence>
+      <AnimatePresence>{undo && <motion.div className="toast row" role="status" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>{t('deleted')}<button className="btn sm" onClick={undoDelete}>{t('undo')}</button></motion.div>}</AnimatePresence>
     </div>
       <ConsentDialog open={!consent || dialog === 'notice'} onAccept={() => { setConsent(true); setDialog(null); setTimeout(() => document.getElementById('ask')?.focus(), 50); }} onClose={consent ? () => setDialog(null) : undefined} />
       <AboutDialog open={dialog === 'about'} onClose={() => setDialog(null)} />
@@ -270,13 +350,13 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
 }
 
 function AssistantMsg({ m, onVote, onRetry, onAsk, onShowMap }: { m: Msg; onVote: (v: 'up' | 'down') => void; onRetry: () => void; onAsk: (q: string) => void; onShowMap: (placeId: string) => void }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [copied, setCopied] = useState(false);
   const [openSrc, setOpenSrc] = useState<string | null>(null);
   const mood = m.streaming ? (m.text ? 'talking' : 'thinking') : 'idle';
   const srcKey = (s: Source) => `${s.docId}|${s.locator ?? ''}`;
   const src = m.sources?.find((s) => srcKey(s) === openSrc);
-  // Si el mapa se pidió desde la tarjeta del trámite o del "no sé", se dibuja debajo de ella, donde el usuario está mirando.
+  // Si el mapa se pidió desde la tarjeta del trámite o de "sin información", se dibuja debajo de ella, donde el usuario está mirando.
   const mapAfter = !!(m.procedure || m.unknown);
   return (
     <motion.div className="msg-ai" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
@@ -294,7 +374,6 @@ function AssistantMsg({ m, onVote, onRetry, onAsk, onShowMap }: { m: Msg; onVote
         {m.procedure && <ProcedureCard p={m.procedure} onShowMap={onShowMap} />}
         {m.unknown && <UnknownCard u={m.unknown} onShowMap={onShowMap} />}
         {m.map && mapAfter && <CampusMap action={m.map} scrollIntoView />}
-        {m.link && !m.streaming && <a className="btn sm action-link" href={m.link.href} target="_blank" rel="noreferrer"><IcBook width={15} height={15} />{m.link.label}</a>}
         {m.error && <p className="err" role="alert">{m.error}</p>}
 
         {!m.streaming && m.sources && m.sources.length > 0 && (
@@ -310,15 +389,14 @@ function AssistantMsg({ m, onVote, onRetry, onAsk, onShowMap }: { m: Msg; onVote
               {src && (
                 <motion.div className="src-detail" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
                   <b>{src.title}</b>
-                  <span className="mono small">{t('version')} {src.version} · {t('docOf')} {src.docDate}{src.locator ? ` · ${src.locator}` : ''}</span>
-                  <span>“{src.snippet}”</span>
+                  <span className="mono small">{t('version')} {src.version} · {t('docOf')} {src.docDate}{src.locator ? ` · ${locatorLabel(src.locator, lang)}` : ''}</span>
+                  <span lang="es">“{src.snippet}”{t('originalQuote') && <span className="small" lang={lang}> ({t('originalQuote')})</span>}</span>
                   <span className="row" style={{ marginTop: 4 }}>
                     {src.url && (
                       <a className="btn sm" href={docHref(src.url, src.page)} target="_blank" rel="noreferrer">
                         {src.page ? t('openDocAt', { loc: `${t('page')} ${src.page}` }) : t('openDoc')}<IcExternal width={14} height={14} /><span className="sr"> (nueva pestaña)</span>
                       </a>
                     )}
-                    <a className="btn sm ghost" href={`#/documentos?doc=${src.docId}`} target="_blank" rel="noreferrer">{t('viewRecord')}</a>
                   </span>
                   {!src.url && <span className="small">{t('internalNote')}</span>}
                 </motion.div>
@@ -363,13 +441,13 @@ function AboutDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
             <ul>
               {en ? <>
                 <li><b>Only official documents.</b> It answers from regulations, calendars and procedures uploaded by the university. Every answer shows the document, version and date.</li>
-                <li><b>It says "I don't know".</b> If no document supports the answer, it says so and gives you the office to contact.</li>
+                <li><b>No official information, no answer.</b> If no document supports the answer, it says so and gives you the office to contact.</li>
                 <li><b>Step-by-step procedures:</b> what it is, what you need, in which order and where.</li>
                 <li><b>Spanish and English</b>, with automatic detection. Kichwa greeting in beta.</li>
                 <li><b>Checked regularly</b> against a set of control questions with known answers.</li>
               </> : <>
                 <li><b>Solo documentos oficiales.</b> Responde con reglamentos, calendarios y procedimientos cargados por la universidad. Cada respuesta muestra el documento, la versión y la fecha.</li>
-                <li><b>Dice "no sé".</b> Si ningún documento respalda la respuesta, lo dice y te da la dependencia a la que puedes acudir.</li>
+                <li><b>Sin información oficial, no responde.</b> Si ningún documento respalda la respuesta, lo indica y te da la dependencia a la que puedes acudir.</li>
                 <li><b>Trámites paso a paso:</b> qué es, qué necesitas, en qué orden y dónde.</li>
                 <li><b>Español e inglés</b>, con detección automática. Saludo en kichwa en prueba.</li>
                 <li><b>Se verifica</b> con un set de preguntas de control con respuesta conocida.</li>

@@ -235,7 +235,6 @@ export function answerFor(q: string, lang: Lang): Answer {
       .join('\n');
     return {
       entryId: 'inventario', text: `${head}\n\n${lines}`, sources: [],
-      link: { label: isEn ? 'See all documents' : 'Ver todos los documentos', href: '#/documentos' },
       follow: topTrends(lang, 2),
     };
   }

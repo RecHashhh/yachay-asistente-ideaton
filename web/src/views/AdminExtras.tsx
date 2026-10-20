@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { useMemo, useState } from 'react';
-import { controlSize, runControl, type ControlResult } from '../lib/api';
+import { controlSize, replaceControlSet, runControl, type ControlResult } from '../lib/api';
 
 // ---------------------------------------------------------------------------
 // Validación: set de preguntas de control con respuesta conocida
@@ -12,7 +12,33 @@ const pctl = (xs: number[], p: number) => { const s = [...xs].sort((a, b) => a -
 export function Validation() {
   const [res, setRes] = useState<ControlResult[] | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
-  const total = controlSize();
+  const [total, setTotal] = useState(controlSize);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const exportCsv = () => {
+    if (!res) return;
+    const head = 'id;pregunta;idioma;esperado;obtenido;resultado;latencia_ms';
+    const rows = res.map((r) => [r.id, r.q, r.lang, r.expect, r.got, r.ok ? 'correcta' : r.hallucination ? 'alucinacion' : 'incorrecta', r.ms].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(';'));
+    const blob = new Blob(['\ufeff' + [head, ...rows].join('\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `validacion-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  /** CSV con columnas id;pregunta;idioma;esperado (esperado = id del documento o "no_se"). Separador ; o ,. */
+  const importCsv = async (f: File) => {
+    const lines = (await f.text()).replace(/^\ufeff/, '').split(/\r?\n/).filter((l) => l.trim());
+    const sep = lines[0]!.includes(';') ? ';' : ',';
+    const cells = (l: string) => l.split(sep).map((c) => c.trim().replace(/^"|"$/g, '').replaceAll('""', '"'));
+    const body = /pregunta|question/i.test(lines[0]!) ? lines.slice(1) : lines;
+    const cases = body.map(cells).filter((c) => c.length >= 4 && c[1]).map(([id, q, lang, expect]) => ({ id: id!, q: q!, lang: (lang === 'en' ? 'en' : 'es') as 'es' | 'en', expect: expect! }));
+    if (!cases.length) { setMsg('El archivo no tiene filas válidas (id;pregunta;idioma;esperado).'); return; }
+    replaceControlSet(cases);
+    setTotal(cases.length); setRes(null);
+    setMsg(`Se cargaron ${cases.length} preguntas de control.`);
+  };
 
   const m = useMemo(() => {
     if (!res) return null;
@@ -35,16 +61,19 @@ export function Validation() {
   return (
     <>
       <header>
-        <div><h2>Validación de veracidad</h2><p>Preguntas con respuesta conocida: cada una debe citar el documento correcto, o decir "no sé" si no está en las fuentes.</p></div>
+        <div><h2>Validación de veracidad</h2><p>Preguntas con respuesta conocida: cada una debe citar el documento correcto, o responder "sin información oficial" si no está en las fuentes.</p></div>
         <span className="sp" />
+        <label className="btn">Importar CSV<input type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsv(f); e.target.value = ''; }} /></label>
+        <button className="btn" onClick={exportCsv} disabled={!res}>Exportar resultados</button>
         <button className="btn primary" onClick={run} disabled={progress !== null}>{progress !== null ? `Evaluando ${progress}/${total}` : res ? 'Volver a evaluar' : `Evaluar ${total} preguntas`}</button>
       </header>
+      {msg && <p className="small" role="status">{msg}</p>}
       {progress !== null && <div className="progress"><i style={{ transform: `scaleX(${progress / total})` }} /></div>}
       {m && (
         <motion.div className="kpis" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <div className="kpi"><b>{m.accuracy} %</b><span>exactitud total</span></div>
           <div className="kpi"><b>{m.grounded} %</b><span>citan la fuente correcta</span></div>
-          <div className="kpi"><b>{m.refusal} %</b><span>"no sé" cuando corresponde</span></div>
+          <div className="kpi"><b>{m.refusal} %</b><span>"sin información" cuando corresponde</span></div>
           <div className="kpi"><b>{m.halluc}</b><span>respuestas sin fuente (alucinaciones)</span></div>
           <div className="kpi"><b>{m.es} / {m.en} %</b><span>exactitud español / inglés</span></div>
           <div className="kpi"><b>{(m.p50 / 1000).toFixed(1)} s</b><span>latencia p50 · p95 {(m.p95 / 1000).toFixed(1)} s</span></div>
@@ -59,8 +88,8 @@ export function Validation() {
                 <td className="mono">{r.id}</td>
                 <td>{r.q}</td>
                 <td className="mono">{r.lang.toUpperCase()}</td>
-                <td className="mono">{r.expect === 'no_se' ? 'no sé' : r.expect}</td>
-                <td className="mono">{r.got === 'no_se' ? 'no sé' : r.got || '(sin fuente)'}</td>
+                <td className="mono">{r.expect === 'no_se' ? 'sin información' : r.expect}</td>
+                <td className="mono">{r.got === 'no_se' ? 'sin información' : r.got || '(sin fuente)'}</td>
                 <td><span className={`st ${r.ok ? 'indexado' : 'error'}`}>{r.ok ? 'Correcta' : r.hallucination ? 'Alucinación' : 'Incorrecta'}</span></td>
               </tr>
             ))}
@@ -68,7 +97,7 @@ export function Validation() {
           </tbody>
         </table>
       </div>
-      <p className="small muted">Con datos de ejemplo, el resultado mide el simulador, no un modelo real. El set definitivo se arma con los documentos del Día 1: al menos 100 preguntas por mitades en español e inglés, y un 20 % que deben responderse con "no sé".</p>
+      <p className="small muted">Con datos de ejemplo, el resultado mide el simulador, no un modelo real. El set definitivo se arma con los documentos del Día 1: al menos 100 preguntas por mitades en español e inglés, y un 20 % que deben responderse con "sin información oficial". Usa «Importar CSV» para cargarlo y «Exportar resultados» para adjuntar la evidencia al paper.</p>
     </>
   );
 }
@@ -79,8 +108,8 @@ export function Validation() {
 
 /** Precios por millón de tokens (USD), API de Anthropic, consultados el 2026-10-20. Verificar antes de publicar. */
 const MODELS = {
-  'claude-haiku-5-5': { name: 'Claude Haiku 5.5', in: 0.1, out: 0.5, cacheRead: 0.01 /* estimado 0,1× entrada */ },
-  'claude-sonnet-5-5': { name: 'Claude Sonnet 5.5', in: 2, out: 10, cacheRead: 0.2 },
+  'claude-haiku-5-5': { name: 'Claude Haiku 5.5', in: 0.1, out: 0.5, cacheRead: 0.01 },
+  'claude-sonnet-5-5': { name: 'Claude Sonnet 5.5', in: 2, out: 10, cacheRead: 0.1 },
 } as const;
 type ModelId = keyof typeof MODELS;
 
@@ -107,7 +136,7 @@ interface Assumptions {
 const DEFAULTS: Assumptions = {
   students: 1800, queriesPerStudentDay: 0.3, peakFactor: 4, cacheHit: 0.3, answerModel: 'claude-haiku-5-5',
   sysTokens: 1500, chunks: 4, chunkTokens: 500, historyTokens: 400, questionTokens: 40, outTokens: 300,
-  routerIn: 250, routerOut: 15, infraMonthly: 40, docs: 300, chunksPerDoc: 40, embedDim: 1024,
+  routerIn: 250, routerOut: 15, infraMonthly: 48, docs: 300, chunksPerDoc: 40, embedDim: 1024,
 };
 
 const M = 1_000_000;
@@ -173,7 +202,7 @@ export function Cost() {
           {num('chunkTokens', 'Tokens por fragmento', 50)}
           {num('historyTokens', 'Tokens de historial (resumen + 6 turnos)', 50)}
           {num('outTokens', 'Tokens de respuesta (promedio)', 50)}
-          {num('infraMonthly', 'Servidor al mes (USD): API + Postgres/pgvector + embeddings', 5)}
+          {num('infraMonthly', 'Servidor al mes (USD): 4 vCPU / 8 GB con API, PostgreSQL + pgvector y embeddings', 1)}
           {num('docs', 'Documentos en la base')}
           {num('chunksPerDoc', 'Fragmentos por documento')}
         </div>
@@ -199,7 +228,7 @@ export function Cost() {
           ))}</tbody>
         </table>
       </div>
-      <p className="small muted">Precios de la API de Anthropic por millón de tokens, consultados el 20-10-2026: Haiku 5.5 $0.10 entrada / $0.50 salida (prompts de hasta 100K tokens; la lectura de caché de $0.01 es un estimado de 0,1× la entrada, por confirmar); Sonnet 5.5 $2 / $10 / $0.20. La escritura de caché cuesta 1,25× la entrada y el prefijo mínimo cacheable es de 512 tokens. El costo del servidor es un supuesto: reemplázalo por la cotización real.</p>
+      <p className="small muted">Precios de la API de Anthropic por millón de tokens, consultados el 20-10-2026: Haiku 5.5 $0.10 entrada / $0.50 salida / $0.01 lectura de caché (prompts de hasta 100K tokens); Sonnet 5.5 $2 / $10 / $0.10. La escritura de caché (5 min) cuesta 1,25× la entrada y el prefijo mínimo cacheable es de 512 tokens. Fuente: platform.claude.com/docs/en/about-claude/pricing. Servidor: DigitalOcean Droplet Basic 4 vCPU / 8 GB, $48 al mes (digitalocean.com/pricing/droplets, consultado el 20-10-2026); alternativa con base de datos administrada: Droplet 2 vCPU / 4 GB $24 + PostgreSQL administrado $15,15.</p>
     </>
   );
 }
