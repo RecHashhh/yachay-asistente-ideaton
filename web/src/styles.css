@@ -160,6 +160,7 @@ button{cursor:pointer}
 .md p + p,.md p + ul,.md ul + p,.md p + ol,.md ol + p{margin-top:10px}
 .md ul,.md ol{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:4px}
 .md strong{font-weight:700}
+.md a{overflow-wrap:anywhere;text-decoration:underline;text-underline-offset:2px}
 .md .w{animation:wordin .45s var(--ease) both}
 @keyframes wordin{from{opacity:0;filter:blur(3px)}to{opacity:1;filter:none}}
 
