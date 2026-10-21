@@ -7,7 +7,7 @@ import { ConsentDialog, hasConsent, trapFocus } from '../components/ConsentDialo
 import { Markdown } from '../components/Markdown';
 import { Mascot } from '../components/Mascot';
 import { ProcedureCard, UnknownCard } from '../components/ProcedureCard';
-import { IcSpeaker, IcBook, IcExternal, IcSpark, IcCheck, IcClose, IcCopy, IcDown, IcArrowDown, IcExpand, IcGlobe, IcInfo, IcLock, IcShield, IcMenu, IcMoon, IcPlus, IcRetry, IcSun, IcTrend, IcUp } from '../components/icons';
+import { IcSpeaker, IcExternal, IcSpark, IcCheck, IcClose, IcCopy, IcDown, IcArrowDown, IcExpand, IcGlobe, IcInfo, IcLock, IcShield, IcMenu, IcMoon, IcPlus, IcRetry, IcSun, IcTrend, IcUp } from '../components/icons';
 import { docHref, getTopics, getTrends, sendFeedback, streamChat } from '../lib/api';
 import { displayStream } from '../lib/displayStream';
 import { LANGS, detectLang, locatorLabel, topicLabel, useT, type Lang } from '../lib/i18n';
@@ -310,7 +310,6 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
           {mobileRail && <button className="icon-btn" aria-label={t('close')} onClick={() => setMobileRail(false)}><IcClose /></button>}
           <div className="brand"><Mascot size={30} /><div><b>{BRAND.mascotName}</b><small>{BRAND.university}</small></div></div>
           <button className="item" onClick={newChat} title={t('newChat')} aria-label={t('newChat')}><IcPlus /><span className="rail-label">{t('newChat')}</span></button>
-          <a className="item" href="#/guias" title={lang === 'en' ? 'Guides and preparation' : 'Guías y preparación'}><IcBook /><span className="rail-label">{lang === 'en' ? 'Guides and preparation' : 'Guías y preparación'}</span></a>
           <nav className="chat-list" aria-label={t('recent')}>
             <ChatList chats={chats} currentId={chatId} onOpen={(id) => { const c = chats.find((x) => x.id === id); if (c) openChat(c); }} onRename={renameChat} onDelete={deleteChat} />
           </nav>
