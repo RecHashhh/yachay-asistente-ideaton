@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Yachi · Mascota vectorial</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f6f7fb;color:#172b3a;font:16px/1.6 system-ui,sans-serif}main{max-width:1000px;margin:auto;padding:48px 24px}h1{font-size:32px;line-height:1.2;margin:8px 0}p{color:#596778}header{margin-bottom:30px}.states{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.state{background:#fff;border:1px solid #e1e4ec;border-radius:16px;padding:22px 10px;text-align:center}.state h2{font-size:15px;margin:14px 0 0}.state svg{display:block;margin:auto}.sizes,.contrast{display:flex;align-items:center;gap:25px;flex-wrap:wrap;padding:26px;margin-top:24px;border-radius:14px;background:white}.contrast{background:#111318;color:#e8eaf0}.sizes figure{margin:0;text-align:center}.sizes figcaption{font-size:12px;color:#596778}.sizes svg{display:block;margin:0 auto 8px}button{padding:10px 18px;border:1px solid #c7ccdc;border-radius:8px;background:white;color:#27618e;font:inherit;cursor:pointer}button:focus-visible,a:focus-visible{outline:3px solid #27618e;outline-offset:3px}.links{display:flex;gap:20px;flex-wrap:wrap;margin-top:24px}a{color:#27618e}@media(max-width:650px){.states{grid-template-columns:1fr 1fr}main{padding:24px 16px}}
+</style>
+<main><header><small>YACHAY TECH · PROPUESTA VECTORIAL</small><h1>Yachi, versión robot</h1><p>Casco plateado, franja azul, bordes rojos y ojos LED. Refinado a partir de tu nueva referencia.</p></header><div id="preview"></div><div class="links"><a href="/">Ver en el chat</a><a href="/yachi-robot.svg" download>Descargar SVG animado</a><button id="pause">Pausar animaciones</button></div></main>
+<script type="module">
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {Mascot} from '/src/components/Mascot.tsx';
+const e=React.createElement;
+createRoot(document.getElementById('preview')).render(e(React.Fragment,null,
+  e('section',{className:'states'},...['idle','thinking','talking','happy'].map((m,i)=>e('article',{className:'state',key:m},e(Mascot,{size:150,mood:m}),e('h2',null,['En reposo','Pensando','Hablando','Contento'][i])))),
+  e('section',{className:'sizes'},e('strong',null,'Tamaños reales'),...[28,36,64,128].map(size=>e('figure',{key:size},e(Mascot,{size}),e('figcaption',null,size+' px')))),
+  e('section',{className:'contrast'},e(Mascot,{size:80,mood:'thinking'}),e(Mascot,{size:36}),e('span',null,'Vista sobre fondo oscuro'))
+));
+let paused=false;
+document.getElementById('pause').onclick=()=>{paused=!paused;document.querySelectorAll('svg *').forEach(el=>el.style.animationPlayState=paused?'paused':'running');document.getElementById('pause').textContent=paused?'Reanudar animaciones':'Pausar animaciones'};
+</script>
+</html>

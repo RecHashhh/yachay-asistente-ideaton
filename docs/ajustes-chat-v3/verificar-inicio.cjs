@@ -1,0 +1,34 @@
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const assert=require('node:assert/strict');
+(async()=>{
+  const b=await chromium.launch({channel:'chrome',headless:true});
+  const p=await b.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
+  const errors=[];
+  p.on('pageerror',e=>errors.push(e.message));
+  await p.goto('http://127.0.0.1:5180');
+  await p.evaluate(()=>{
+    localStorage.setItem('yt-consent-2026-10c','1');
+    localStorage.setItem('yt-chats',JSON.stringify([{id:'test-history',title:'Residencias',at:Date.now(),msgs:[{id:'u',role:'user',text:'Residencias'},{id:'a',role:'assistant',text:'Consulta de ejemplo para verificar la interfaz',suggestions:['¿Dónde quedan las residencias?']}]}]));
+  });
+  await p.reload();
+  await p.locator('.suggest-card').first().waitFor();
+  assert.equal(await p.locator('.suggest-card').count(),4);
+  assert.equal(await p.getByText('Para continuar con tus consultas',{exact:true}).isVisible(),true);
+  assert.equal(await p.getByText('Lo más consultado esta semana',{exact:true}).isVisible(),true);
+  assert.equal(await p.locator('.mascot-robot').count(),2);
+  await p.waitForTimeout(700);
+  await p.screenshot({path:'docs/ajustes-chat-v3/inicio-restaurado.png'});
+  await p.route('**/__yachi_api/trends?*',r=>r.fulfill({status:503,body:'Test offline'}));
+  await p.reload();
+  await p.getByRole('button',{name:'Reintentar',exact:true}).waitFor();
+  assert.equal(await p.getByText('Lo más consultado esta semana',{exact:true}).isVisible(),true);
+  await p.unroute('**/__yachi_api/trends?*');
+  await p.getByRole('button',{name:'Reintentar',exact:true}).click();
+  await p.locator('.suggest-card').first().waitFor();
+  assert.equal(await p.locator('.suggest-card').count(),4);
+  await p.setViewportSize({width:390,height:844});
+  assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth),390);
+  assert.deepEqual(errors,[]);
+  console.log('OK: API real por proxy, cuatro tarjetas, sugerencias personales, error visible y recuperación con Reintentar; sin errores JS ni desborde móvil.');
+  await b.close();
+})().catch(e=>{console.error(e);process.exit(1)});

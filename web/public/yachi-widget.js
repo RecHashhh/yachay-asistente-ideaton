@@ -23,7 +23,7 @@
   var css = '' +
     '.yw-btn{position:fixed;right:20px;bottom:20px;width:60px;height:60px;border-radius:50%;border:0;background:' + BLUE + ';box-shadow:0 6px 20px rgba(20,22,40,.25);cursor:pointer;z-index:2147483000;display:grid;place-items:center;transition:transform .2s cubic-bezier(.2,.8,.2,1)}' +
     '.yw-btn:hover{transform:scale(1.06)}.yw-btn:focus-visible{outline:3px solid #06B0EE;outline-offset:3px}' +
-    '.yw-btn svg{width:44px;height:44px;transition:transform .25s,opacity .2s}' +
+    '.yw-btn svg,.yw-btn img{width:44px;height:44px;transition:transform .25s,opacity .2s}' +
     '.yw-btn .yw-x{position:absolute;opacity:0;transform:rotate(-90deg);width:24px;height:24px}' +
     '.yw-open .yw-btn .yw-face{opacity:0;transform:scale(.5)}.yw-open .yw-btn .yw-x{opacity:1;transform:none}' +
     '.yw-panel{position:fixed;right:20px;bottom:92px;width:400px;height:min(640px,calc(100vh - 120px));border-radius:16px;overflow:hidden;box-shadow:0 12px 48px rgba(20,22,40,.28);z-index:2147483000;background:#fff;opacity:0;transform:translateY(16px) scale(.96);transform-origin:bottom right;pointer-events:none;transition:opacity .22s,transform .28s cubic-bezier(.2,.8,.2,1)}' +
@@ -35,7 +35,11 @@
     '@media (max-width:520px){.yw-panel{right:0;bottom:0;width:100vw;height:100dvh;border-radius:0}.yw-open .yw-btn{display:none}}' +
     '@media (prefers-reduced-motion:reduce){.yw-btn,.yw-panel,.yw-greet{transition:none}}';
 
-  var face = '<svg class="yw-face" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 8c13 0 22 9 22 23 0 14-9 25-22 25S10 45 10 31C10 17 19 8 32 8z" fill="#fff" opacity=".14"/><ellipse cx="23" cy="29" rx="4.2" ry="5.2" fill="#fff"/><ellipse cx="41" cy="29" rx="4.2" ry="5.2" fill="#fff"/><circle cx="24" cy="30" r="2.1" fill="#0b1020"/><circle cx="42" cy="30" r="2.1" fill="#0b1020"/><circle cx="17" cy="38" r="3.2" fill="#06B0EE" opacity=".7"/><circle cx="47" cy="38" r="3.2" fill="#06B0EE" opacity=".7"/><path d="M26 40 Q32 42 38 40 Q32 48 26 40Z" fill="#0b1020"/></svg>';
+  var face = document.createElement('img');
+  face.className = 'yw-face';
+  face.src = host + '/favicon.svg';
+  face.alt = '';
+  face.setAttribute('aria-hidden', 'true');
   var x = '<svg class="yw-x" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
   var root = document.createElement('div');
@@ -47,7 +51,8 @@
   btn.type = 'button';
   btn.setAttribute('aria-label', lang === 'en' ? 'Open assistant' : 'Abrir asistente');
   btn.setAttribute('aria-expanded', 'false');
-  btn.innerHTML = face + x + '<span class="yw-dot"></span>';
+  btn.innerHTML = x + '<span class="yw-dot"></span>';
+  btn.prepend(face);
   var panel = document.createElement('div');
   panel.className = 'yw-panel';
   panel.setAttribute('role', 'dialog');

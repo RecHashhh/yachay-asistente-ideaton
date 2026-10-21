@@ -5,10 +5,11 @@ import { Mascot } from '../components/Mascot';
 import { IcArrowLeft, IcMoon, IcSun, IcTrash, IcUpload } from '../components/icons';
 import { Cost, Inbox, Validation } from './AdminExtras';
 import { Filters } from './AdminFilters';
-import { adminLogin, adminLogout, createTopic, deleteDoc, getTopics, getTrends, listDocs, uploadDoc, type Admin as AdminUser } from '../lib/api';
+import { AdminInquiries } from './AdminInquiries';
+import { adminLogin, adminLogout, createTopic, deleteDoc, getTopics, getTrends, listDocs, reprocessDoc, uploadDoc, type Admin as AdminUser } from '../lib/api';
 import type { DocMeta, Topic, Trend } from '../lib/types';
 
-type Tab = 'docs' | 'upload' | 'topics' | 'trends' | 'inbox' | 'filters' | 'validation' | 'cost';
+type Tab = 'docs' | 'upload' | 'topics' | 'trends' | 'inbox' | 'inquiries' | 'filters' | 'validation' | 'cost';
 const ACCEPT = '.pdf,.xlsx,.csv';
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -46,7 +47,7 @@ export function Admin({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggleT
         <h1 className="admin-h">Base de conocimiento</h1>
         <span className="sp" />
         <nav className="tabs" aria-label="Secciones">
-          {([['docs', 'Documentos'], ['upload', 'Subir'], ['topics', 'Temas'], ['trends', 'Tendencias'], ['inbox', 'Sin respuesta'], ['filters', 'Filtros'], ['validation', 'Validación'], ['cost', 'Costo']] as [Tab, string][]).map(([k, l]) => (
+          {([['docs', 'Documentos'], ['upload', 'Subir'], ['topics', 'Temas'], ['trends', 'Tendencias'], ['inbox', 'Sin respuesta'], ['inquiries', 'Consultas'], ['filters', 'Filtros'], ['validation', 'Validación'], ['cost', 'Costo']] as [Tab, string][]).map(([k, l]) => (
             <button key={k} aria-pressed={tab === k} onClick={() => { setTab(k); if (k !== 'upload') setReplacing(null); }}>{l}</button>
           ))}
         </nav>
@@ -57,13 +58,14 @@ export function Admin({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggleT
 
       <AnimatePresence mode="wait">
         <motion.main key={tab} className="admin-main" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-          {tab === 'docs' && <Docs docs={docs} topicName={topicName} onNew={() => { setReplacing(null); setTab('upload'); }} onReplace={(d) => { setReplacing(d); setTab('upload'); }} onDelete={async (d) => { if (confirm(`¿Quitar "${d.title}" de la base de conocimiento? El asistente dejará de usarlo.`)) { await deleteDoc(d.id); await refresh(); } }} />}
+          {tab === 'docs' && <Docs docs={docs} topicName={topicName} onNew={() => { setReplacing(null); setTab('upload'); }} onReplace={(d) => { setReplacing(d); setTab('upload'); }} onChanged={() => void refresh()} onDelete={async (d) => { if (confirm(`¿Quitar "${d.title}" de la base de conocimiento? El asistente dejará de usarlo.`)) { await deleteDoc(d.id); await refresh(); } }} />}
           {tab === 'upload' && <Upload topics={topics} docs={docs} replacing={replacing} onDone={async () => { setReplacing(null); await refresh(); setTab('docs'); }} />}
           {tab === 'topics' && <Topics topics={topics} docs={docs} onCreate={async (t) => { await createTopic(t); await refresh(); }} />}
           {tab === 'trends' && <Trends trends={trends} topicName={topicName} />}
           {tab === 'validation' && <Validation />}
           {tab === 'filters' && <Filters />}
           {tab === 'cost' && <Cost />}
+          {tab === 'inquiries' && <AdminInquiries />}
           {tab === 'inbox' && <Inbox docs={docs} onUpload={() => { setReplacing(null); setTab('upload'); }} onValidate={() => setTab('validation')} />}
         </motion.main>
       </AnimatePresence>
@@ -91,7 +93,7 @@ function Login({ onLogin }: { onLogin: (u: AdminUser) => void }) {
   );
 }
 
-function Docs({ docs, topicName, onNew, onReplace, onDelete }: { docs: DocMeta[]; topicName: (id: string) => string; onNew: () => void; onReplace: (d: DocMeta) => void; onDelete: (d: DocMeta) => void }) {
+function Docs({ docs, topicName, onNew, onReplace, onDelete, onChanged }: { docs: DocMeta[]; topicName: (id: string) => string; onNew: () => void; onReplace: (d: DocMeta) => void; onDelete: (d: DocMeta) => void; onChanged: () => void }) {
   const [q, setQ] = useState('');
   const shown = docs.filter((d) => `${d.title} ${topicName(d.topicId)}`.toLowerCase().includes(q.toLowerCase()));
   const chunks = docs.reduce((n, d) => n + d.chunks, 0);
@@ -117,8 +119,9 @@ function Docs({ docs, topicName, onNew, onReplace, onDelete }: { docs: DocMeta[]
                 <td className="mono">{d.version}</td>
                 <td className="mono">{d.docDate}</td>
                 <td>{d.origin === 'web' ? (d.url ? <a href={d.url} target="_blank" rel="noreferrer">Página web</a> : 'Página web') : 'Interno'}</td>
-                <td><span className={`st ${d.status}`}>{d.status === 'indexado' ? `Indexado · ${d.chunks}` : d.status === 'procesando' ? 'Procesando' : 'Error'}</span></td>
-                <td><div className="row" style={{ flexWrap: 'nowrap', justifyContent: 'flex-end' }}><button className="btn sm" onClick={() => onReplace(d)}>Nueva versión</button><button className="icon-btn danger" aria-label={`Quitar ${d.title}`} onClick={() => onDelete(d)}><IcTrash /></button></div></td>
+                <td><span className={`st ${d.status}`}>{d.status === 'indexado' ? `Indexado · ${d.chunks}` : d.status === 'procesando' ? 'Procesando' : 'Error'}</span>
+                  {d.notes && d.status !== 'indexado' && <div className={`small ${d.status === 'error' ? 'err' : 'muted'}`} style={{ maxWidth: 260 }}>{d.notes}</div>}</td>
+                <td><div className="row" style={{ flexWrap: 'nowrap', justifyContent: 'flex-end' }}>{d.status === 'error' && <button className="btn sm" onClick={() => void reprocessDoc(d.id).then(onChanged)}>Reprocesar</button>}<button className="btn sm" onClick={() => onReplace(d)}>Nueva versión</button><button className="icon-btn danger" aria-label={`Quitar ${d.title}`} onClick={() => onDelete(d)}><IcTrash /></button></div></td>
               </tr>
             ))}
             {!shown.length && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 32 }}>No hay documentos que coincidan.</td></tr>}

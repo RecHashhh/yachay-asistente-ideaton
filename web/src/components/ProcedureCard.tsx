@@ -45,14 +45,14 @@ export function ProcedureCard({ p, onShowMap }: { p: Procedure; onShowMap: (plac
       </div>
       {p.deadlines && p.deadlines.length > 0 && (
         <div className="proc-block">
-          <h3>{t('deadlines')}</h3>
+          <h3>{t('deadlines')}{p.deadlinesPast && <span className="tag" style={{ marginLeft: 8 }}>{lang === 'en' ? 'Period ended' : 'Período terminado'}</span>}</h3>
           <ul className="deadlines">
             {p.deadlines.map((d) => (
               <li key={d.title}>
                 <span><b>{d.title}</b><span className="small muted"> · {fmtRange(d.start, d.end, lang)}</span></span>
-                <button className="btn sm" onClick={() => downloadIcs(d, `${p.title}. ${t('office')}: ${p.office}. ${p.source.title} (${t('version')} ${p.source.version}, ${p.source.locator}).`)}>
+                {!p.deadlinesPast && <button className="btn sm" onClick={() => downloadIcs(d, `${p.title}. ${t('office')}: ${p.office}. ${p.source.title} (${t('version')} ${p.source.version}, ${p.source.locator}).`)}>
                   <IcCalendar width={14} height={14} />{t('addCal')}<span className="sr">: {d.title}</span>
-                </button>
+                </button>}
               </li>
             ))}
           </ul>
@@ -81,6 +81,7 @@ export function UnknownCard({ u, question, transcript, onShowMap }: { u: Unknown
           <div className="row">
             <span className="tag">{u.contact.office}</span>
             {u.contact.email && <a className="btn sm" href={`mailto:${u.contact.email}`}>{u.contact.email}</a>}
+            {u.contact.phone && <span className="small muted">{u.contact.phone}</span>}
             {place && <button className="btn sm" onClick={() => onShowMap(place.id)}><IcMap width={14} height={14} />{t('showMap')}</button>}
             {!form && <button className="btn sm primary" onClick={() => setForm(true)}><IcSend width={14} height={14} />{t('sendToOffice')}</button>}
           </div>

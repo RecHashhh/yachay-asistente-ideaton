@@ -181,9 +181,22 @@ def room_lookup(q: str) -> tuple[Place, str] | None:
     return pl, r["code"]
 
 
-def place_lookup(q: str) -> Place | None:
+ORIGIN = re.compile(r"\b(desde|from)\s+(?:el |la |los |las |the )?(.+?)(?=\s+(?:hasta|hacia|al|a la|a|to)\s|$)")
+
+
+def split_origin(q: str) -> tuple[str, Place | None]:
+    """"¿Cómo llego a la biblioteca desde el rectorado?" → (pregunta sin el origen, Rectorado)."""
+    n = norm(q)
+    m = ORIGIN.search(n)
+    if not m:
+        return q, None
+    origin = place_lookup(m.group(2), need_intent=False)
+    return (n[: m.start()] + " " + n[m.end():]).strip(), origin
+
+
+def place_lookup(q: str, need_intent: bool = True) -> Place | None:
     n = f" {norm(q)} "
-    if not WHERE.search(n):
+    if need_intent and not WHERE.search(n):
         return None
     with conn() as c:
         rows = c.execute("SELECT id, name, name_en, uso, horario, lat, lon, maps_url, aliases, fuente FROM places").fetchall()

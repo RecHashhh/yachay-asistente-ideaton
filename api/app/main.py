@@ -1,6 +1,7 @@
 """API de Yachi. Mismo contrato que web/src/lib/types.ts: `uvicorn app.main:app --port 8000`."""
 
 import asyncio
+import hashlib
 import json
 import re
 import secrets
@@ -10,12 +11,12 @@ from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import filters, graph, rules
+from . import filters, graph, processing, rules
 from .config import API_DIR, settings
 from .db import conn, open_pool
 from .search import vectors
@@ -28,6 +29,8 @@ def purge() -> None:
         c.execute("DELETE FROM messages WHERE created_at < now() - make_interval(days => %s)", (settings.retention_days,))
         c.execute("DELETE FROM unanswered WHERE last_at < now() - make_interval(days => %s) AND status <> 'convertida'", (settings.retention_days,))
         c.execute("DELETE FROM inquiries WHERE delete_after < now()")
+        c.execute("DELETE FROM admin_sessions WHERE expires_at < now()")
+        c.execute("DELETE FROM admin_audit WHERE at < now() - interval '2 years'")  # bitácora: 2 años para auditorías
 
 
 async def _purge_loop() -> None:
@@ -43,6 +46,8 @@ async def _purge_loop() -> None:
 async def lifespan(_: FastAPI):
     open_pool()
     vectors.load()
+    for doc_id in processing.pending():  # subidas que quedaron a medias si el servidor se reinició
+        asyncio.get_running_loop().run_in_executor(None, processing.process, doc_id)
     task = asyncio.create_task(_purge_loop())
     yield
     task.cancel()
@@ -63,6 +68,7 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1000)
     lang: str = "es"
     history: list[Turn] = []
+    attachments: list[dict] = Field(default_factory=list, max_length=4)
 
 
 def client_ip(request: Request) -> str:
@@ -73,6 +79,8 @@ def client_ip(request: Request) -> str:
 
 @app.post("/chat")
 async def chat(req: ChatRequest, request: Request):
+    if req.attachments:
+        raise HTTPException(400, "El análisis de archivos no está disponible. Envía tu consulta como texto.")
     lang = req.lang if req.lang in ("es", "en", "qu") else "es"
     ip = client_ip(request)
     if not (filters.allow(f"ip:{ip}", settings.rate_ip_min, 60) and filters.allow(f"s:{req.sessionId}", settings.rate_session_min, 60)
@@ -181,29 +189,73 @@ def inquiries(i: InquiryIn):
 
 # ------------------------------------------------------------------ administración
 
-_tokens: dict[str, tuple[str, float]] = {}  # prototipo: en producción, Microsoft Entra ID
+# Sesiones en la base (hash SHA-256 del token). Prototipo con contraseña; en producción: Microsoft Entra ID (ver README).
+SESSION_HOURS = 8
+
+
+def _hash(tok: str) -> str:
+    return hashlib.sha256(tok.encode()).hexdigest()
+
+
+def audit(email: str, action: str, target: str | None = None, ip: str | None = None) -> None:
+    with conn() as c:
+        c.execute("INSERT INTO admin_audit (email, action, target, ip) VALUES (%s,%s,%s,%s)", (email, action, (target or "")[:300] or None, ip))
 
 
 class Login(BaseModel):
-    email: str
-    password: str
+    email: str = Field(max_length=200)
+    password: str = Field(max_length=200)
 
 
 @app.post("/admin/login")
-def admin_login(b: Login):
-    if not settings.admin_password or b.email.strip().lower() not in settings.admin_emails or not secrets.compare_digest(b.password, settings.admin_password):
+def admin_login(b: Login, request: Request):
+    ip = client_ip(request)
+    email = b.email.strip().lower()
+    # Fuerza bruta: tras 5 intentos fallidos por IP en 15 min (o 10 por correo en 1 h) se bloquea; los aciertos no cuentan.
+    if filters.blocked(f"login-ip:{ip}", 5, 900) or filters.blocked(f"login-mail:{email}", 10, 3600):
+        raise HTTPException(429, "Demasiados intentos fallidos. Espera 15 minutos y vuelve a intentarlo.", headers={"Retry-After": "900"})
+    if len(settings.admin_password) < 12:
+        raise HTTPException(503, "El Portal está deshabilitado: ADMIN_PASSWORD debe tener al menos 12 caracteres.")
+    if email not in settings.admin_emails or not secrets.compare_digest(b.password.encode(), settings.admin_password.encode()):
+        filters.record(f"login-ip:{ip}")
+        filters.record(f"login-mail:{email}")
+        audit(email, "login_fallido", None, ip)
         raise HTTPException(401, "Correo o contraseña incorrectos")
     tok = secrets.token_urlsafe(32)
-    _tokens[tok] = (b.email, time.time() + 8 * 3600)
-    return {"token": tok, "name": b.email.split("@")[0], "email": b.email}
+    with conn() as c:
+        c.execute("DELETE FROM admin_sessions WHERE expires_at < now()")
+        c.execute("INSERT INTO admin_sessions (token_hash, email, expires_at) VALUES (%s, %s, now() + make_interval(hours => %s))",
+                  (_hash(tok), email, SESSION_HOURS))
+    audit(email, "login", None, ip)
+    return {"token": tok, "name": email.split("@")[0], "email": email}
 
 
 def admin(authorization: str = Header(default="")) -> str:
     tok = authorization.removeprefix("Bearer ").strip()
-    who = _tokens.get(tok)
-    if not who or who[1] < time.time():
+    if not tok:
+        raise HTTPException(401, "Inicia sesión")
+    with conn() as c:
+        r = c.execute("SELECT email FROM admin_sessions WHERE token_hash = %s AND expires_at > now()", (_hash(tok),)).fetchone()
+    if not r:
         raise HTTPException(401, "Sesión expirada")
-    return who[0]
+    return r["email"]
+
+
+@app.post("/admin/logout")
+def admin_logout(authorization: str = Header(default="")):
+    tok = authorization.removeprefix("Bearer ").strip()
+    with conn() as c:
+        r = c.execute("DELETE FROM admin_sessions WHERE token_hash = %s RETURNING email", (_hash(tok),)).fetchone()
+    if r:
+        audit(r["email"], "logout")
+    return {"ok": True}
+
+
+@app.get("/admin/audit")
+def admin_audit_log(_: str = Depends(admin)):
+    with conn() as c:
+        rows = c.execute("SELECT at, email, action, target FROM admin_audit ORDER BY at DESC LIMIT 200").fetchall()
+    return [{"at": r["at"].isoformat(), "email": r["email"], "action": r["action"], "target": r["target"]} for r in rows]
 
 
 @app.get("/admin/docs")
@@ -219,19 +271,34 @@ def admin_docs(_: str = Depends(admin)):
         "url": r["url"] if r["acceso"] != "interno" else None, "uploadedAt": r["uploaded_at"].isoformat(), "uploadedBy": r["uploaded_by"],
         "status": r["status"] if r["status"] in ("procesando", "indexado", "error") else "indexado", "chunks": r["n_chunks"], "sizeKb": r["size_kb"],
         "audiencia": r["audiencia"], "periodo": r["periodo"], "acceso": r["acceso"],
+        "notes": r["notes"] if r["uploaded_by"] != "corpus" else None,
     } for r in rows]
 
 
 @app.delete("/admin/docs/{doc_id}")
-def admin_delete(doc_id: str, _: str = Depends(admin)):
+def admin_delete(doc_id: str, who: str = Depends(admin)):
     with conn() as c:
         c.execute("UPDATE documents SET status = 'retirado', is_current = false WHERE id = %s", (doc_id,))
+    audit(who, "retirar", doc_id)
     vectors.load()
     return {"ok": True}
 
 
+@app.post("/admin/docs/{doc_id}/reprocess")
+def admin_reprocess(doc_id: str, tasks: BackgroundTasks, who: str = Depends(admin)):
+    """Vuelve a procesar un documento subido (por ejemplo, tras un error)."""
+    with conn() as c:
+        d = c.execute("SELECT uploaded_by FROM documents WHERE id = %s", (doc_id,)).fetchone()
+        if not d or d["uploaded_by"] == "corpus":
+            raise HTTPException(400, "Solo se reprocesan documentos subidos desde el Portal")
+        c.execute("UPDATE documents SET status = 'procesando', notes = 'En cola para procesar' WHERE id = %s", (doc_id,))
+    audit(who, "reprocesar", doc_id)
+    tasks.add_task(processing.process, doc_id)
+    return {"ok": True}
+
+
 @app.post("/admin/docs")
-async def admin_upload(file: UploadFile = File(...), title: str = Form(...), topicId: str = Form(...), version: str = Form(...),
+async def admin_upload(tasks: BackgroundTasks, file: UploadFile = File(...), title: str = Form(...), topicId: str = Form(...), version: str = Form(...),
                        docDate: str = Form(...), origin: str = Form("interno"), url: str | None = Form(None), replaces: str | None = Form(None),
                        who: str = Depends(admin)):
     ext = Path(file.filename or "").suffix.lower().lstrip(".")
@@ -249,11 +316,11 @@ async def admin_upload(file: UploadFile = File(...), title: str = Form(...), top
             """INSERT INTO documents (id, title, tipo, topic_id, version, fecha_consulta, url, acceso, kind, status, uploaded_by, size_kb, replaces, notes)
                VALUES (%s,%s,'documento',%s,%s,%s,%s,%s,%s,'procesando',%s,%s,%s,%s)""",
             (doc_id, title, topicId, version, docDate or None, url, "publico" if origin == "web" and url else "interno", ext, who,
-             max(1, len(data) // 1024), replaces, "Pendiente de fragmentar con preparar_corpus.py y cargar con app.ingest"),
+             max(1, len(data) // 1024), replaces, "En cola para procesar"),
         )
-        if replaces:
-            c.execute("UPDATE documents SET is_current = false WHERE id = %s", (replaces,))
-    vectors.load()
+    audit(who, "subir", f"{doc_id}{f' (reemplaza {replaces})' if replaces else ''}")
+    # Se fragmenta, se calculan los embeddings y se indexa en segundo plano; el Portal consulta el estado cada 2 s.
+    tasks.add_task(processing.process, doc_id)
     return {"id": doc_id, "title": title, "topicId": topicId, "kind": ext, "version": version, "docDate": docDate, "origin": origin, "url": url,
             "uploadedAt": time.strftime("%Y-%m-%dT%H:%M:%S"), "uploadedBy": who, "status": "procesando", "chunks": 0, "sizeKb": max(1, len(data) // 1024)}
 
@@ -266,11 +333,12 @@ class TopicIn(BaseModel):
 
 
 @app.post("/admin/topics")
-def admin_topic(t: TopicIn, _: str = Depends(admin)):
+def admin_topic(t: TopicIn, who: str = Depends(admin)):
     tid = re.sub(r"[^a-z0-9]+", "-", rules.norm(t.name)).strip("-")
     with conn() as c:
         c.execute("INSERT INTO topics (id, name, description, name_en, description_en) VALUES (%s,%s,%s,%s,%s) ON CONFLICT (id) DO NOTHING",
                   (tid, t.name, t.description, t.nameEn, t.descriptionEn))
+    audit(who, "tema", tid)
     return {"id": tid, **t.model_dump()}
 
 
@@ -288,9 +356,10 @@ class InboxPatch(BaseModel):
 
 
 @app.patch("/admin/unanswered/{item_id}")
-def admin_unanswered_patch(item_id: str, p: InboxPatch, _: str = Depends(admin)):
+def admin_unanswered_patch(item_id: str, p: InboxPatch, who: str = Depends(admin)):
     with conn() as c:
         c.execute("UPDATE unanswered SET status = coalesce(%s, status), control_id = coalesce(%s, control_id) WHERE id = %s", (p.status, p.controlId, item_id))
+    audit(who, "bandeja", f"{item_id} → {p.status or p.controlId}")
     return {"ok": True}
 
 
@@ -330,6 +399,7 @@ def admin_filter_upsert(f: FilterIn, who: str = Depends(admin)):
             (f.category, term, f.active, f.note, who),
         )
     filters.invalidate()
+    audit(who, "filtro", f"{f.category}: {term} ({'activo' if f.active else 'desactivado'})")
     return {"ok": True, "term": term}
 
 
@@ -353,9 +423,53 @@ def admin_filter_test(_: str = Depends(admin)):
 
 
 class CaseIn(BaseModel):
-    q: str
-    lang: str = "es"
-    expect: str
+    q: str = Field(min_length=1, max_length=1000)
+    lang: str = Field(default="es", pattern="^(es|en)$")
+    expect: str = Field(min_length=1, max_length=500)
+
+
+@app.get("/admin/inquiries")
+def list_inquiries(_: str = Depends(admin)):
+    with conn() as c:
+        rows = c.execute("SELECT code, office, email, question, lang, transcript, status, created_at FROM inquiries WHERE delete_after > now() ORDER BY created_at DESC LIMIT 100").fetchall()
+    return [{**r, "created_at": r["created_at"].isoformat()} for r in rows]
+
+
+class InquiryStatus(BaseModel):
+    status: str = Field(pattern="^(nueva|en_atencion|resuelta)$")
+
+
+@app.patch("/admin/inquiries/{code}")
+def update_inquiry(code: str, b: InquiryStatus, who: str = Depends(admin)):
+    with conn() as c:
+        row = c.execute("UPDATE inquiries SET status = %s, updated_at = now() WHERE code = %s AND delete_after > now() RETURNING code", (b.status, code)).fetchone()
+        if not row:
+            raise HTTPException(404, "Consulta no encontrada")
+    audit(who, "estado_consulta", code)
+    return {"ok": True}
+
+
+class ImportedCase(CaseIn):
+    id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+
+
+class ControlImport(BaseModel):
+    cases: list[ImportedCase] = Field(min_length=1, max_length=1000)
+
+
+@app.put("/admin/validation/cases")
+def replace_cases(b: ControlImport, who: str = Depends(admin)):
+    """Reemplazo atómico: validar todo antes de modificar el set persistido."""
+    if len({case.id for case in b.cases}) != len(b.cases):
+        raise HTTPException(400, "Los identificadores del CSV deben ser únicos")
+    with conn() as c:
+        c.execute("LOCK TABLE control_cases IN EXCLUSIVE MODE")
+        c.execute("DELETE FROM control_cases")
+        for case in b.cases:
+            c.execute("INSERT INTO control_cases (id, q, lang, expect, source) VALUES (%s,%s,%s,%s,'csv')",
+                      (case.id, case.q.strip(), case.lang, case.expect.strip()))
+    audit(who, "importar_control", str(len(b.cases)))
+    return {"total": len(b.cases)}
 
 
 @app.get("/admin/validation/cases")
@@ -365,11 +479,12 @@ def cases(_: str = Depends(admin)):
 
 
 @app.post("/admin/validation/cases")
-def add_case(b: CaseIn, _: str = Depends(admin)):
+def add_case(b: CaseIn, who: str = Depends(admin)):
     with conn() as c:
         n = c.execute("SELECT count(*) AS n FROM control_cases WHERE id LIKE 'C%%'").fetchone()["n"] + 1
         cid = f"C{n:03d}"
         c.execute("INSERT INTO control_cases (id, q, lang, expect, source) VALUES (%s,%s,%s,%s,'bandeja')", (cid, b.q, b.lang, b.expect))
+    audit(who, "caso_control", cid)
     return {"id": cid, **b.model_dump()}
 
 
@@ -395,7 +510,7 @@ async def run_validation(_: str = Depends(admin)):
         expected = case["expect"].split("|")
         ok = (kind == case["expect"]) if case["expect"] in ("no_se", "aclaracion") else any(d in docs for d in expected)
         results.append({"id": case["id"], "q": case["q"], "lang": case["lang"], "expect": case["expect"], "got": got, "ok": ok,
-                        "hallucination": bool(text.strip()) and not docs and kind is None, "ms": int((time.time() - t0) * 1000)})
+                        "hallucination": bool(text.strip()) and not docs and kind is None, "answer": text, "ms": int((time.time() - t0) * 1000)})
     metrics = {"total": len(results), "ok": sum(r["ok"] for r in results)}
     with conn() as c:
         c.execute("INSERT INTO validation_runs (model, metrics, results) VALUES (%s,%s,%s)",

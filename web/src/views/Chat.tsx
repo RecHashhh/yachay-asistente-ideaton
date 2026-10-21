@@ -1,5 +1,5 @@
-import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { BRAND } from '../config';
 import { CampusMap } from '../components/CampusMap';
 import { Composer } from '../components/Composer';
@@ -7,8 +7,9 @@ import { ConsentDialog, hasConsent, trapFocus } from '../components/ConsentDialo
 import { Markdown } from '../components/Markdown';
 import { Mascot } from '../components/Mascot';
 import { ProcedureCard, UnknownCard } from '../components/ProcedureCard';
-import { IcSpeaker, IcExternal, IcSpark, IcCheck, IcClose, IcCopy, IcDown, IcExpand, IcGlobe, IcInfo, IcLock, IcShield, IcMenu, IcMoon, IcPlus, IcRetry, IcSun, IcTrend, IcUp } from '../components/icons';
+import { IcSpeaker, IcExternal, IcSpark, IcCheck, IcClose, IcCopy, IcDown, IcArrowDown, IcExpand, IcGlobe, IcInfo, IcLock, IcShield, IcMenu, IcMoon, IcPlus, IcRetry, IcSun, IcTrend, IcUp } from '../components/icons';
 import { docHref, getTopics, getTrends, sendFeedback, streamChat } from '../lib/api';
+import { displayStream } from '../lib/displayStream';
 import { LANGS, detectLang, locatorLabel, topicLabel, useT, type Lang } from '../lib/i18n';
 import { placeById, placeName } from '../lib/campus';
 import { ChatList } from '../components/ChatList';
@@ -24,6 +25,8 @@ interface Msg {
   text: string;
   files?: Attachment[];
   status?: string;
+  activity?: string[];
+  answerMode?: 'extractive';
   sources?: Source[];
   map?: MapAction;
   procedure?: Procedure;
@@ -78,6 +81,8 @@ interface Props { theme: 'light' | 'dark'; toggleTheme: () => void; setLang: (l:
 
 export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
   const { t, lang } = useT();
+  const reducedMotion = useReducedMotion();
+  const composerId = useId();
   const [consent, setConsent] = useState(hasConsent);
   const [dialog, setDialog] = useState<'notice' | 'about' | null>(null);
   const [chats, setChats] = useState<Conversation[]>(loadChats);
@@ -86,10 +91,20 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
   const [input, setInput] = useState('');
   const [files, setFiles] = useState<Attachment[]>([]);
   const [trends, setTrends] = useState<Trend[]>([]);
+  const [trendsError, setTrendsError] = useState(false);
+  const [trendsRetry, setTrendsRetry] = useState(0);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [railOpen, setRailOpen] = useState(true);
   const [mobileRail, setMobileRail] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (!mobileRail) return;
+    const previous = document.activeElement as HTMLElement | null;
+    document.querySelector<HTMLElement>('#chat-sidebar button')?.focus();
+    const close = (event: globalThis.KeyboardEvent) => { if (event.key === 'Escape') setMobileRail(false); };
+    document.addEventListener('keydown', close);
+    return () => { document.removeEventListener('keydown', close); previous?.focus(); };
+  }, [mobileRail]);
   const [suggestLang, setSuggestLang] = useState<Lang | null>(null);
   const [voiceOpen, setVoiceOpen] = useState(!!voice);
   useEffect(() => { if (voice) setVoiceOpen(true); }, [voice]);
@@ -97,18 +112,32 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
   const [undo, setUndo] = useState<{ chat: Conversation; index: number } | null>(null);
   useEffect(() => { if (!undo) return; const x = setTimeout(() => setUndo(null), 6000); return () => clearTimeout(x); }, [undo]);
   const abort = useRef<AbortController | null>(null);
-  const endRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const followEnd = useRef(true);
+  const [awayFromEnd, setAwayFromEnd] = useState(false);
+  useEffect(() => () => abort.current?.abort(), []);
   const busy = msgs.some((m) => m.streaming);
   const modalOpen = !consent || dialog !== null || voiceOpen;
   // Lo que oye un lector de pantalla: el estado al empezar y la respuesta completa al terminar, no cada palabra del stream.
   const lastAi = [...msgs].reverse().find((m) => m.role === 'assistant');
   const announce = !lastAi ? '' : lastAi.streaming ? t('thinking') + '…' : lastAi.unknown ? t(lastAi.unknown.reason === 'fuera_de_dominio' ? 'outOfDomain' : 'unknownTitle') : [lastAi.text.replaceAll('**', ''),lastAi.procedure?.title].filter(Boolean).join('. ');
 
-  useEffect(() => { void getTrends(lang).then(setTrends); }, [lang]);
-  useEffect(() => { void getTopics().then(setTopics); }, []);
-  // Baja al final solo cuando llega un mensaje o avanza el stream; abrir un mapa o una fuente no mueve la vista.
+  useEffect(() => {
+    let active = true;
+    setTrendsError(false);
+    setTrends([]);
+    void getTrends(lang).then((items) => {
+      if (active) setTrends(items);
+    }).catch(() => { if (active) setTrendsError(true); });
+    return () => { active = false; };
+  }, [lang, trendsRetry]);
+  useEffect(() => { void getTopics().then(setTopics).catch(() => setTopics([])); }, []);
+  // Sigue la respuesta solo mientras la persona esté al final; nunca le quita el lugar de lectura.
   const last = msgs[msgs.length - 1];
-  useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [msgs.length, last?.text, last?.procedure, last?.unknown, last?.streaming]);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && followEnd.current) el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
+  }, [msgs.length, last?.text, last?.procedure, last?.unknown, last?.streaming]);
   useEffect(() => { if (!toastMsg) return; const x = setTimeout(() => setToastMsg(null), 3200); return () => clearTimeout(x); }, [toastMsg]);
 
   // Sugiere cambiar de idioma si escribe en otro (detección local; el backend también detecta).
@@ -151,7 +180,10 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
       setPii({ text, base, att }); setInput(text); return;
     }
     if (piiMode === 'skip') text = redact(text);
+    const keepTyping = document.activeElement?.id === 'ask';
     setPii(null);
+    followEnd.current = true;
+    setAwayFromEnd(false);
     setInput(''); setFiles([]);
     const user: Msg = { id: uid(), role: 'user', text, files: att.length ? att : undefined };
     const ai: Msg = { id: uid(), role: 'assistant', text: '', streaming: true, status: t('thinking') };
@@ -159,10 +191,15 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
     setMsgs([...base, user, ai]);
     const ctrl = new AbortController();
     abort.current = ctrl;
+    if (keepTyping) requestAnimationFrame(() => {
+      if (!ctrl.signal.aborted) document.getElementById('ask')?.focus({ preventScroll: true });
+    });
     try {
-      for await (const ev of streamChat({ sessionId: chatId, message: text, lang, history, attachments: att.length ? att : undefined }, ctrl.signal)) {
-        if (ev.type === 'status') patch(ai.id, () => ({ status: ev.label }));
-        else if (ev.type === 'token') patch(ai.id, (m) => ({ text: m.text + ev.text, status: undefined }));
+      const events = streamChat({ sessionId: chatId, message: text, lang, history, attachments: att.length ? att : undefined }, ctrl.signal);
+      for await (const ev of displayStream(events, ctrl.signal, !!reducedMotion)) {
+        if (ev.type === 'status') patch(ai.id, (m) => ({ status: ev.label, activity: [...new Set([...(m.activity ?? []), ev.label])].slice(-8) }));
+        else if (ev.type === 'answer_mode') patch(ai.id, () => ({ answerMode: ev.mode }));
+        else if (ev.type === 'token') patch(ai.id, (m) => ({ text: m.text + ev.text, status: m.status ?? (lang === 'en' ? 'Responding' : 'Respondiendo') }));
         else if (ev.type === 'tool') patch(ai.id, () => ({ map: ev.input }));
         else if (ev.type === 'procedure') patch(ai.id, () => ({ procedure: ev.item }));
         else if (ev.type === 'unknown') patch(ai.id, () => ({ unknown: ev.item, status: undefined }));
@@ -182,8 +219,8 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
   }
 
   const stop = () => abort.current?.abort();
-  const newChat = () => { stop(); setChatId(uid()); setMsgs([]); setMobileRail(false); setPii(null); };
-  const openChat = (c: Conversation) => { stop(); setChatId(c.id); setMsgs(c.msgs); setMobileRail(false); setPii(null); };
+  const newChat = () => { stop(); followEnd.current = true; setAwayFromEnd(false); setChatId(uid()); setMsgs([]); setMobileRail(false); setPii(null); };
+  const openChat = (c: Conversation) => { stop(); followEnd.current = true; setAwayFromEnd(false); setChatId(c.id); setMsgs(c.msgs); setMobileRail(false); setPii(null); };
   const persist = (fn: (c: Conversation[]) => Conversation[]) => setChats((prev) => { const next = fn(prev); saveChats(next); return next; });
   const renameChat = (id: string, title: string) => persist((cs) => cs.map((c) => (c.id === id ? { ...c, title, renamed: true } : c)));
   const deleteChat = (id: string) => {
@@ -237,8 +274,10 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
   }, [chats]);
 
   const composer = (
+    <motion.div layoutId={composerId} layout="position" transition={{ layout: { duration: reducedMotion ? 0 : 0.3, ease: [0.2, 0.8, 0.2, 1] } }}>
     <Composer value={input} onChange={setInput} files={files} onFiles={setFiles} onSend={() => void send(input)} onStop={stop} busy={busy}
       disabled={!consent} autoFocus={empty && !embed} hints={empty ? [] : hints} onHint={(q) => void send(q)} toast={setToastMsg} onVoice={() => setVoiceOpen(true)} />
+    </motion.div>
   );
 
   const langBanner = (
@@ -267,7 +306,8 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
     <div className={`app${embed ? ' embed' : ''}${railOpen ? '' : ' rail-closed'}${mobileRail ? ' rail-open-mobile' : ''}`} inert={modalOpen || undefined}>
       <div className="sr" role="status" aria-live="polite">{announce}</div>
       {!embed && (
-        <aside id="chat-sidebar" className="rail" aria-label={t('recent')}>
+        <aside id="chat-sidebar" className="rail" aria-label={t('recent')} role={mobileRail ? 'dialog' : undefined} aria-modal={mobileRail || undefined} onKeyDown={(e) => { if (mobileRail) trapFocus(e); if (e.key === 'Escape') setMobileRail(false); }}>
+          {mobileRail && <button className="icon-btn" aria-label={t('close')} onClick={() => setMobileRail(false)}><IcClose /></button>}
           <div className="brand"><Mascot size={30} /><div><b>{BRAND.mascotName}</b><small>{BRAND.university}</small></div></div>
           <button className="item" onClick={newChat} title={t('newChat')} aria-label={t('newChat')}><IcPlus /><span className="rail-label">{t('newChat')}</span></button>
           <nav className="chat-list" aria-label={t('recent')}>
@@ -282,7 +322,7 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
       )}
       {mobileRail && <div className="scrim" style={{ zIndex: 35, backdropFilter: 'none' }} onClick={() => setMobileRail(false)} />}
 
-      <main className="chat">
+      <main className="chat" inert={mobileRail || undefined}>
         <header className="topbar">
           {embed ? <Mascot size={28} mood={busy ? 'thinking' : 'idle'} /> : (
             <button className="icon-btn" aria-label={t('recent')} aria-controls="chat-sidebar" aria-expanded={window.matchMedia('(max-width: 820px)').matches ? mobileRail : railOpen} onClick={() => (window.matchMedia('(max-width: 820px)').matches ? setMobileRail(true) : setRailOpen((o) => !o))}><IcMenu /></button>
@@ -312,9 +352,13 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
                 <div className="follow">{forYou.map((q) => <button key={q} className="chip" onClick={() => void send(q)}>{q}</button>)}</div>
               </div>
             )}
-            {trends.length > 0 && (
+            {(trends.length > 0 || trendsError) && (
               <div className="suggest">
                 <h2><IcTrend width={15} height={15} />{t('trending')}</h2>
+                {trendsError && <div className="row" role="status">
+                  <p className="small muted">{lang === 'en' ? 'Could not load popular questions.' : 'No se pudieron cargar las consultas más frecuentes.'}</p>
+                  <button className="btn sm" onClick={() => setTrendsRetry((n) => n + 1)}>{lang === 'en' ? 'Retry' : 'Reintentar'}</button>
+                </div>}
                 <div className="suggest-grid">
                   {trends.slice(0, embed ? 3 : 4).map((x, i) => (
                     <motion.button key={x.query} className="suggest-card" onClick={() => void send(x.query)}
@@ -329,8 +373,15 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
           </motion.section>
         ) : (
           <>
-            <div className="scroll">
-              <div className="thread">
+            <div className="scroll" ref={scrollRef} onWheel={(e) => { if (e.deltaY < 0) { followEnd.current = false; setAwayFromEnd(true); } }}
+              onTouchMove={() => { followEnd.current = false; setAwayFromEnd(true); }}
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+                followEnd.current = atEnd;
+                setAwayFromEnd(!atEnd);
+              }}>
+              <motion.div className="thread" initial={{ opacity: 0, y: reducedMotion ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }}>
                 <AnimatePresence initial={false}>
                   {msgs.map((m, i) => m.role === 'user'
                     ? (
@@ -340,17 +391,20 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
                       </motion.div>
                     )
                     : <AssistantMsg key={m.id} m={m}
-                        onVote={(v) => { patch(m.id, () => ({ vote: v })); if (v === 'up' && m.serverId) void sendFeedback(m.serverId, v); }}
-                        onReason={(r) => { if (m.serverId) void sendFeedback(m.serverId, 'down', { question: msgs[i - 1]?.text ?? '', lang, reason: r ?? undefined }); }}
+                        onVote={(v) => { patch(m.id, () => ({ vote: v })); if (v === 'up' && m.serverId) void sendFeedback(m.serverId, v).catch(() => { patch(m.id, () => ({ vote: undefined })); setToastMsg(lang === 'en' ? 'Your feedback was not saved. Try again.' : 'No se guardó tu valoración. Intenta de nuevo.'); }); }}
+                        onReason={async (r) => { if (!m.serverId) throw new Error('Respuesta sin identificador'); await sendFeedback(m.serverId, 'down', { question: msgs[i - 1]?.text ?? '', lang, reason: r ?? undefined }); }}
                         question={msgs[i - 1]?.text}
                         transcript={transcriptOf(msgs.slice(0, i + 1), lang)}
                         onRetry={() => retry(m.id)} onAsk={(q) => void send(q)}
                         onShowMap={(placeId) => patch(m.id, () => ({ map: { destino: placeId, origen: 'entrada' } }))} />)}
                 </AnimatePresence>
-                <div ref={endRef} />
-              </div>
+              </motion.div>
             </div>
             <div className="composer-wrap">
+              {awayFromEnd && <button className="jump-to-latest" onClick={() => {
+                followEnd.current = true; setAwayFromEnd(false);
+                scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: reducedMotion ? 'instant' : 'smooth' });
+              }}><IcArrowDown width={16} height={16} />{lang === 'en' ? 'Latest message' : 'Ver lo más reciente'}</button>}
               {langBanner}
               {piiBanner}
               {composer}
@@ -376,7 +430,7 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
   );
 }
 
-function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAsk, onShowMap }: { m: Msg; question?: string; transcript: string; onVote: (v: 'up' | 'down') => void; onReason: (r: FeedbackReason | null) => void; onRetry: () => void; onAsk: (q: string) => void; onShowMap: (placeId: string) => void }) {
+function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAsk, onShowMap }: { m: Msg; question?: string; transcript: string; onVote: (v: 'up' | 'down') => void; onReason: (r: FeedbackReason | null) => Promise<void>; onRetry: () => void; onAsk: (q: string) => void; onShowMap: (placeId: string) => void }) {
   const { t, lang } = useT();
   const [copied, setCopied] = useState(false);
   const [openSrc, setOpenSrc] = useState<string | null>(null);
@@ -390,9 +444,13 @@ function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAs
     await speak([s.intro.replace(/Di "siguiente"[^.]*\.|Say "next"[^.]*\./, ''), ...s.steps, s.outro].join(' '), lang, loadPrefs());
     setReading(false);
   };
-  const mood = m.streaming ? (m.text ? 'talking' : 'thinking') : 'idle';
+  const mood = reading ? 'talking' : m.streaming ? (m.text ? 'talking' : 'thinking') : 'idle';
   const srcKey = (s: Source) => `${s.docId}|${s.locator ?? ''}`;
   const src = m.sources?.find((s) => srcKey(s) === openSrc);
+  // Conserva la presentación honesta también para conversaciones guardadas antes de answer_mode.
+  const legacyExtract = /^(Esto dice el documento oficial más relevante:|This is what the most relevant official document says:)\s*/;
+  const extractive = m.answerMode === 'extractive' || legacyExtract.test(m.text);
+  const answerText = extractive ? m.text.replace(legacyExtract, '') : m.text;
   // Si el mapa se pidió desde la tarjeta del trámite o de "sin información", se dibuja debajo de ella, donde el usuario está mirando.
   const mapAfter = !!(m.procedure || m.unknown);
   return (
@@ -400,14 +458,18 @@ function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAs
       <Mascot size={36} mood={mood} decorative />
       <div className="body">
         <AnimatePresence mode="wait">
-          {m.status && (
+          {m.streaming && m.status && (
             <motion.span key={m.status} className="status" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.2 }}>
               <span className="working">{m.status}…</span>
             </motion.span>
           )}
         </AnimatePresence>
         {m.map && !mapAfter && <CampusMap action={m.map} />}
-        {m.text && <Markdown text={m.text} animate={!!m.streaming} />}
+        {m.text && <div className={extractive ? 'extractive-answer' : undefined}>
+          {extractive && <p className="extractive-label">{lang === 'en' ? 'Document excerpt' : 'Fragmento del documento'}</p>}
+          <Markdown text={answerText} animate={!!m.streaming} />
+          {extractive && <p className="extractive-note">{lang === 'en' ? 'Literal text from the source, without an AI-written summary.' : 'Texto literal de la fuente, sin resumen redactado por IA.'}</p>}
+        </div>}
         {m.procedure && <ProcedureCard p={m.procedure} onShowMap={onShowMap} />}
         {m.clarify && <ClarifyCard question={m.clarify.question} options={m.clarify.options} onPick={onAsk} />}
         {m.unknown && <UnknownCard u={m.unknown} question={question} transcript={transcript} onShowMap={onShowMap} />}
@@ -452,7 +514,6 @@ function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAs
             <button className="icon-btn" aria-label={t('bad')} title={t('bad')} aria-pressed={m.vote === 'down'} onClick={() => onVote('down')}><IcDown /></button>
             {ttsSupported() && <button className="icon-btn" aria-label={reading ? t('stopReading') : t('readAloud')} title={reading ? t('stopReading') : t('readAloud')} aria-pressed={reading} onClick={readAloud}><IcSpeaker /></button>}
             <button className="icon-btn" aria-label={t('retry')} title={t('retry')} onClick={onRetry}><IcRetry /></button>
-            {m.latencyMs !== undefined && <span className="latency mono">{(m.latencyMs / 1000).toFixed(1)} s</span>}
           </div>
         )}
 

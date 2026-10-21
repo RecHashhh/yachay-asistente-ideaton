@@ -1,5 +1,73 @@
 # Informe de avance frente a la rúbrica — Reto 1: Chatbot Institucional de Procedimientos
 
+## Revisión con los documentos oficiales — 20 de octubre de 2026
+
+Fuentes revisadas: `Rubrica_Reto_Chatbot_Institucional.pdf` (p. 1) y `Reto1 chatbot Yachaytech.pdf` (pp. 2–6), facilitados por el usuario desde Downloads. Sus requisitos son criterios del concurso; esta revisión no autoriza publicar documentos institucionales ni subir cambios a GitHub.
+
+**Estado de la evidencia:** la auditoría integral de esta fecha combina pruebas públicas reales, revisión de código y pruebas administrativas con API simulada, identificadas por separado en `docs/auditoria-integral-2026-10-20/index.html`. No permite declarar cumplimiento total ni asignar una nota final.
+
+**Advertencia sobre el contenido histórico que sigue:** fue elaborado para una etapa anterior del prototipo. Sus notas 4/4, porcentajes del simulador, afirmaciones de accesibilidad, estimaciones de precios y descripciones de funcionalidades no constituyen resultados vigentes verificados. El backend ya existe; el acceso administrativo real requiere autenticación y no se debe usar la instrucción antigua de «cualquier correo y contraseña». No reutilizar cifras o afirmaciones históricas en el paper sin comprobarlas.
+
+### Objetivos y criterios de cierre
+
+Los siete criterios de la rúbrica no tienen ponderaciones indicadas. Kichwa es un valor agregado; español e inglés son obligatorios. Producción, matrícula/notas/pagos reales y firma electrónica quedan fuera del alcance exigido. La guía paso a paso y la representatividad estudiantil sí forman parte del alcance.
+
+| Objetivo | Evidencia disponible | Condición de cierre propuesta | Prioridad |
+|---|---|---|---|
+| Responder trámites oficiales paso a paso | Chat y fuentes funcionan; hay respuestas extractivas que reproducen fragmentos en vez de resolver la consulta | Inventario de trámites con fuente vigente; verificar por trámite qué hacer, cómo, orden, documentos y dependencia. Omitir datos ausentes y reconocerlos | 1 |
+| Cubrir representatividad y ubicaciones | Ubicaciones/mapa comprobados parcialmente; no se ha certificado toda la cobertura de representantes | Lista contrastada de consejos, representantes y canales; probar aulas, laboratorios, salas de estudio y residencias contra fuentes oficiales | 1 |
+| Demostrar veracidad | Citas, aclaraciones y rechazo observados; importación CSV y errores de evaluación presentan fallos | Corregir validación; ejecutar set ES/EN revisado por personas sobre backend real; exportar pregunta, respuesta esperada, respuesta obtenida, fuente, fecha y resultado | 1 |
+| Ofrecer primer uso claro y bilingüe | Selector ES/EN, chat progresivo, historial y widget probados; quedan problemas móviles y traducción de respuestas por comprobar | Misma batería ES/EN sin cambiar hechos; recorrido por teclado y móvil, sin recortes; mensajes de error recuperables y fuentes accesibles | 1 |
+| Entregar prototipo honesto y estable | Auditoría con 11 hallazgos | Corregir los fallos que afectan a la demo; conectar o retirar funciones que aparentan capacidades inexistentes, especialmente adjuntos y confirmaciones falsas | 1 |
+| Justificar costo computacional | Calculadora y documentación existentes; valores y precios no revalidados | Fórmulas consistentes, entradas válidas, CPU/RAM/almacenamiento e inferencia; escenarios y supuestos explícitos, precios documentados con fecha | 2 |
+| Completar paper IEEE | Hay notas y documentación; no se localizó un entregable final identificable por nombre paper/IEEE | Paper con resumen, problema, estado del arte y referencias, metodología, arquitectura, validación real, costos, conclusiones y limitaciones | 2 |
+| Documentar uso de IA | Existe `docs/DECLARACION-IA.md` | Completar herramientas/modelos, propósito, aporte humano y de IA, responsables de revisión; incorporarlo al documento técnico | 2 |
+| Publicar código revisable | Origin configurado; main remoto consultado, cambios locales pendientes | Revisar secretos y datos institucionales, compilar, crear commits y publicarlos; verificar acceso anónimo al repositorio y reproducibilidad desde README | 2 |
+| Preparar pitch | Hay guion histórico | Ensayar problema, demo ES/EN, veracidad, costo e impacto; ajustar al tiempo que confirme la organización | 3 |
+
+Como meta interna, no impuesta por los PDF, se propone un set de al menos 100 preguntas equilibrado ES/EN, con casos sin información, ambiguos, fuera de dominio y ataques a instrucciones. Reportar exactitud, cita correcta, rechazo apropiado, resultados por idioma y latencias p50/p95. Cualquier hecho institucional inventado detectado bloquea la versión de demostración hasta corregirlo; no presentar «cero alucinaciones» como garantía universal por superar un set finito.
+
+### Decisión de interacción
+
+Se conserva la aparición progresiva del texto: contribuye a la fluidez percibida exigida en 8.2. El estado breve de trabajo solo se muestra mientras se procesa; al terminar desaparece y ya no aparece «Ver actividad». Las fuentes permanecen disponibles. La animación no demuestra que el modelo esté generando en tiempo real: `displayStream` también reparte texto recibido de golpe por repintados. Mantener Detener, respetar movimiento reducido, evitar esperas añadidas y medir por separado tiempo hasta la primera respuesta visible y tiempo total. No animar de nuevo respuestas históricas.
+
+### Publicación comprobada en esta revisión
+
+Esta subsección conserva el diagnóstico **previo a la solicitud de publicar**. La revisión posterior, descrita más abajo, prepara la publicación y sus correcciones; no debe interpretarse esta fotografía anterior como estado permanente del remoto.
+
+`origin` apunta a `https://github.com/RecHashhh/yachay-asistente-ideaton.git`. `git ls-remote origin refs/heads/main` devolvió `0daca792f2218107508ee14dc9ced26f5b8fb947`. El HEAD local es `12d819c`, con dos commits por delante de la referencia de seguimiento y numerosos archivos modificados o nuevos sin commit. Por tanto, **no está todo publicado**. En esta revisión no se realizó commit, push ni despliegue. Consultar una referencia con las credenciales locales no certifica acceso público anónimo; queda pendiente esa comprobación. GitHub y despliegue de la página son verificaciones distintas.
+
+---
+
+## Contenido histórico — requiere revalidación antes de la entrega
+
+### Correcciones posteriores de esta fecha
+
+Se conectó el CSV de validación al servidor (GET/PUT autenticados, reemplazo transaccional y validación de filas), se agregó recuperación de errores de evaluación/feedback y se deshabilitaron adjuntos del público sin soporte real (el backend también los rechaza explícitamente). Se corrigieron el inicio en poca altura, el formulario móvil y el foco/cierre del menú. El historial «Ver actividad» ya no aparece al terminar. La calculadora limita valores inválidos y usa 384 dimensiones por defecto, coherente con el esquema actual; sus costos siguen siendo una estimación, no mediciones de consumo.
+
+Se añadió **Consultas** al portal: listado de las últimas 100 vigentes y estados nueva/en atención/resuelta, con autenticación y bitácora. Aplicar `api/sql/05_consultas.sql` mediante `python -m app.migrate`. No envía correos; la atención es manual y el texto público evita prometer una respuesta automática. La migración se aplicó en la base local durante esta revisión. Los contratos y la interfaz se probaron en aislamiento; no se certificó el circuito administrativo con personas reales.
+
+Verificación: `npm --prefix web run build`; seis pruebas de contratos HTTP con `python -m unittest discover -s tests -v` desde `api`; regresión Playwright en `scripts/verificar-entrega.cjs` con API simulada. Queda una advertencia de tamaño del bundle de Vite. Estos resultados no sustituyen la evaluación factual del chatbot.
+
+### Comparación con instituciones — fuentes consultadas el 20-10-2026
+
+Revisión documental de fuentes primarias, no una prueba de acceso autenticado a los productos. Las publicaciones históricas acreditan funciones descritas en esas fechas; no garantizan que todos los servicios sigan iguales hoy. «No documentado» no significa «inexistente».
+
+| Referente | Qué aporta y qué nos falta | Cómo orientar Yachi |
+|---|---|---|
+| [Pounce · Georgia State](https://success.gsu.edu/reduction-of-summer-melt/) | Mensajería SMS 24/7, orientación personalizada para matrícula y evidencia experimental de impacto. Yachi no tiene campañas proactivas ni resultados de impacto con estudiantes | Medir resolución de consultas, corrección y tiempo de completar una tarea antes de sumar más canales |
+| [Genie · Deakin](https://www.deakin.edu.au/about-deakin/news-and-media-releases/articles/deakins-genie-a-virtual-digital-assistant-out-of-the-bottle) | La universidad documentó horarios, tareas, recursos, saldo y préstamos, además de navegación. Yachi carece de integración autenticada con esos servicios | El mapa ya es una coincidencia, no una exclusividad. Las integraciones personales quedan como futuro: sistemas críticos están fuera del reto |
+| [Sunny · ASU](https://news.asu.edu/20200709-asu-launches-bilingual-chatbot-reach-parents-who-want-go-college) | Orientación bilingüe ES/EN dirigida también a estudiantes con hijos. Yachi no ha validado recorridos por perfiles | Bilingüismo es requisito básico; diferenciar por precisión y claridad para estudiantes nuevos y de intercambio |
+| [LOLA · Universidad de Murcia](https://clutv10.um.es/pro/video?id=116011) | Asistencia para preinscripción/matrícula con interacción familiar de mensajería. Yachi todavía necesita pruebas de tareas completas con usuarios | Priorizar resolver una consulta concreta; conservar el diseño minimalista y evitar paneles técnicos en la conversación |
+
+**Diferenciación defendible:** la combinación en una misma conversación de evidencia institucional visible (documento/versión/fecha y enlace cuando exista), guía de trámite curada y localización física; herramientas de revisión y validación administrables; identidad local y widget. Son fortalezas observables del prototipo, no funciones exclusivas de Yachi. Voz, calendario, bilingüismo y mascota no son innovaciones por sí solos. El valor científico debe probarse con una evaluación reproducible de la exactitud y de la resolución de tareas. Kichwa solo se presentará como valor agregado cuando lo valide un hablante competente.
+
+**Orden de evolución:** (1) cobertura y fuentes vigentes; (2) evaluación humana ES/EN; (3) atención manual realmente operativa; (4) prueba con estudiantes; (5) recordatorios optativos o nuevos canales si los resultados lo justifican. No añadir matrícula, notas o pagos reales para aparentar madurez: no son necesarios para este reto.
+
+Los precios de Haiku/Sonnet usados en la calculadora se contrastaron con la [tarifa oficial de Anthropic](https://platform.claude.com/docs/en/about-claude/pricing); el supuesto de servidor 4 vCPU/8 GiB a USD 48/mes se contrastó con [DigitalOcean Basic Regular](https://www.digitalocean.com/pricing/droplets). El costo real depende de tráfico, uso efectivo de caché, configuración, impuestos y operación; el monto de la calculadora no demuestra que una instancia soporte una carga concreta.
+
+Se prepararon `docs/entrega/paper.tex` (borrador IEEE) y `docs/entrega/revision.html` (comparación, cierre y guion de pitch). Falta completar autores, evaluación factual, revisión institucional y ensayo. El repositorio se comprobó público mediante una consulta anónima a la API de GitHub (`private: false`). La publicación de commits se verifica al finalizar; no equivale a desplegar una página.
+
 Documento de trabajo del equipo. Recorre cada criterio de la rúbrica (escala 1 a 4), dice qué pide el nivel 4, qué tiene hoy el prototipo, dónde verlo y qué falta. Sirve como base para el paper IEEE y el guion del pitch. Actualizarlo cada vez que se agregue algo.
 
 - Repositorio: https://github.com/RecHashhh/yachay-asistente-ideaton

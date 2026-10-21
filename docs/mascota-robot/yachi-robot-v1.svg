@@ -1,0 +1,18 @@
+<svg class="mascot mascot-robot" data-mood="idle" width="160" height="160" viewBox="0 0 80 80" role="img" aria-label="Yachi, mascota robot de Yachay Tech" xmlns="http://www.w3.org/2000/svg"><style>.mascot-robot .robot-head{transform-origin:40px 42px;animation:robot-float 4s ease-in-out infinite}
+.mascot-robot .robot-eyes{transform-box:fill-box;transform-origin:center;animation:robot-blink 5.2s ease-in-out infinite}
+.mascot-robot[data-mood="thinking"] .robot-head{animation:robot-think 2.4s ease-in-out infinite}
+.mascot-robot[data-mood="thinking"] .robot-gaze{animation:robot-look 2.4s ease-in-out infinite}
+.mascot-robot[data-mood="talking"] .robot-head{animation:robot-float 1.5s ease-in-out infinite}
+.mascot-robot[data-mood="talking"] .robot-smile{visibility:hidden}
+.mascot-robot .robot-voice path{transform-box:fill-box;transform-origin:center;animation:robot-speak .5s ease-in-out infinite alternate}
+.mascot-robot .robot-voice path:nth-child(2){animation-delay:-.2s}
+.mascot-robot .robot-voice path:nth-child(3){animation-delay:-.35s}
+.mascot-robot[data-mood="happy"] .robot-head{animation:robot-happy 2.5s ease-in-out infinite}
+@keyframes robot-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-1px)}}
+@keyframes robot-blink{0%,43%,47%,100%{transform:scaleY(1)}45%{transform:scaleY(.12)}}
+@keyframes robot-think{0%,100%{transform:rotate(0)}40%,65%{transform:rotate(-4deg)}}
+@keyframes robot-look{0%,100%{transform:translate(0,0)}40%,65%{transform:translate(2px,-1px)}}
+@keyframes robot-speak{from{transform:scaleY(.4)}to{transform:scaleY(1)}}
+@keyframes robot-happy{0%,100%{transform:translateY(0) rotate(0)}40%{transform:translateY(-1.5px) rotate(-3deg)}65%{transform:translateY(-1px) rotate(3deg)}}
+@media(prefers-reduced-motion:reduce){.mascot-robot *{animation:none!important;transform:none!important}}
+</style><g class="robot-head" stroke-linejoin="round" stroke-linecap="round"><path d="M13 27 6 31v19l8 5 5-9V31Z" fill="#27618e" stroke="#182a38" stroke-width="2.5"/><path d="m67 27 7 4v19l-8 5-5-9V31Z" fill="#27618e" stroke="#182a38" stroke-width="2.5"/><path d="M8 35v11m64-11v11" stroke="#70d9dd" stroke-width="2.5"/><path d="m29 63 3 9h16l3-9" fill="#27618e" stroke="#182a38" stroke-width="2.5"/><path d="M13 29q1-16 17-19h20q16 3 17 19l-2 25q-3 11-16 13H31Q18 65 15 54Z" fill="#303c48" stroke="#182a38" stroke-width="3"/><path d="m18 28 4-9 11-5h5v13Zm24-14h8l9 5 4 9-21-1Z" fill="#27618e"/><path d="m23 22 8-4m17 0 8 4" fill="none" stroke="#70a9d0" stroke-width="2"/><path d="M35 12h10l-2 9h-6Z" fill="#dd555b"/><path d="m20 55 9 7h22l9-7-8 11H28Z" fill="#36c5bb"/><path d="M18 29q22-7 44 0l1 17q-1 7-9 9H26q-8-2-9-9Z" fill="#112631" stroke="#67d5cf" stroke-width="2.5"/><path d="M23 29q17-4 34 0" fill="none" stroke="#ed6266" stroke-width="2.5"/><path d="m21 34 5-1" fill="none" stroke="#d9f7fa" stroke-width="1.5" opacity=".45"/><g class="robot-gaze"><g class="robot-eyes" fill="#eefbff"><ellipse cx="29" cy="40" rx="5.5" ry="4.5"/><ellipse cx="51" cy="40" rx="5.5" ry="4.5"/></g></g><path class="robot-smile" d="M35 48q5 4 10 0" fill="none" stroke="#67d5cf" stroke-width="2"/><path d="m27 59 6 3m14 0 6-3" stroke="#ef9b4f" stroke-width="2.5"/></g></svg>

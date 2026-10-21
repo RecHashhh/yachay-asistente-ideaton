@@ -140,6 +140,7 @@ export function ConsentDialog({ open, intro, onAccept, onClose }: { open: boolea
                 <div className="ob-art" aria-hidden="true">{step === 0 ? <Mascot size={72} /> : <span className="ob-src"><span className="kind">v2</span>{o.srcExample}</span>}</div>
                 <h2 id="consent-title">{o.title[step]}</h2>
                 <p className="muted">{o.body[step]}</p>
+                <a href="https://www.yachaytech.edu.ec/" target="_blank" rel="noreferrer">{lang === 'en' ? 'Visit the university website without using the chat' : 'Ir a la web de la universidad sin usar el chat'}</a>
                 <div className="row" style={{ justifyContent: 'flex-end' }}>
                   <button className="btn ghost" onClick={() => setStep(2)}>{o.skip}</button>
                   <span className="sp" />
@@ -156,6 +157,7 @@ export function ConsentDialog({ open, intro, onAccept, onClose }: { open: boolea
               <dl>{x.rows.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
             </details>
             <p className="small muted">{x.contact} {PRIVACY.dpoEmail}</p>
+            <a href="https://www.yachaytech.edu.ec/" target="_blank" rel="noreferrer">{lang === 'en' ? 'Visit the university website without using the chat' : 'Ir a la web de la universidad sin usar el chat'}</a>
             <div className="row" style={{ justifyContent: 'flex-end' }}>
               {onClose && <button className="btn ghost danger" onClick={revokeConsent}>{x.revoke}</button>}
               <span className="sp" />

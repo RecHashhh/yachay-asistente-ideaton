@@ -1,0 +1,72 @@
+% Borrador para IEEEtran. Compilar con pdflatex dos veces o abrir en Overleaf.
+% No contiene los documentos institucionales privados.
+\documentclass[conference]{IEEEtran}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{amsmath}
+\usepackage{url}
+\usepackage{hyperref}
+\title{Yachi: diseño de un asistente institucional trazable para procedimientos universitarios}
+\author{\IEEEauthorblockN{Autores del equipo: por completar}
+\IEEEauthorblockA{Universidad Yachay Tech\\Urcuquí, Ecuador}}
+\begin{document}
+\maketitle
+\begin{abstract}
+Se presenta el diseño e implementación de Yachi, un prototipo conversacional orientado a procedimientos, representación estudiantil y ubicaciones universitarias. Combina recuperación de información institucional, fuentes visibles, guías estructuradas y navegación del campus. Se distinguen el simulador de interfaz, el modo extractivo y la generación asistida por modelo. La verificación funcional incluye compilación, contratos HTTP y recorridos de navegador con API aislada. La validación factual bilingüe y el estudio con usuarios permanecen pendientes; no se reportan porcentajes de precisión ni impacto sin una medición correspondiente. Este documento es un borrador de trabajo, no una investigación concluida.
+\end{abstract}
+\begin{IEEEkeywords}
+asistente institucional, recuperación de información, trazabilidad, experiencia de usuario, evaluación
+\end{IEEEkeywords}
+\section{Introducción y problema}
+La dispersión de reglamentos, calendarios y procedimientos dificulta que un estudiante identifique qué gestión realizar, en qué orden, con qué documentos y ante qué dependencia. El Reto 1 del ideatón solicita un prototipo o propuesta con información verificable, español e inglés y una experiencia intuitiva. Se delimita el problema a orientación informativa: no se realizan matrícula, pagos, modificación de notas ni firma electrónica.
+
+La pregunta de investigación propuesta es: ¿en qué medida una conversación con fuentes verificables y guía estructurada mejora la resolución correcta de consultas institucionales frente a buscar directamente en documentos? La hipótesis debe contrastarse con usuarios; no se considera demostrada por la existencia del prototipo.
+\section{Estado del arte}
+Pounce documenta atención por mensajería y evaluación experimental en procesos de matrícula\cite{pounce}. Genie describe acceso a servicios personales y navegación\cite{genie}. Sunny documenta orientación bilingüe para públicos específicos\cite{sunny}; LOLA se orienta a preinscripción y matrícula\cite{lola}. Estas publicaciones institucionales acreditan funciones descritas en sus fechas, no una auditoría actual de todos sus servicios.
+
+La recuperación aumentada con generación conecta el modelo con información recuperada\cite{rag}. En un entorno institucional, recuperar y citar un documento no prueba por sí solo que la respuesta sea correcta: deben evaluarse correspondencia factual, vigencia, cobertura y rechazo adecuado. La aportación propuesta de Yachi es integrar evidencia visible, guía de procedimiento y ubicación; no se reivindica exclusividad de sus componentes.
+\section{Metodología}
+Se propone un ciclo de inventario documental, estructuración de metadatos, implementación, evaluación y corrección. El corpus oficial se administra por un canal autorizado y se excluye del repositorio público. Cada documento requiere fuente, tema, versión, fecha, acceso y vigencia. El equipo debe completar el inventario y la revisión humana, incluyendo representatividad estudiantil.
+
+La evaluación distinguirá tres configuraciones: simulador, backend extractivo y backend con generación. Las métricas de una no se atribuirán a otra. Las pruebas con respuestas HTTP simuladas verifican estados de interfaz y recuperación de errores, no calidad del modelo ni persistencia de producción.
+\section{Diseño e implementación}
+La interfaz utiliza React y TypeScript; la API, FastAPI y LangGraph, con PostgreSQL y recuperación textual/vectorial. El enrutamiento incluye consultas ambiguas, ausencia de información, restricciones de ámbito y localización. Las fuentes visibles proceden de metadatos del servidor. Las guías curadas dependen de evidencia del corpus y requieren revisión institucional.
+
+El chat presenta estados breves durante el procesamiento y texto progresivo. Al finalizar se elimina el historial técnico de actividad y se conservan respuesta y fuentes. La presentación progresiva puede repartir contenido ya recibido; no debe confundirse con una medición de velocidad de inferencia. Se permite detener, se respeta movimiento reducido y no se debe desplazar a quien lee mensajes anteriores.
+
+El portal incorpora documentos, temas, tendencias, consultas sin resolver, filtros, validación, costos y consultas registradas. Estas últimas cuentan con estados de atención y bitácora; el contacto humano es manual, sin envío automático de correos. Los adjuntos del público se deshabilitan hasta disponer de análisis real, manteniendo la carga administrativa de documentos.
+\section{Validación y resultados disponibles}
+En esta fase pasan seis pruebas aisladas de contratos HTTP, la compilación TypeScript/Vite y una regresión Playwright de menú móvil, foco, errores de feedback/evaluación, importación CSV, formulario móvil y atención de consultas. La compilación advierte sobre el tamaño de un paquete JavaScript. Estos resultados demuestran únicamente las condiciones cubiertas por cada prueba.
+
+Se propone un conjunto interno de al menos 100 preguntas balanceadas ES/EN, con respuestas esperadas revisadas por personas, consultas ambiguas, fuera de ámbito y sin información. La cantidad no proviene de una obligación numérica del reto. Las preguntas deben separarse de las usadas para ajustar el sistema; los casos de un mismo procedimiento no deben producir una falsa independencia estadística.
+
+Una comprobación adicional sobre una tabla temporal de PostgreSQL verificó el guardado del set y la reversión completa de un fallo intermedio. Esta prueba no modificó el set persistente de la aplicación ni sustituye la validación factual.
+
+Para cada pregunta se conservarán configuración, fecha, pregunta, respuesta esperada, respuesta obtenida, documento, resultado y latencia. Se reportarán exactitud factual con rúbrica humana, coincidencia de fuente, rechazo apropiado y latencias p50/p95. La coincidencia de documento y la alerta de texto sin cita son indicadores automáticos parciales. La tabla de resultados empíricos queda pendiente: no se sustituye por valores del simulador.
+
+En una prueba de tareas con estudiantes se propone medir resolución correcta, tiempo, errores y percepción de claridad, comparando el asistente con búsqueda documental. El protocolo, participantes y resultados deberán completarse con consentimiento y datos minimizados.
+\section{Costo computacional}
+Sean $S$ estudiantes, $q$ consultas por estudiante y día, $h$ fracción de aciertos de caché y $c_m$ costo por consulta sin acierto. El costo mensual estimado es:
+\begin{equation}
+ C = C_{infra} + 30Sq(1-h)c_m + C_{escritura}.
+\end{equation}
+El costo $c_m$ incluye entrada, salida y clasificación según la arquitectura elegida. La calculadora utiliza precios documentados de Anthropic\cite{pricing} y un servidor de referencia de DigitalOcean\cite{infra}. El supuesto de 4 vCPU y 8 GiB a USD 48 mensuales no constituye una medición de capacidad. La caché debe verificarse en la configuración real; no se presentarán ahorros supuestos como consumo observado.
+
+Para $N$ vectores de dimensión $d$ con float32, el almacenamiento vectorial mínimo es $4Nd$ bytes, al que se añaden texto, metadatos e índices. El esquema actual usa dimensión 384. CPU, RAM, disco, concurrencia, respaldos y costos operativos requieren medición antes de una adopción institucional.
+\section{Uso de IA}
+OpenAI Codex asistió en código, correcciones, auditoría con Playwright, investigación y borradores. El usuario definió identidad, preferencias visuales y prioridades. La declaración del repositorio debe completarse con herramientas históricas confirmadas, responsables humanos y revisión de contenido. La aprobación visual no acredita revisión de cada hecho ni autoría humana de todo el código.
+\section{Conclusiones y limitaciones}
+Se dispone de un prototipo con fuentes visibles, conversación, mapas y herramientas administrativas. La viabilidad propuesta depende de documentos vigentes, responsables de atención y evaluación factual ES/EN. No se certifican ausencia universal de alucinaciones, conformidad WCAG, generación bilingüe completa ni funcionamiento de voz con hardware real. Kichwa permanece como valor agregado pendiente de validación competente.
+
+Antes de entregar: completar autores, inventario, revisión de referencias, resultados empíricos, responsable institucional, revisión del aviso y ensayo del pitch. Publicar código no equivale a desplegar un servicio de producción.
+\begin{thebibliography}{9}
+\bibitem{pounce} Georgia State University, ``Reduction of Summer Melt,'' [En línea]. Disponible: \url{https://success.gsu.edu/reduction-of-summer-melt/}. Consulta: 20 oct. 2026.
+\bibitem{genie} Deakin University, ``Deakin's Genie: a virtual digital assistant out of the bottle,'' [En línea]. Disponible: \url{https://www.deakin.edu.au/about-deakin/news-and-media-releases/articles/deakins-genie-a-virtual-digital-assistant-out-of-the-bottle}. Consulta: 20 oct. 2026.
+\bibitem{sunny} Arizona State University, ``ASU launches bilingual chatbot to reach parents who want to go to college,'' 2020. [En línea]. Disponible: \url{https://news.asu.edu/20200709-asu-launches-bilingual-chatbot-reach-parents-who-want-go-college}.
+\bibitem{lola} Universidad de Murcia, ``LOLA Chatbot (Corto),'' 2018. [En línea]. Disponible: \url{https://clutv10.um.es/pro/video?id=116011}.
+\bibitem{rag} P. Lewis et al., ``Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks,'' NeurIPS, 2020. [En línea]. Disponible: \url{https://arxiv.org/abs/2005.11401}.
+\bibitem{pricing} Anthropic, ``Pricing,'' [En línea]. Disponible: \url{https://platform.claude.com/docs/en/about-claude/pricing}. Consulta: 20 oct. 2026.
+\bibitem{infra} DigitalOcean, ``Droplet Pricing,'' [En línea]. Disponible: \url{https://www.digitalocean.com/pricing/droplets}. Consulta: 20 oct. 2026.
+\end{thebibliography}
+\end{document}

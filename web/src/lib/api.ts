@@ -2,7 +2,9 @@ import * as inbox from './inbox';
 import * as mock from './mock';
 import type { ChatRequest, DocMeta, PublicDoc, StreamEvent, Topic, Trend, UploadInput } from './types';
 
-const API = ((import.meta.env.VITE_API_URL as string | undefined) ?? '').replace(/\/$/, '');
+const configuredApi = ((import.meta.env.VITE_API_URL as string | undefined) ?? '').replace(/\/$/, '');
+// En desarrollo Vite reenvía las llamadas: evita bloqueos CORS entre puertos locales.
+const API = import.meta.env.DEV && /^https?:\/\//.test(configuredApi) ? '/__yachi_api' : configuredApi;
 /** Sin VITE_API_URL el frontend funciona con el simulador (mock.ts). */
 export const MOCK = !API;
 
@@ -11,7 +13,13 @@ const adminToken = () => { try { return sessionStorage.getItem(ADMIN_TOKEN_KEY) 
 
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(API + path, { ...init, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken()}`, ...init?.headers } });
-  if (!r.ok) throw new Error((await r.text()) || r.statusText);
+  if (!r.ok) {
+    // FastAPI responde {"detail": "..."}: se muestra el mensaje, no el JSON.
+    const raw = await r.text();
+    let msg = raw || r.statusText;
+    try { const d = (JSON.parse(raw) as { detail?: unknown }).detail; if (typeof d === 'string') msg = d; } catch { /* texto plano */ }
+    throw new Error(msg);
+  }
   return r.json() as Promise<T>;
 }
 
@@ -52,7 +60,7 @@ export function sendFeedback(messageId: string, vote: 'up' | 'down', ctx?: { que
     if (vote === 'down' && ctx) inbox.recordUnanswered(ctx.question, ctx.lang, 'voto_negativo', ctx.reason);
     return Promise.resolve();
   }
-  return fetch(`${API}/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messageId, vote, reason: ctx?.reason }) }).then(() => undefined);
+  return json('/feedback', { method: 'POST', body: JSON.stringify({ messageId, vote, reason: ctx?.reason }) }).then(() => undefined);
 }
 
 export type { FeedbackReason, InboxItem, InboxStatus, Inquiry } from './inbox';
@@ -65,6 +73,13 @@ export function sendInquiry(i: Omit<inbox.Inquiry, 'code' | 'at'>): Promise<inbo
 
 // ---------- Bandeja "Sin respuesta" (administración) ----------
 export const listInbox = (): Promise<inbox.InboxItem[]> => (MOCK ? Promise.resolve(inbox.listInbox()) : json('/admin/unanswered'));
+export interface RegisteredInquiry {
+  code: string; office: string; email: string; question: string; lang: string;
+  transcript: string | null; status: 'nueva' | 'en_atencion' | 'resuelta'; created_at: string;
+}
+export const listInquiries = (): Promise<RegisteredInquiry[]> => MOCK ? Promise.resolve([]) : json('/admin/inquiries');
+export const updateInquiry = (code: string, status: RegisteredInquiry['status']): Promise<void> =>
+  json(`/admin/inquiries/${encodeURIComponent(code)}`, { method: 'PATCH', body: JSON.stringify({ status }) });
 export function updateInbox(id: string, patch: Partial<Pick<inbox.InboxItem, 'status' | 'controlId'>>): Promise<void> {
   if (MOCK) { inbox.updateInbox(id, patch); return Promise.resolve(); }
   return json(`/admin/unanswered/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
@@ -78,8 +93,13 @@ export type { ControlResult } from './mock';
 export const runControl = (onProgress?: (n: number) => void) =>
   MOCK ? mock.runControl(onProgress) : json<import('./mock').ControlResult[]>('/admin/validation/run', { method: 'POST' });
 export const controlSize = () => mock.controlSet.length;
+export const listControlCases = (): Promise<import('./mock').ControlCase[]> =>
+  MOCK ? Promise.resolve([...mock.controlSet]) : json('/admin/validation/cases');
 /** Reemplaza el set de control (importado desde CSV en el portal). */
-export const replaceControlSet = (cases: import('./mock').ControlCase[]) => { mock.controlSet.splice(0, mock.controlSet.length, ...cases); };
+export const replaceControlSet = async (cases: import('./mock').ControlCase[]): Promise<void> => {
+  if (MOCK) { mock.controlSet.splice(0, mock.controlSet.length, ...cases); return; }
+  await json('/admin/validation/cases', { method: 'PUT', body: JSON.stringify({ cases }) });
+};
 export const getTopics = (): Promise<Topic[]> => (MOCK ? Promise.resolve([...mock.topics]) : json('/topics'));
 
 /** Documentos vigentes visibles para cualquier usuario (vista "Documentos disponibles"). */
@@ -102,7 +122,11 @@ export async function adminLogin(email: string, password: string): Promise<Admin
   sessionStorage.setItem(ADMIN_TOKEN_KEY, r.token);
   return { name: r.name, email: r.email };
 }
-export const adminLogout = () => { try { sessionStorage.removeItem(ADMIN_TOKEN_KEY); } catch { /* sin almacenamiento */ } };
+export const adminLogout = () => {
+  // La sesión se invalida también en el servidor (no basta con olvidar el token en el navegador).
+  if (!MOCK) void fetch(`${API}/admin/logout`, { method: 'POST', headers: { Authorization: `Bearer ${adminToken()}` } }).catch(() => undefined);
+  try { sessionStorage.removeItem(ADMIN_TOKEN_KEY); } catch { /* sin almacenamiento */ }
+};
 
 // ---------- Filtros del chat (crisis, denuncias, groserías, manipulación, fuera del ámbito, nunca filtrar) ----------
 
@@ -126,6 +150,20 @@ export function deleteDoc(id: string): Promise<void> {
   return json(`/admin/docs/${id}`, { method: 'DELETE' });
 }
 
+/** Lugares con coordenadas reales (se cachea: no cambian durante la sesión). */
+let placesCache: Promise<import('./types').RealPlaceInfo[]> | null = null;
+export const getPlaces = (): Promise<import('./types').RealPlaceInfo[]> => {
+  if (MOCK) return Promise.resolve([]);
+  placesCache ??= json<import('./types').RealPlaceInfo[]>('/places').catch((e: unknown) => { placesCache = null; throw e; });
+  return placesCache;
+};
+
+/** Vuelve a procesar un documento subido que quedó con error. */
+export function reprocessDoc(id: string): Promise<void> {
+  if (MOCK) return Promise.resolve();
+  return json(`/admin/docs/${id}/reprocess`, { method: 'POST' });
+}
+
 export function createTopic(t: Omit<Topic, 'id'>): Promise<Topic> {
   if (MOCK) {
     const n = { ...t, id: t.name.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-') };
@@ -145,7 +183,12 @@ export function uploadDoc(input: UploadInput, onProgress: (p: number) => void): 
     x.open('POST', `${API}/admin/docs`);
     x.setRequestHeader('Authorization', `Bearer ${adminToken()}`);
     x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100)); };
-    x.onload = () => (x.status < 300 ? resolve(JSON.parse(x.responseText) as DocMeta) : reject(new Error(x.responseText || `Error ${x.status}`)));
+    x.onload = () => {
+      if (x.status < 300) { resolve(JSON.parse(x.responseText) as DocMeta); return; }
+      let msg = x.responseText || `Error ${x.status}`;
+      try { const d = (JSON.parse(x.responseText) as { detail?: unknown }).detail; if (typeof d === 'string') msg = d; } catch { /* texto plano */ }
+      reject(new Error(msg));
+    };
     x.onerror = () => reject(new Error('No se pudo subir el archivo'));
     x.send(fd);
   });

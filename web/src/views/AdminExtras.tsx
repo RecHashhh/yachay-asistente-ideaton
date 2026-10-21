@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
-import { addControlCase, controlSize, listInbox, replaceControlSet, runControl, updateInbox, type ControlResult, type InboxItem } from '../lib/api';
+import { addControlCase, listControlCases, listInbox, replaceControlSet, runControl, updateInbox, type ControlResult, type InboxItem } from '../lib/api';
 import type { DocMeta } from '../lib/types';
 
 // ---------------------------------------------------------------------------
@@ -13,13 +13,23 @@ const pctl = (xs: number[], p: number) => { const s = [...xs].sort((a, b) => a -
 export function Validation() {
   const [res, setRes] = useState<ControlResult[] | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
-  const [total, setTotal] = useState(controlSize);
+  const [total, setTotal] = useState(0);
   const [msg, setMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  useEffect(() => {
+    let active = true;
+    listControlCases().then((cases) => { if (active) setTotal(cases.length); })
+      .catch(() => { if (active) setMsg('No se pudo cargar el set de control. Recarga la página para intentarlo de nuevo.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
 
   const exportCsv = () => {
     if (!res) return;
-    const head = 'id;pregunta;idioma;esperado;obtenido;resultado;latencia_ms';
-    const rows = res.map((r) => [r.id, r.q, r.lang, r.expect, r.got, r.ok ? 'correcta' : r.hallucination ? 'alucinacion' : 'incorrecta', r.ms].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(';'));
+    const head = 'id;pregunta;idioma;esperado;obtenido;resultado;latencia_ms;respuesta';
+    const rows = res.map((r) => [r.id, r.q, r.lang, r.expect, r.got, r.ok ? 'coincide' : r.hallucination ? 'sin_fuente' : 'no_coincide', r.ms, r.answer ?? ''].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(';'));
     const blob = new Blob(['\ufeff' + [head, ...rows].join('\n')], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -30,15 +40,36 @@ export function Validation() {
 
   /** CSV con columnas id;pregunta;idioma;esperado (esperado = id del documento o "no_se"). Separador ; o ,. */
   const importCsv = async (f: File) => {
-    const lines = (await f.text()).replace(/^\ufeff/, '').split(/\r?\n/).filter((l) => l.trim());
-    const sep = lines[0]!.includes(';') ? ';' : ',';
-    const cells = (l: string) => l.split(sep).map((c) => c.trim().replace(/^"|"$/g, '').replaceAll('""', '"'));
-    const body = /pregunta|question/i.test(lines[0]!) ? lines.slice(1) : lines;
-    const cases = body.map(cells).filter((c) => c.length >= 4 && c[1]).map(([id, q, lang, expect]) => ({ id: id!, q: q!, lang: (lang === 'en' ? 'en' : 'es') as 'es' | 'en', expect: expect! }));
-    if (!cases.length) { setMsg('El archivo no tiene filas válidas (id;pregunta;idioma;esperado).'); return; }
-    replaceControlSet(cases);
-    setTotal(cases.length); setRes(null);
-    setMsg(`Se cargaron ${cases.length} preguntas de control.`);
+    setImporting(true); setMsg(null);
+    try {
+      const text = (await f.text()).replace(/^\ufeff/, '');
+      const sep = text.split(/\r?\n/, 1)[0]!.includes(';') ? ';' : ',';
+      const rows: string[][] = []; let row: string[] = [], cell = '', quoted = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i]!;
+        if (c === '"') { if (quoted && text[i + 1] === '"') { cell += '"'; i++; } else quoted = !quoted; }
+        else if (c === sep && !quoted) { row.push(cell.trim()); cell = ''; }
+        else if ((c === '\n' || c === '\r') && !quoted) {
+          if (c === '\r' && text[i + 1] === '\n') i++;
+          row.push(cell.trim()); if (row.some(Boolean)) rows.push(row); row = []; cell = '';
+        } else cell += c;
+      }
+      if (quoted) throw new Error('El CSV tiene comillas sin cerrar.');
+      row.push(cell.trim()); if (row.some(Boolean)) rows.push(row);
+      const body = /pregunta|question/i.test(rows[0]?.[1] ?? '') ? rows.slice(1) : rows;
+      if (!body.length || body.length > 1000) throw new Error('El CSV debe contener entre 1 y 1000 preguntas.');
+      const cases = body.map(([id, q, lang, expect], index) => {
+        if (!id || !/^[A-Za-z0-9_-]{1,64}$/.test(id) || !q || q.length > 1000 || !expect || expect.length > 500 || !['es', 'en'].includes(lang ?? ''))
+          throw new Error(`Fila ${index + 1}: revisa id, pregunta, idioma (es/en) y esperado.`);
+        return { id, q, lang: lang as 'es' | 'en', expect };
+      });
+      if (new Set(cases.map((c) => c.id)).size !== cases.length) throw new Error('Los identificadores deben ser únicos.');
+      await replaceControlSet(cases);
+      const saved = await listControlCases();
+      setTotal(saved.length); setRes(null);
+      setMsg(`Se guardaron ${saved.length} preguntas de control.`);
+    } catch (e) { setMsg((e as Error).message || 'No se pudo importar el CSV.'); }
+    finally { setImporting(false); }
   };
 
   const m = useMemo(() => {
@@ -57,25 +88,30 @@ export function Validation() {
     };
   }, [res]);
 
-  const run = async () => { setRes(null); setProgress(0); setRes(await runControl(setProgress)); setProgress(null); };
+  const run = async () => {
+    setRes(null); setMsg(null); setProgress(0);
+    try { setRes(await runControl(setProgress)); }
+    catch { setMsg('No se pudo completar la evaluación. Vuelve a intentarlo.'); }
+    finally { setProgress(null); }
+  };
 
   return (
     <>
       <header>
         <div><h2>Validación de veracidad</h2><p>Preguntas con respuesta conocida: cada una debe citar el documento correcto, o responder "sin información oficial" si no está en las fuentes.</p></div>
         <span className="sp" />
-        <label className="btn">Importar CSV<input type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsv(f); e.target.value = ''; }} /></label>
+        <label className="btn">Importar CSV<input type="file" accept=".csv,text/csv" hidden disabled={loading || importing || progress !== null} onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsv(f); e.target.value = ''; }} /></label>
         <button className="btn" onClick={exportCsv} disabled={!res}>Exportar resultados</button>
-        <button className="btn primary" onClick={run} disabled={progress !== null}>{progress !== null ? `Evaluando ${progress}/${total}` : res ? 'Volver a evaluar' : `Evaluar ${total} preguntas`}</button>
+        <button className="btn primary" onClick={run} disabled={loading || importing || total === 0 || progress !== null}>{progress !== null ? `Evaluando ${progress}/${total}` : res ? 'Volver a evaluar' : `Evaluar ${total} preguntas`}</button>
       </header>
       {msg && <p className="small" role="status">{msg}</p>}
-      {progress !== null && <div className="progress"><i style={{ transform: `scaleX(${progress / total})` }} /></div>}
+      {progress !== null && <div className="progress"><i style={{ transform: `scaleX(${total ? progress / total : 0})` }} /></div>}
       {m && (
         <motion.div className="kpis" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <div className="kpi"><b>{m.accuracy} %</b><span>exactitud total</span></div>
-          <div className="kpi"><b>{m.grounded} %</b><span>citan la fuente correcta</span></div>
+          <div className="kpi"><b>{m.grounded} %</b><span>coinciden con el documento esperado</span></div>
           <div className="kpi"><b>{m.refusal} %</b><span>"sin información" cuando corresponde</span></div>
-          <div className="kpi"><b>{m.halluc}</b><span>respuestas sin fuente (alucinaciones)</span></div>
+          <div className="kpi"><b>{m.halluc}</b><span>alertas de respuesta sin fuente</span></div>
           <div className="kpi"><b>{m.es} / {m.en} %</b><span>exactitud español / inglés</span></div>
           <div className="kpi"><b>{(m.p50 / 1000).toFixed(1)} s</b><span>latencia p50 · p95 {(m.p95 / 1000).toFixed(1)} s</span></div>
         </motion.div>
@@ -137,7 +173,7 @@ interface Assumptions {
 const DEFAULTS: Assumptions = {
   students: 1800, queriesPerStudentDay: 0.3, peakFactor: 4, cacheHit: 0.3, answerModel: 'claude-haiku-5-5',
   sysTokens: 1500, chunks: 4, chunkTokens: 500, historyTokens: 400, questionTokens: 40, outTokens: 300,
-  routerIn: 250, routerOut: 15, infraMonthly: 48, docs: 300, chunksPerDoc: 40, embedDim: 1024,
+  routerIn: 250, routerOut: 15, infraMonthly: 48, docs: 300, chunksPerDoc: 40, embedDim: 384,
 };
 
 const M = 1_000_000;
@@ -153,7 +189,7 @@ function compute(a: Assumptions) {
   const perMiss = answerCost + routerCost;
   // Un acierto de caché semántica no llama a ningún modelo (solo embedding local + búsqueda).
   const perQuery = (1 - a.cacheHit) * perMiss;
-  const cacheWritesDay = 12 * 14; // ~14 h de uso, 12 escrituras por hora
+  const cacheWritesDay = Math.min(qDay, 12 * 14); // supuesto: una por consulta como máximo, hasta una cada 5 min de tráfico
   const cacheWriteMonthly = (cacheWritesDay * a.sysTokens * m.in * 1.25 * 30) / M;
   const llmMonthly = perQuery * qDay * 30 + cacheWriteMonthly;
   const vectors = a.docs * a.chunksPerDoc;
@@ -169,7 +205,7 @@ export function Cost() {
   const r = compute(a);
   const set = <K extends keyof Assumptions>(k: K, v: Assumptions[K]) => setA((x) => ({ ...x, [k]: v }));
   const num = (k: keyof Assumptions, label: string, step = 1) => (
-    <label className="field"><span>{label}</span><input className="inp mono" type="number" step={step} min={0} value={a[k] as number} onChange={(e) => set(k, Number(e.target.value) as never)} /></label>
+    <label className="field"><span>{label}</span><input className="inp mono" type="number" step={step} min={0} value={a[k] as number} onChange={(e) => set(k, Math.max(0, Number(e.target.value) || 0) as never)} /></label>
   );
   const scenarios = [
     { name: 'Normal', f: 1 },
@@ -196,7 +232,7 @@ export function Cost() {
           {num('students', 'Estudiantes')}
           {num('queriesPerStudentDay', 'Consultas por estudiante al día', 0.05)}
           {num('peakFactor', 'Multiplicador en matrículas', 0.5)}
-          <label className="field"><span>Acierto de caché semántica (0 a 1)</span><input className="inp mono" type="number" step={0.05} min={0} max={1} value={a.cacheHit} onChange={(e) => set('cacheHit', Math.min(1, Number(e.target.value)))} /></label>
+          <label className="field"><span>Acierto de caché semántica (0 a 1)</span><input className="inp mono" type="number" step={0.05} min={0} max={1} value={a.cacheHit} onChange={(e) => set('cacheHit', Math.max(0, Math.min(1, Number(e.target.value) || 0)))} /></label>
           <label className="field"><span>Modelo que responde</span><select className="inp" value={a.answerModel} onChange={(e) => set('answerModel', e.target.value as ModelId)}>{Object.entries(MODELS).map(([id, x]) => <option key={id} value={id}>{x.name} · ${x.in} / ${x.out} por MTok</option>)}</select></label>
           {num('sysTokens', 'Tokens fijos en caché (sistema + herramientas)', 50)}
           {num('chunks', 'Fragmentos recuperados por consulta')}

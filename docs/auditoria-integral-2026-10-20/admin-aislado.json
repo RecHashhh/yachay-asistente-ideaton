@@ -1,0 +1,218 @@
+{
+  "results": [
+    {
+      "name": "Pantalla Documentos",
+      "status": "OK",
+      "details": {
+        "title": "Documentos"
+      },
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Búsqueda y estado vacío",
+      "status": "OK",
+      "details": "El filtro funciona con datos de prueba.",
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Reprocesar: conexión del botón",
+      "status": "OK",
+      "details": "Se comprueba la petición, no el procesamiento.",
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Pantalla Subir",
+      "status": "OK",
+      "details": {
+        "title": "Subir documento"
+      },
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Carga de documento: formulario",
+      "status": "OK",
+      "details": {
+        "postMultipart": true
+      },
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Pantalla Temas",
+      "status": "OK",
+      "details": {
+        "title": "Temas"
+      },
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Pantalla Tendencias",
+      "status": "OK",
+      "details": {
+        "title": "Tendencias"
+      },
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Pantalla Sin respuesta",
+      "status": "OK",
+      "details": {
+        "title": "Sin respuesta"
+      },
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Pantalla Filtros",
+      "status": "OK",
+      "details": {
+        "title": "Filtros"
+      },
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Filtros: botones y métricas",
+      "status": "OK",
+      "details": "Resultados de API simulada.",
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Pantalla Validación",
+      "status": "OK",
+      "details": {
+        "title": "Validación de veracidad"
+      },
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Importar CSV en modo backend",
+      "status": "FALLO",
+      "details": {
+        "visibleMessage": [
+          "Se cargaron 1 preguntas de control."
+        ],
+        "requestsToPersist": []
+      },
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Evaluar y exportar: conexión de interfaz",
+      "status": "OK",
+      "details": "El botón solicita el run y genera CSV con resultados simulados.",
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Pantalla Costo",
+      "status": "OK",
+      "details": {
+        "title": "Costo computacional"
+      },
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Calculadora: cero estudiantes",
+      "status": "OK",
+      "details": "$0.00031\ncosto de modelo por consulta\n$0.31\npor cada 1.000 consultas\n0\nconsultas por día\n$48.95\ntotal al mes (modelo + infraestructura)",
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Calculadora: límite de caché",
+      "status": "FALLO",
+      "details": "El campo permite un valor negativo y lo usa en el cálculo a pesar de indicar 0–1.",
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Administración móvil",
+      "status": "FALLO",
+      "details": [
+        {
+          "tab": "Documentos",
+          "viewport": 390,
+          "width": 390
+        },
+        {
+          "tab": "Subir",
+          "viewport": 390,
+          "width": 674
+        },
+        {
+          "tab": "Temas",
+          "viewport": 390,
+          "width": 390
+        },
+        {
+          "tab": "Tendencias",
+          "viewport": 390,
+          "width": 390
+        },
+        {
+          "tab": "Sin respuesta",
+          "viewport": 390,
+          "width": 390
+        },
+        {
+          "tab": "Filtros",
+          "viewport": 390,
+          "width": 390
+        },
+        {
+          "tab": "Validación",
+          "viewport": 390,
+          "width": 390
+        },
+        {
+          "tab": "Costo",
+          "viewport": 390,
+          "width": 390
+        }
+      ],
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Validación: fallo de red",
+      "status": "FALLO",
+      "details": "Tras 503 el botón queda deshabilitado en Evaluando; revisar recuperación y aviso.",
+      "mode": "API simulada; no valida backend"
+    },
+    {
+      "name": "Salir: interfaz",
+      "status": "OK",
+      "details": {
+        "tokenRemoved": true,
+        "logoutRequested": true
+      },
+      "mode": "API simulada; no valida backend"
+    }
+  ],
+  "errors": [
+    "Servicio no disponible (prueba)"
+  ],
+  "calls": [
+    {
+      "endpoint": "/admin/login",
+      "method": "POST"
+    },
+    {
+      "endpoint": "/admin/docs/audit-error/reprocess",
+      "method": "POST"
+    },
+    {
+      "endpoint": "/admin/docs",
+      "method": "POST"
+    },
+    {
+      "endpoint": "/admin/filters/check",
+      "method": "POST"
+    },
+    {
+      "endpoint": "/admin/filters/test",
+      "method": "POST"
+    },
+    {
+      "endpoint": "/admin/validation/run",
+      "method": "POST"
+    },
+    {
+      "endpoint": "/admin/logout",
+      "method": "POST"
+    }
+  ]
+}

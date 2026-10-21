@@ -2,6 +2,16 @@
 
 Requisito obligatorio de la sección 13 del reto. Distingue qué decidió el equipo, qué generó la IA y cómo se verificó. Las filas marcadas _(equipo)_ las completa el equipo antes de la entrega.
 
+## Actualización verificable — 20 de octubre de 2026
+
+En esta fase se utilizó **OpenAI Codex** como asistente de programación: cambios en React/TypeScript y Python, mascota vectorial y animaciones CSS, auditoría con Playwright, corrección de conexiones y errores, investigación web de chatbots institucionales y preparación de documentación. Los modelos exactos utilizados en todas las sesiones anteriores no se pueden reconstruir a partir de este repositorio; el equipo debe confirmar los identificadores antes de la entrega.
+
+El usuario decidió el enfoque minimalista, la identidad de Yachi, la adaptación de la mascota de referencia, la barra lateral colapsada y las prioridades de interacción. La IA asistió en código, propuestas visuales, investigación y borradores. La aprobación de una apariencia por el usuario no equivale a revisión humana de cada respuesta institucional, del código completo o del aviso legal.
+
+Verificación de esta fase: compilación TypeScript/Vite, navegador Chrome con Playwright, comprobaciones de contrato y pruebas con API simulada cuando no se dispone de acceso administrativo real. Estas pruebas se documentan con sus límites. No se ha certificado WCAG ni probado todo el recorrido de voz con hardware real en esta fase. El backend existe y puede operar en modo extractivo sin clave del proveedor; ese modo no acredita generación bilingüe completa.
+
+La declaración histórica siguiente debe contrastarse con registros del equipo: nombres de herramientas/modelos, afirmaciones de revisión humana y resultados previos de axe no fueron certificados de nuevo aquí. El paper y el pitch preparados con asistencia de IA son borradores: faltan autores, resultados empíricos definitivos y aprobación del equipo. No deben presentarse como investigación ya concluida.
+
 ## 1. Herramientas usadas
 
 | Herramienta | Modelo | Para qué se usó |

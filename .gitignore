@@ -19,3 +19,11 @@ docs/fuentes/
 docs/rag/
 /Crear base de datos Yachi.cmd
 /Crear base de datos Yachi (sin contraseña).cmd
+
+# Evidencias locales: pueden reproducir documentos institucionales o datos de sesiones.
+docs/**/*.png
+docs/**/*.jpg
+docs/**/*.pdf
+docs/auditoria-integral-2026-10-20/resultados.json
+docs/auditoria-integral-2026-10-20/index.html
+.codebase-memory/

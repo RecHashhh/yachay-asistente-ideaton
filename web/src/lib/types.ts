@@ -24,6 +24,8 @@ export interface DocMeta {
   status: DocStatus;
   chunks: number;
   sizeKb: number;
+  /** Resultado del procesamiento de una subida (fragmentos generados o motivo del error). */
+  notes?: string | null;
   /** Versiones anteriores reemplazadas por esta. */
   history?: { version: string; docDate: string; replacedAt: string }[];
 }
@@ -93,7 +95,12 @@ export interface MapAction {
   nombre?: string;
   horario?: string | null;
   mapsUrl?: string | null;
+  /** Punto de partida real ("¿cómo llego… desde el rectorado?"): se dibuja una flecha hasta el destino. */
+  desde?: { lat: number; lon: number; nombre: string } | null;
 }
+
+/** Lugar con coordenadas reales (GET /places). */
+export interface RealPlaceInfo { id: string; name: string; nameEn: string | null; uso: string | null; horario: string | null; lat: number; lon: number; mapsUrl: string | null }
 
 /** Guía paso a paso de un trámite: qué es, qué se necesita, en qué orden y dónde. Sale de un documento fuente, nunca del modelo solo. */
 export interface Procedure {
@@ -107,17 +114,20 @@ export interface Procedure {
   source: Source;
   /** Plazos del trámite (del calendario académico) para "Añadir al calendario". */
   deadlines?: { title: string; start: string; end?: string }[];
+  /** Los plazos son de un período ya terminado: se muestran como referencia, sin "Añadir al calendario". */
+  deadlinesPast?: boolean;
 }
 
 /** Respuesta explícita "sin información oficial": no hay fragmento con relevancia suficiente o la pregunta está fuera del dominio. */
 export interface Unknown {
   reason: 'sin_fuente' | 'fuera_de_dominio';
-  contact?: { office: string; email?: string; placeId?: PlaceId };
+  contact?: { office: string; email?: string; phone?: string; placeId?: PlaceId };
 }
 
 /** Eventos que el backend envía por SSE (text/event-stream), uno por línea `data: {...}`. */
 export type StreamEvent =
   | { type: 'status'; label: string }
+  | { type: 'answer_mode'; mode: 'extractive' }
   | { type: 'token'; text: string }
   | { type: 'tool'; name: 'mostrar_en_mapa'; input: MapAction }
   | { type: 'procedure'; item: Procedure }

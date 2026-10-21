@@ -333,6 +333,7 @@ export async function* mockChat(req: ChatRequest, signal?: AbortSignal): AsyncGe
   }
   if (a.map) yield { type: 'tool', name: 'mostrar_en_mapa', input: { destino: a.map, origen: 'entrada' } };
   const parts = a.text.match(/\S+\s*/g) ?? [];
+  if (parts.length) yield { type: 'status', label: en ? 'Writing response' : 'Redactando respuesta' };
   for (let i = 0; i < parts.length;) {
     const n = 1 + Math.floor(Math.random() * 3);
     yield { type: 'token', text: parts.slice(i, i + n).join('') };
@@ -405,9 +406,10 @@ export function addControlCase(c: Omit<ControlCase, 'id'>): ControlCase {
 export interface ControlResult extends ControlCase {
   got: string;
   ok: boolean;
-  /** Respondió con contenido sin citar ninguna fuente: se cuenta como alucinación. */
+  /** Alerta heurística: contenido sin fuente; no mide todos los errores factuales. */
   hallucination: boolean;
   ms: number;
+  answer?: string;
 }
 
 export async function runControl(onProgress?: (done: number) => void): Promise<ControlResult[]> {

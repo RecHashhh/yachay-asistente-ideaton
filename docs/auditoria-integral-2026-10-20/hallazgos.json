@@ -1,0 +1,112 @@
+[
+  {
+    "id": "F01",
+    "p": "P1",
+    "title": "Adjuntar funciona visualmente, pero el backend descarta el archivo",
+    "proof": "Selección, vista previa y retirada reales correctas. Al instanciar ChatRequest con attachments, model_dump() no conserva el campo: no está declarado en el contrato.",
+    "impact": "Una persona puede creer que Yachi leyó su PDF o imagen cuando solo está respondiendo al texto.",
+    "fix": "Conectar carga, límites y recuperación del archivo con el backend; mientras no exista esa capacidad, deshabilitar el envío de adjuntos y explicarlo.",
+    "source": "api/app/main.py · ChatRequest; web/src/components/Composer.tsx; web/src/lib/api.ts · streamChat",
+    "kind": "Prueba real de frontend + contrato Python ejecutado sin red"
+  },
+  {
+    "id": "F02",
+    "p": "P1",
+    "title": "Importar CSV de validación no actualiza el set del servidor",
+    "proof": "La interfaz dice «Se cargaron 1 preguntas de control», pero la prueba registra cero peticiones para persistirlas. replaceControlSet y controlSize operan sobre mock.controlSet incluso con API configurada.",
+    "impact": "La cantidad mostrada y las preguntas importadas pueden no coincidir con las que evalúa el backend.",
+    "fix": "Obtener el set desde la API, persistir la importación y confirmar el número real antes de evaluar.",
+    "source": "web/src/lib/api.ts · controlSize/replaceControlSet; web/src/views/AdminExtras.tsx · importCsv",
+    "kind": "Reproducido con API aislada + revisión de código"
+  },
+  {
+    "id": "F03",
+    "p": "P1",
+    "title": "Feedback muestra éxito aunque el servidor responda con error",
+    "proof": "Con HTTP 503 simulado, sigue apareciendo «Gracias. El equipo de la universidad revisará esta respuesta». sendFeedback no comprueba response.ok y el panel confirma antes del guardado.",
+    "impact": "Se puede perder una alerta sobre información incorrecta mientras se promete que será revisada.",
+    "fix": "Esperar confirmación, comprobar el código HTTP y ofrecer Reintentar; no mostrar éxito hasta guardar.",
+    "source": "web/src/lib/api.ts · sendFeedback; web/src/components/Feedback.tsx · FeedbackPanel",
+    "kind": "Error HTTP reproducido en aislamiento"
+  },
+  {
+    "id": "F04",
+    "p": "P1",
+    "title": "La consulta a una dependencia se registra, pero falta cerrar el circuito de atención",
+    "proof": "El handler /inquiries inserta en la base y devuelve un código. No realiza un envío en ese handler. No se encontró una pantalla de gestión de estas consultas entre las ocho secciones del portal.",
+    "impact": "El usuario obtiene un código sin una vía de atención visible para el personal en esta aplicación.",
+    "fix": "Implementar una bandeja y/o notificaciones con estados y responsables. Hasta entonces describirlo como registro de consulta, sin prometer entrega ni respuesta.",
+    "source": "api/app/main.py · inquiries; web/src/components/ProcedureCard.tsx · InquiryForm; web/src/views/Admin.tsx · tabs",
+    "kind": "Hallazgo de código y navegación; no se envió una consulta real"
+  },
+  {
+    "id": "F05",
+    "p": "P2",
+    "title": "La evaluación queda bloqueada si falla la API",
+    "proof": "Con HTTP 503, el botón permanece deshabilitado como «Evaluando» y se produce un rechazo no controlado. run no usa catch/finally.",
+    "impact": "Es necesario abandonar o recargar la pantalla para volver a intentar.",
+    "fix": "Mostrar un error legible y restaurar el estado en finally; manejar también errores al cargar inventario y bandeja.",
+    "source": "web/src/views/AdminExtras.tsx · Validation.run; admin-aislado.json",
+    "kind": "Reproducido con fallo de red simulado"
+  },
+  {
+    "id": "F06",
+    "p": "P2",
+    "title": "El inicio recorta el saludo cuando falta altura",
+    "proof": "Con scroll del inicio en cero: a 320×568 el saludo empieza en y≈−44 px, y a 390×400 en y≈−95 px; el área empieza en y=56. A 390×844 sí queda visible.",
+    "impact": "Parte del contenido queda por encima del área de lectura; puede empeorar con el teclado abierto.",
+    "fix": "Usar centrado seguro o alinear arriba cuando el contenido supere el alto. Validar después con teclado real en móvil.",
+    "source": "web/src/styles.css · .hello; resultados.json; inicio-320x568.png",
+    "kind": "Medición real del DOM en tres viewports"
+  },
+  {
+    "id": "F07",
+    "p": "P2",
+    "title": "El formulario Subir se desborda en móvil",
+    "proof": "Con datos aislados, la vista Subir alcanza 674 px de ancho en un viewport de 390 px. Las otras siete secciones se mantuvieron en 390 px durante esta prueba.",
+    "impact": "Campos y acciones quedan fuera del ancho de pantalla.",
+    "fix": "Revisar min-width de grids, campos y zona de carga; romper nombres largos y probar 320/390 px con y sin archivo.",
+    "source": "web/src/views/Admin.tsx · Upload; web/src/styles.css · .form-grid; simulado-movil-subir.png",
+    "kind": "Medición de frontend con API simulada"
+  },
+  {
+    "id": "F08",
+    "p": "P2",
+    "title": "El menú móvil no cierra con Escape ni aísla el fondo",
+    "proof": "Escape deja rail-open-mobile activo y main.chat no es inert. El menú no tiene cierre visible propio ni manejo modal completo de foco.",
+    "impact": "La navegación por teclado puede acceder al fondo mientras el lateral está abierto.",
+    "fix": "Añadir cierre, Escape, foco dentro del menú, fondo inerte y retorno al botón que lo abrió.",
+    "source": "web/src/views/Chat.tsx · mobileRail; resultados.json",
+    "kind": "Prueba real de teclado + inspección del DOM"
+  },
+  {
+    "id": "F09",
+    "p": "P2",
+    "title": "La calculadora acepta una tasa de caché fuera del rango indicado",
+    "proof": "El campo 0–1 acepta −2. El código aplica Math.min(1, valor), sin limitar el mínimo; el cálculo usa ese valor.",
+    "impact": "Produce estimaciones incoherentes si el usuario escribe o pega valores negativos.",
+    "fix": "Limitar a [0,1], validar el resto de supuestos y señalar entradas inválidas.",
+    "source": "web/src/views/AdminExtras.tsx · Cost; admin-aislado.json",
+    "kind": "Reproducido en calculadora local"
+  },
+  {
+    "id": "F10",
+    "p": "P3",
+    "title": "La primera visita no facilita la alternativa al consentimiento",
+    "proof": "La bienvenida y el aviso funcionan. El diálogo menciona opciones externas, pero no proporciona un enlace directo a la web institucional; tampoco hay una acción alternativa explícita junto a aceptar.",
+    "impact": "Quien decide no usar el chat queda sin un camino inmediato dentro del diálogo.",
+    "fix": "Añadir un enlace institucional verificado y una salida clara. Revisar el texto final con el responsable institucional.",
+    "source": "web/src/components/ConsentDialog.tsx; 01-bienvenida.png",
+    "kind": "Navegación real y revisión de contenido; no es evaluación legal"
+  },
+  {
+    "id": "F11",
+    "p": "P3",
+    "title": "La composición todavía tiene decisiones visuales mejorables",
+    "proof": "Las sugerencias pueden quedar 3+1 en escritorio, existen dos accesos de voz con propósitos distintos y las ocho secciones administrativas dependen de una fila desplazable en móvil.",
+    "impact": "Jerarquía menos clara, repetición de temas y secciones difíciles de descubrir.",
+    "fix": "Mantener la identidad actual; equilibrar tarjetas, distinguir Dictar/Conversar y evaluar navegación administrativa adaptable. Esto requiere decisión de diseño, no una sustitución automática.",
+    "source": "web/src/styles.css; web/src/components/Composer.tsx; web/src/views/Admin.tsx",
+    "kind": "Evaluación heurística, no defecto funcional demostrado"
+  }
+]

@@ -158,6 +158,10 @@ def main() -> None:
                 ],
             )
         load_places(c)
+        from .procedures import load_seed
+
+        n_proc = load_seed(c)  # guías de trámite (RAG_DIR/tramites.json), con citas verificadas
+        print(f"{n_proc} guías de trámite cargadas.")
         from .control_seed import seed_control
 
         seed_control(c)

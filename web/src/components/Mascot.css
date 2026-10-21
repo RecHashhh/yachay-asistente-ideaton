@@ -1,0 +1,17 @@
+.mascot-robot .robot-head{transform-origin:40px 42px;animation:robot-float 4s ease-in-out infinite}
+.mascot-robot .robot-eyes{transform-box:fill-box;transform-origin:center;animation:robot-blink 5.2s ease-in-out infinite}
+.mascot-robot[data-mood="thinking"] .robot-head{animation:robot-think 2.4s ease-in-out infinite}
+.mascot-robot[data-mood="thinking"] .robot-gaze{animation:robot-look 2.4s ease-in-out infinite}
+.mascot-robot[data-mood="talking"] .robot-head{animation:robot-float 1.5s ease-in-out infinite}
+.mascot-robot[data-mood="talking"] .robot-smile{visibility:hidden}
+.mascot-robot .robot-voice path{transform-box:fill-box;transform-origin:center;animation:robot-speak .5s ease-in-out infinite alternate}
+.mascot-robot .robot-voice path:nth-child(2){animation-delay:-.2s}
+.mascot-robot .robot-voice path:nth-child(3){animation-delay:-.35s}
+.mascot-robot[data-mood="happy"] .robot-head{animation:robot-happy 2.5s ease-in-out infinite}
+@keyframes robot-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-1px)}}
+@keyframes robot-blink{0%,43%,47%,100%{transform:scaleY(1)}45%{transform:scaleY(.12)}}
+@keyframes robot-think{0%,100%{transform:rotate(0)}40%,65%{transform:rotate(-4deg)}}
+@keyframes robot-look{0%,100%{transform:translate(0,0)}40%,65%{transform:translate(2px,-1px)}}
+@keyframes robot-speak{from{transform:scaleY(.4)}to{transform:scaleY(1)}}
+@keyframes robot-happy{0%,100%{transform:translateY(0) rotate(0)}40%{transform:translateY(-1.5px) rotate(-3deg)}65%{transform:translateY(-1px) rotate(3deg)}}
+@media(prefers-reduced-motion:reduce){.mascot-robot *{animation:none!important;transform:none!important}}

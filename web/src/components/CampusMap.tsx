@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from 'motion/react';
-import { useEffect, useRef } from 'react';
+import { Suspense, lazy, useEffect, useRef } from 'react';
 import { PLACES, VIEWBOX, placeById, placeName } from '../lib/campus';
 import { useT } from '../lib/i18n';
 import type { MapAction } from '../lib/types';
@@ -92,11 +92,13 @@ function CampusBase({ activeId, lang }: { activeId: string; lang: string }) {
   );
 }
 
-/** Lugar real (coordenadas de los Excel de la universidad): nombre, horario y enlace a Google Maps. */
+const RealMap = lazy(() => import('./RealMap'));
+
+/** Lugar real (coordenadas de los Excel de la universidad): mapa interactivo; mientras carga, la tarjeta con nombre y horario. */
 function RealPlace({ action }: { action: MapAction }) {
   const { t } = useT();
   const href = action.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${action.lat},${action.lon}`;
-  return (
+  const card = (
     <motion.figure className="map-card real-place" style={{ margin: 0 }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
       <figcaption>
         <span className="dot" />
@@ -106,4 +108,5 @@ function RealPlace({ action }: { action: MapAction }) {
       </figcaption>
     </motion.figure>
   );
+  return <Suspense fallback={card}><RealMap action={action} /></Suspense>;
 }

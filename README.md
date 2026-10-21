@@ -4,8 +4,8 @@ Chatbot público de la universidad. Responde con los documentos que cargan los a
 
 ```
 IDEATHON/
-  web/   Frontend React + Vite + motion (este paso)
-  api/   Backend LangChain + LangGraph (siguiente paso)
+  web/   Frontend React + Vite + motion
+  api/   Backend FastAPI + LangGraph + PostgreSQL/pgvector
 ```
 
 ## Correr el frontend
@@ -22,6 +22,30 @@ npm run dev          # http://localhost:5180
 - Portal de administración: `http://localhost:5180/#/admin`. En modo de ejemplo entra cualquier correo `@yachaytech.edu.ec` con una contraseña de 4 caracteres o más.
 
 Si `VITE_API_URL` está vacío (ver `.env.example`), todo funciona con el simulador `web/src/lib/mock.ts`. Los datos de ejemplo **no son información oficial**.
+
+## Estado de entrega — 20 de octubre de 2026
+
+Existe backend real además del simulador. Consulta `api/README.md` para instalarlo y preparar las tablas; los documentos fuente se suministran por un canal autorizado, no se incluyen en este repositorio público. Configura `web/.env` según `web/.env.example` para conectar la API. En desarrollo, Vite utiliza un proxy local; en producción se requiere configurar el origen permitido o un proxy equivalente.
+
+El código no equivale a un despliegue en producción. Sin credenciales del proveedor, las rutas extractivas permiten consultar fuentes pero no demuestran generación bilingüe completa. La autenticación de ejemplo descrita arriba solo corresponde al modo simulador.
+
+La importación CSV de Validación usa ahora GET/PUT autenticados del backend. Los errores de evaluación y feedback permiten reintentar sin confirmar un guardado fallido. El análisis de archivos del usuario está deshabilitado mientras no exista esa capacidad; la carga de documentos institucionales del administrador es una función distinta y se mantiene. Las consultas a oficinas se registran sin prometer notificaciones ni respuestas automáticas.
+
+Objetivos, límites y evidencia: [informe de rúbrica](docs/INFORME-RUBRICA.md). Las autoevaluaciones antiguas y métricas del simulador no certifican resultados reales. Las capturas locales que reproduzcan contenido institucional se excluyen de nuevas publicaciones.
+
+La nueva sección **Consultas** del portal permite al personal autorizado revisar las últimas 100 consultas vigentes y marcar su estado. Requiere aplicar las migraciones (`cd api; python -m app.migrate` con el entorno virtual activo). El contacto es manual: no envía correos. Comparación documentada, guion de pitch y límites: [revisión de entrega](docs/entrega/revision.html). [Borrador IEEE en LaTeX](docs/entrega/paper.tex), pendiente de autores y resultados reales.
+
+### Comprobaciones reproducibles
+
+```powershell
+npm --prefix web run build
+# Desde api, con dependencias instaladas y configuración local válida:
+.venv/Scripts/python.exe -m unittest discover -s tests -v
+```
+
+Para la regresión visual, instalar Playwright en `web` (`npm --prefix web install --no-save playwright`) y disponer de Chrome. Con Vite ejecutándose en el puerto 5180 y `VITE_API_URL` configurado para activar el contrato de API: `node scripts/verificar-entrega.cjs` desde la raíz. Se interceptan las peticiones para probar fallos y reintentos con datos sintéticos; no acredita la base de datos real. Se puede usar `AUDIT_URL` para otro puerto y `PLAYWRIGHT_MODULE` para una instalación existente de Playwright.
+
+La comprobación opcional `api/tests/verify_postgres.py`, ejecutada desde `api` con el entorno virtual, usa exclusivamente una tabla temporal de PostgreSQL: verifica guardado y rollback completo si falla una fila durante el reemplazo. Requiere una base configurada con el esquema, pero no modifica el set persistente de la aplicación.
 
 ## Incrustar el asistente en cualquier página
 

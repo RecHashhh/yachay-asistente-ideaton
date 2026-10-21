@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { BRAND } from '../config';
+import { MOCK } from '../lib/api';
 import { LANGS, useT } from '../lib/i18n';
 import type { Attachment } from '../lib/types';
 import { IcCapture, IcClip, IcMic, IcSend, IcStop, IcWave } from './icons';
@@ -44,6 +45,7 @@ export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy
   }, [value]);
 
   const add = (list: File[]) => {
+    if (!MOCK) { toast(lang === 'en' ? 'File analysis is not available yet. Paste your question as text.' : 'El análisis de archivos aún no está disponible. Pega tu consulta como texto.'); return; }
     const ok = list.filter((f) => (f.type.startsWith('image/') || f.type === 'application/pdf') && f.size <= MAX_MB * 1024 * 1024);
     if (ok.length < list.length) toast(`Solo imágenes o PDF de hasta ${MAX_MB} MB`);
     const room = MAX_FILES - files.length;
@@ -126,8 +128,8 @@ export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (canSend) onSend(); } }} />
         <div className="composer-bar">
-          <button type="button" className="icon-btn" title={t('attach')} aria-label={t('attach')} onClick={() => fileRef.current?.click()} disabled={disabled || files.length >= MAX_FILES}><IcClip /></button>
-          <button type="button" className="icon-btn" title={t('capture')} aria-label={t('capture')} onClick={capture} disabled={disabled || files.length >= MAX_FILES}><IcCapture /></button>
+          <button type="button" className="icon-btn" title={MOCK ? t('attach') : (lang === 'en' ? 'File analysis is not available yet' : 'El análisis de archivos aún no está disponible')} aria-label={t('attach')} onClick={() => fileRef.current?.click()} disabled={disabled || !MOCK || files.length >= MAX_FILES}><IcClip /></button>
+          <button type="button" className="icon-btn" title={MOCK ? t('capture') : (lang === 'en' ? 'Image analysis is not available yet' : 'El análisis de imágenes aún no está disponible')} aria-label={t('capture')} onClick={capture} disabled={disabled || !MOCK || files.length >= MAX_FILES}><IcCapture /></button>
           <button type="button" className={`icon-btn mic${rec ? ' on' : ''}`} title={t('mic')} aria-label={t('mic')} aria-pressed={!!rec} onClick={mic} disabled={disabled}><IcMic /></button>
           <span className="sp" />
           {onVoice && <button type="button" className="voice-btn" onClick={onVoice} disabled={disabled} title={t('voiceMode')}><IcWave /><span>{lang === 'en' ? 'Voice' : 'Voz'}</span><span className="sr"> — {t('voiceMode')}</span></button>}

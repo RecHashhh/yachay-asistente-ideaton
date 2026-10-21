@@ -29,9 +29,17 @@ const REASONS: FeedbackReason[] = ['incorrecta', 'desactualizada', 'no_responde'
  * Panel tras el 👎: por qué no sirvió (llega a la bandeja "Sin respuesta" del portal) y la opción de hablar con una persona
  * adjuntando la conversación.
  */
-export function FeedbackPanel({ office, question, transcript, onReason }: { office: string; question: string; transcript: string; onReason: (r: FeedbackReason | null) => void }) {
-  const { t } = useT();
+export function FeedbackPanel({ office, question, transcript, onReason }: { office: string; question: string; transcript: string; onReason: (r: FeedbackReason | null) => Promise<void> }) {
+  const { t, lang } = useT();
   const [sent, setSent] = useState<FeedbackReason | 'skip' | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState(false);
+  const submit = async (reason: FeedbackReason | null) => {
+    setPending(true); setError(false);
+    try { await onReason(reason); setSent(reason ?? 'skip'); }
+    catch { setError(true); }
+    finally { setPending(false); }
+  };
   const [human, setHuman] = useState(false);
   const label: Record<FeedbackReason, string> = { incorrecta: t('fbIncorrect'), desactualizada: t('fbOutdated'), no_responde: t('fbNotAnswered'), confusa: t('fbConfusing') };
   return (
@@ -42,9 +50,10 @@ export function FeedbackPanel({ office, question, transcript, onReason }: { offi
         <>
           <b>{t('fbTitle')}</b>
           <div className="follow">
-            {REASONS.map((r) => <button key={r} className="chip" onClick={() => { setSent(r); onReason(r); }}>{label[r]}</button>)}
-            <button className="chip ghost" onClick={() => { setSent('skip'); onReason(null); }}>{t('fbSkip')}</button>
+            {REASONS.map((r) => <button key={r} className="chip" disabled={pending} onClick={() => void submit(r)}>{label[r]}</button>)}
+            <button className="chip ghost" disabled={pending} onClick={() => void submit(null)}>{t('fbSkip')}</button>
           </div>
+          {error && <p className="err" role="alert">{lang === 'en' ? 'Your feedback was not saved. Please try again.' : 'No se guardó tu valoración. Vuelve a intentarlo.'}</p>}
         </>
       )}
       {!human && <button className="btn sm" onClick={() => setHuman(true)}><IcUser width={14} height={14} />{t('talkHuman')}</button>}

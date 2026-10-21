@@ -220,6 +220,16 @@ def unsupported_facts(answer: str, sources: str) -> list[str]:
 _hits: dict[str, list[float]] = {}
 
 
+def blocked(key: str, limit: int, window_s: int) -> bool:
+    """¿Hay `limit` eventos registrados con `record` en la ventana? (no registra nada)."""
+    now = time.time()
+    return sum(1 for t in _hits.get(key, []) if now - t < window_s) >= limit
+
+
+def record(key: str) -> None:
+    _hits.setdefault(key, []).append(time.time())
+
+
 def allow(key: str, limit: int, window_s: int) -> bool:
     """Ventana deslizante en memoria (un proceso). Con varias instancias: mover a la base o a Redis."""
     now = time.time()
