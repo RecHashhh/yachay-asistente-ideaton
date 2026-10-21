@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_embedding_model: str = "bge-m3"
     anthropic_api_key: SecretStr = SecretStr("")
-    anthropic_model: str = "claude-haiku-4-5-20251001"
+    anthropic_model: str = "claude-haiku-5-5"
 
     rag_min_similarity: float = 0.30
     rag_vector_candidates: int = 20
