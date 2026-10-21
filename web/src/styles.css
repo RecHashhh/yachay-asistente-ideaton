@@ -430,3 +430,14 @@ select option{background:var(--surface);color:var(--ink)}
 .form-grid > .field{min-width:0}
 .form-grid .inp{min-width:0;width:100%;max-width:100%}
 .drop b{overflow-wrap:anywhere;max-width:100%}
+.real-map-canvas{height:clamp(260px,38vh,380px);width:100%;isolation:isolate;z-index:0}
+.real-map figcaption{flex-wrap:wrap}
+.real-map .map-pulse{animation:map-pulse 1.8s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes map-pulse{0%{stroke-opacity:1;fill-opacity:.2}100%{stroke-opacity:.15;fill-opacity:.04}}
+.real-map .map-route{animation:map-route 1.2s linear infinite}
+@keyframes map-route{to{stroke-dashoffset:-16}}
+.real-map .map-tip{font:600 12px/1.2 inherit;border-radius:8px;box-shadow:var(--shadow)}
+/* Modo oscuro: teselas atenuadas para que el mapa no deslumbre (los marcadores conservan su color). */
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .real-map .leaflet-tile{filter:brightness(.62) invert(1) contrast(.9) hue-rotate(180deg) saturate(.6)} }
+:root[data-theme="dark"] .real-map .leaflet-tile{filter:brightness(.62) invert(1) contrast(.9) hue-rotate(180deg) saturate(.6)}
+.real-map figcaption>span:nth-child(2){min-width:0;overflow-wrap:anywhere}

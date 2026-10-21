@@ -6,7 +6,7 @@ Leyenda: ✅ hecho y verificado · 🟡 hecho en parte o sin verificar con el si
 
 > **Estado de la plataforma (actualizado).** Backend **en funcionamiento** con PostgreSQL 18 + pgvector 0.8.7 (índice HNSW): 75 documentos, 1.446 fragmentos con embeddings, 10 lugares y 50 aulas con coordenadas reales, frontend conectado. Falta solo la **clave de Anthropic**: sin ella, Yachi responde en modo extractivo (muestra el fragmento oficial más relevante, sin redactar).
 >
-> **Métricas reales de búsqueda** (40 preguntas de control, corpus real): documento correcto entre los 5 que recibe el modelo **29/29 = 100 %** (recall@5), en primer lugar 16/29 (MRR 0,73); reglas exactas (aulas, lugares, aclaración, fuera de ámbito) **11/11**; tiempo de búsqueda **27–58 ms**. La única falla inicial («otra universidad» vs. «cambio de IES») se resolvió con expansión de sinónimos.
+> **Métricas reales de búsqueda, sin modelo** (set ampliado a **119 preguntas** con evidencia literal en el corpus: 73 en español y 20 en inglés con documento esperado, 12 «sin información», 6 de aclaración y 8 de lugares): documento correcto entre los 5 que recibe el modelo **80/93 = 86 %** (recall@5), en primer lugar 57/93 (MRR 0,71); 13 respondidas con guía de trámite; reglas exactas **26/26**. El set inicial de 40 daba 29/29: el set ampliado es más difícil a propósito y muestra 13 fallas reales (calendarios de posgrado, enlace al SIGA, retiro de nivelación, preguntas en inglés con cifras), que se trabajarán al calibrar con el modelo. No se ajustó la búsqueda a estas preguntas para no inflar la métrica.
 
 ---
 
@@ -16,16 +16,16 @@ Leyenda: ✅ hecho y verificado · 🟡 hecho en parte o sin verificar con el si
 |---|---|---|---|
 | A1 | Estilo Gemini/minimalista, como el Help Desk | ✅ | `web/`; tipografía Inter y colores de yachaytech.edu.ec |
 | A2 | React con animaciones tipo Claude | ✅ | Streaming palabra por palabra, mascota animada, estados |
-| A3 | Datos en XLSX, PDF y CSV | 🟡 | Corpus del equipo (71 docs, 1.424 fragmentos) listo para el backend; la subida desde el portal guarda el archivo, pero el troceo lo hace `preparar_corpus.py` |
+| A3 | Datos en XLSX, PDF y CSV | ✅ | Corpus del equipo cargado y **la subida desde el Portal se procesa sola** (`api/app/processing.py`): PDF con tablas, Excel con celdas combinadas y CSV → fragmentos → embeddings → índice. Probado con los tres formatos y con un PDF dañado (queda en «error» con el motivo) |
 | A4 | Metadatos: tema, fecha, versión | 🟡 | Tema y audiencia se asignan al cargar (`api/app/catalog.py`); **la versión solo existe si está en el nombre** (V4.0) y la fecha es de consulta, no del documento |
 | A5 | Dos tipos de usuario (admin y público) | ✅ | Portal `#/admin`; el público no ve el inventario |
 | A6 | Mascota de YT que habla | 🟡 | Mascota animada y modo voz; el arte nuevo está en curso (otra sesión) |
 | A7 | LangChain/LangGraph | ✅ · 🟡 | `api/app/graph.py` corriendo con la base real; falta probar la redacción con el modelo (clave pendiente) |
 | A8 | Sugerir consultas por tendencias | ✅ | Front; el backend calcula tendencias reales desde `messages` |
-| A9 | Mapa SVG con flecha y círculos | 🟡 | Funciona con plano esquemático; **coordenadas reales ya cargables** (10 puntos + 50 aulas) pero el mapa del front aún no las usa |
+| A9 | Mapa con flecha y círculos | ✅ | **Mapa real interactivo** (Leaflet + OpenStreetMap) con las coordenadas de los Excel: círculo en el destino, flecha desde el origen («¿cómo llego… desde el rectorado?»), lugares de referencia y enlace «Cómo llegar a pie». Claro, oscuro y móvil, 0 violaciones de accesibilidad |
 | A10 | Aviso de uso de datos | ✅ | LOPDP art. 12 completo; datos del responsable por confirmar con legal |
 | A11 | Interacciones decorativas tipo Claude | ✅ | |
-| A12 | Portal para actualizar la base | ✅ · 🟡 | Funciona con la base real; la subida guarda el archivo pero aún no lo fragmenta ni indexa sola |
+| A12 | Portal para actualizar la base | ✅ | Subir, reemplazar (la versión anterior sigue vigente hasta que la nueva queda indexada), reprocesar si falla, retirar. Sesiones en la base, bloqueo por intentos fallidos y bitácora de acciones |
 | A13 | Qué documentos hay en la web y con cuáles contamos | ✅ | `fuentes.csv` (193 fuentes, 73 incluidas, motivo de cada exclusión) y respuesta "¿qué documentos tienes?" |
 | A14 | Estrategias para ahorrar tokens | ✅ | README + calculadora; umbral que evita llamar al modelo sin fuente |
 | A15 | "Confesionario" | ⏸ | Es una página de Facebook de estudiantes, no un canal oficial: Yachi lo explica y deriva a la FEYT y a Bienestar |
@@ -75,7 +75,7 @@ Leyenda: ✅ hecho y verificado · 🟡 hecho en parte o sin verificar con el si
 
 | Métrica | Dónde se mide | Valor actual |
 |---|---|---|
-| Exactitud total | Portal → Validación | 100 % **en el simulador** (26 casos); set real: 40 preguntas listas, ejecución pendiente |
+| Exactitud total | Portal → Validación | 100 % **en el simulador** (26 casos); set real: **119 preguntas** cargadas, ejecución con el modelo pendiente (clave). Sin modelo: recall@5 86 %, reglas 26/26 |
 | Citación correcta | Portal → Validación | 100 % simulador; real: pendiente |
 | "Sin información" correcto | Portal → Validación | 100 % simulador; real: pendiente |
 | Alucinaciones (respuestas sin fuente) | Portal → Validación | 0 simulador; real: pendiente |
@@ -116,6 +116,17 @@ Implementado en `api/app/filters.py` (listas, normalización, datos personales, 
 | G12 | **Medición**: 97 casos (crisis, denuncias, insultos disfrazados, manipulación, saludos, consultas legítimas sensibles y datos personales): **97/97, falsos positivos 0/32, falsos negativos 0/29**. La búsqueda no cambió: recall@5 29/29, MRR 0,73 | NIST AI RMF (medir) |
 
 Pendiente: probar G6 y G10 con el modelo real cuando haya clave; que Bienestar confirme los contactos de G1–G2; ampliar los casos con mensajes reales de la bandeja.
+
+## H. Cierre de pendientes sin clave de Anthropic (20 de octubre)
+
+| # | Pendiente | Estado | Evidencia |
+|---|---|---|---|
+| H1 | Procesar solas las subidas del Portal | ✅ | `api/app/processing.py`; PDF/XLSX/CSV indexados y encontrables por la búsqueda; PDF dañado → «error» con motivo y botón «Reprocesar»; reemplazo sin hueco de vigencia |
+| H2 | Set de control ≥ 100 | ✅ | 119 preguntas (`api/app/control_seed.py`); cada una con cita literal verificada en `docs/rag/rag/control_evidencia.json` (fuera del repo, corpus confidencial); se quitaron 11 preguntas propias del personal administrativo |
+| H3 | Mapa interactivo real | ✅ | `web/src/components/RealMap.tsx` (carga diferida); origen detectado por `rules.split_origin` |
+| H4 | Paso a paso como tarjeta desde el backend | ✅ | 7 guías curadas (tercera matrícula, retiro de carrera y de nivelación, cambio de carrera, cambio de IES, certificados, reingreso) con 124 citas verificadas; se responden sin modelo. Plazos 2026SEM02 vencidos: se muestran como «Período terminado», sin «Añadir al calendario». Contenido en `docs/rag/rag/tramites.json` (fuera del repo) |
+| H5 | Oficina de contacto según el tema | ✅ | `api/app/contacts.py`: oficina por palabras de la pregunta (TIC, salud, psicología, becas, residencias, biblioteca, posgrado, inglés…) con correo y extensión **solo si están en el corpus** |
+| H6 | Acceso al Portal más seguro | ✅ | Sesiones en PostgreSQL (hash SHA-256 del token, 8 h), cierre de sesión en el servidor, bloqueo tras 5 intentos fallidos por IP en 15 min (los aciertos no cuentan), contraseña mínima de 12 caracteres, bitácora `admin_audit` (2 años). Producción: Microsoft Entra ID (README) |
 
 ## F. Orden recomendado
 
