@@ -1,20 +1,19 @@
-"""Conexiones a PostgreSQL (psycopg 3 con pool)."""
+from collections.abc import AsyncIterator
 
-from contextlib import contextmanager
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from psycopg.rows import dict_row
-from psycopg_pool import ConnectionPool
+from app.config import get_settings
 
-from .config import settings
+settings = get_settings()
+engine = create_async_engine(
+    settings.database_url,
+    pool_size=5,
+    max_overflow=5,
+    pool_pre_ping=True,
+)
+SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
-pool = ConnectionPool(settings.database_url, min_size=1, max_size=8, kwargs={"row_factory": dict_row}, open=False)
 
-
-def open_pool() -> None:
-    pool.open(wait=True, timeout=10)
-
-
-@contextmanager
-def conn():
-    with pool.connection() as c:
-        yield c
+async def get_session() -> AsyncIterator[AsyncSession]:
+    async with SessionLocal() as session:
+        yield session

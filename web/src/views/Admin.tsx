@@ -3,10 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BRAND } from '../config';
 import { Mascot } from '../components/Mascot';
 import { IcArrowLeft, IcMoon, IcSun, IcTrash, IcUpload } from '../components/icons';
-import { Cost, Inbox, Validation } from './AdminExtras';
-import { Filters } from './AdminFilters';
-import { AdminInquiries } from './AdminInquiries';
-import { adminLogin, adminLogout, createTopic, deleteDoc, getTopics, getTrends, listDocs, reprocessDoc, uploadDoc, type Admin as AdminUser } from '../lib/api';
+import { Cost, Validation } from './AdminExtras';
+import { SAMPLE_DATA, adminLogin, adminLogout, createTopic, deleteDoc, getTopics, getTrends, listDocs, uploadDoc, type Admin as AdminUser } from '../lib/api';
 import type { DocMeta, Topic, Trend } from '../lib/types';
 
 type Tab = 'docs' | 'upload' | 'topics' | 'trends' | 'inbox' | 'inquiries' | 'filters' | 'validation' | 'cost';
@@ -44,7 +42,8 @@ export function Admin({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggleT
       <header className="admin-top">
         <a className="icon-btn" href="#/" aria-label="Volver al chat"><IcArrowLeft /></a>
         <Mascot size={28} />
-        <h1 className="admin-h">Base de conocimiento</h1>
+        <b>Base de conocimiento</b>
+        {SAMPLE_DATA && <span className="badge-demo">Datos de ejemplo</span>}
         <span className="sp" />
         <nav className="tabs" aria-label="Secciones">
           {([['docs', 'Documentos'], ['upload', 'Subir'], ['topics', 'Temas'], ['trends', 'Tendencias'], ['inbox', 'Sin respuesta'], ['inquiries', 'Consultas'], ['filters', 'Filtros'], ['validation', 'Validación'], ['cost', 'Costo']] as [Tab, string][]).map(([k, l]) => (

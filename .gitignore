@@ -5,25 +5,9 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
-
-# Documentos fuente del reto: confidenciales (sección 7 del planteamiento). No subir al repositorio público.
-docs/*.pdf
-docs/*.xlsx
-docs/*.xls
-docs/*.csv
-!docs/kichwa-traduccion.csv
-docs/*.png
-docs/*.jpg
-docs/*.zip
-docs/fuentes/
-docs/rag/
-/Crear base de datos Yachi.cmd
-/Crear base de datos Yachi (sin contraseña).cmd
-
-# Evidencias locales: pueden reproducir documentos institucionales o datos de sesiones.
-docs/**/*.png
-docs/**/*.jpg
-docs/**/*.pdf
-docs/auditoria-integral-2026-10-20/resultados.json
-docs/auditoria-integral-2026-10-20/index.html
-.codebase-memory/
+rag/*
+!rag/descripciones.csv
+!rag/README.md
+__pycache__/
+.pytest_cache/
+*.py[cod]

@@ -52,7 +52,7 @@ export interface Source {
   docId: string;
   title: string;
   version: string;
-  docDate: string;
+  docDate?: string;
   /** Página (PDF), hoja y fila (xlsx/csv). */
   locator?: string;
   snippet: string;
@@ -161,6 +161,8 @@ export interface Attachment {
 export interface ChatTurn {
   role: 'user' | 'assistant';
   content: string;
+  /** Fuentes adjuntas a una respuesta previa; el backend las valida antes de reutilizarlas. */
+  sources?: Source[];
 }
 
 export interface ChatRequest {
