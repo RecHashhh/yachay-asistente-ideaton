@@ -2,123 +2,147 @@ import { Fragment, type ReactNode } from 'react';
 
 const LINK_PATTERN = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s<>"'`]+|www\.[^\s<>"'`]+)/gi;
 
-/**
- * Markdown mínimo (párrafos, listas, **negrita** y enlaces) pensado para streaming:
- * cada palabra lleva una clave estable según su posición, así React solo monta las palabras nuevas
- * y solo esas ejecutan la animación de entrada (efecto "aparecer" como Claude).
- */
+/** Renderizador Markdown pequeño y seguro, compatible con texto que llega por streaming. */
 export function Markdown({ text, animate }: { text: string; animate: boolean }) {
-  let offset = 0;
-  const blocks = text.split(/\n{2,}/);
-  return (
-    <div className="md">
-      {blocks.map((block, bi) => {
-        const start = offset;
-        offset += block.length + 2;
-        const lines = block.split('\n');
-        const ul = lines.every((l) => /^\s*[-*] /.test(l));
-        const ol = lines.every((l) => /^\s*\d+\. /.test(l));
-        if (ul || ol) {
-          let lo = start;
-          const items = lines.map((l, li) => {
-            const body = l.replace(/^\s*([-*]|\d+\.) /, '');
-            const node = <li key={li}>{inline(body, lo, animate)}</li>;
-            lo += l.length + 1;
-            return node;
-          });
-          return ol ? <ol key={bi}>{items}</ol> : <ul key={bi}>{items}</ul>;
-        }
-        return <p key={bi}>{inline(block, start, animate)}</p>;
-      })}
-    </div>
-  );
+  const lines = text.replace(/\r\n?/g, '\n').split('\n');
+  const blocks: ReactNode[] = [];
+  let i = 0;
+  let sourceOffset = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const start = sourceOffset;
+    if (!line.trim()) { sourceOffset += line.length + 1; i++; continue; }
+
+    const fence = line.match(/^\s*(```+|~~~+)(.*)$/);
+    if (fence) {
+      const marker = fence[1][0];
+      const code: string[] = [];
+      sourceOffset += line.length + 1;
+      i++;
+      while (i < lines.length && !new RegExp(`^\\s*${marker}{3,}\\s*$`).test(lines[i])) {
+        code.push(lines[i]); sourceOffset += lines[i].length + 1; i++;
+      }
+      if (i < lines.length) { sourceOffset += lines[i].length + 1; i++; }
+      blocks.push(<pre key={start}><code>{code.join('\n')}</code></pre>);
+      continue;
+    }
+
+    const heading = line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
+    if (heading) {
+      const level = heading[1].length;
+      const Tag = `h${level}` as keyof JSX.IntrinsicElements;
+      blocks.push(<Tag key={start}>{inline(heading[2], start + line.indexOf(heading[2]), animate)}</Tag>);
+      sourceOffset += line.length + 1; i++; continue;
+    }
+
+    if (i + 1 < lines.length && isTableSeparator(lines[i + 1]) && line.includes('|')) {
+      const rows = [splitRow(line)];
+      sourceOffset += line.length + 1; i += 2; sourceOffset += lines[i - 1].length + 1;
+      while (i < lines.length && lines[i].includes('|') && lines[i].trim()) {
+        rows.push(splitRow(lines[i])); sourceOffset += lines[i].length + 1; i++;
+      }
+      const headers = rows.shift() ?? [];
+      blocks.push(<div className="md-table-wrap" key={start}><table><thead><tr>{headers.map((cell, ci) => <th key={ci}>{inline(cell, start, animate)}</th>)}</tr></thead><tbody>{rows.map((row, ri) => <tr key={ri}>{headers.map((_, ci) => <td key={ci}>{inline(row[ci] ?? '', start, animate)}</td>)}</tr>)}</tbody></table></div>);
+      continue;
+    }
+
+    const listMatch = line.match(/^\s{0,3}([-*+] |\d+[.)] )/);
+    if (listMatch) {
+      const ordered = /^\d/.test(listMatch[1]);
+      const items: ReactNode[] = [];
+      while (i < lines.length) {
+        const item = lines[i].match(/^\s{0,3}([-*+] |\d+[.)] )(.*)$/);
+        if (!item || /^\d/.test(item[1]) !== ordered) break;
+        items.push(<li key={i}>{inline(item[2], sourceOffset + lines[i].indexOf(item[2]), animate)}</li>);
+        sourceOffset += lines[i].length + 1; i++;
+      }
+      const Tag = ordered ? 'ol' : 'ul';
+      blocks.push(<Tag key={start}>{items}</Tag>);
+      continue;
+    }
+
+    if (/^\s{0,3}>/.test(line)) {
+      const quote: ReactNode[] = [];
+      while (i < lines.length && /^\s{0,3}>/.test(lines[i])) {
+        const body = lines[i].replace(/^\s{0,3}> ?/, '');
+        quote.push(<p key={i}>{inline(body, sourceOffset, animate)}</p>);
+        sourceOffset += lines[i].length + 1; i++;
+      }
+      blocks.push(<blockquote key={start}>{quote}</blockquote>);
+      continue;
+    }
+
+    const paragraph = [line];
+    sourceOffset += line.length + 1; i++;
+    while (i < lines.length && lines[i].trim() && !isBlockStart(lines, i)) {
+      paragraph.push(lines[i]); sourceOffset += lines[i].length + 1; i++;
+    }
+    blocks.push(<p key={start}>{inline(paragraph.join('\n'), start, animate)}</p>);
+  }
+  return <div className="md">{blocks}</div>;
 }
+
+function isBlockStart(lines: string[], i: number) {
+  return /^\s{0,3}(#{1,6}\s|```|~~~|>|[-*+] |\d+[.)] )/.test(lines[i]) ||
+    (i + 1 < lines.length && lines[i].includes('|') && isTableSeparator(lines[i + 1]));
+}
+function isTableSeparator(line: string) { return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line); }
+function splitRow(line: string) { return line.trim().replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim()); }
 
 function inline(s: string, base: number, animate: boolean): ReactNode[] {
   const out: ReactNode[] = [];
-  let pos = 0;
-  for (const part of s.split(/(\*\*[^*]+\*\*?)/)) {
-    if (!part) continue;
-    const bold = part.startsWith('**');
-    const txt = bold ? part.replace(/\*\*/g, '') : part;
-    const nodes = inlineText(txt, base + pos, animate);
-    out.push(bold ? <strong key={base + pos}>{nodes}</strong> : <Fragment key={base + pos}>{nodes}</Fragment>);
-    pos += part.length;
+  const pattern = /\*\*(.+?)\*\*|__(.+?)__|~~(.+?)~~|`([^`]+)`|\*([^*\n]+)\*|_([^_\n]+)_/g;
+  let cursor = 0;
+  for (const match of s.matchAll(pattern)) {
+    const start = match.index ?? 0;
+    if (start > cursor) out.push(...inlineText(s.slice(cursor, start), base + cursor, animate));
+    const value = match[1] ?? match[2] ?? match[3] ?? match[4] ?? match[5] ?? match[6] ?? '';
+    const children = match[4] !== undefined ? value : inlineText(value, base + start, animate);
+    const node = match[1] !== undefined || match[2] !== undefined ? <strong>{children}</strong>
+      : match[3] !== undefined ? <del>{children}</del>
+        : match[4] !== undefined ? <code>{value}</code> : <em>{children}</em>;
+    out.push(<Fragment key={base + start}>{node}</Fragment>);
+    cursor = start + match[0].length;
   }
+  if (cursor < s.length) out.push(...inlineText(s.slice(cursor), base + cursor, animate));
   return out;
 }
 
 function inlineText(text: string, base: number, animate: boolean): ReactNode[] {
   const nodes: ReactNode[] = [];
   let cursor = 0;
-  let offset = 0;
-
-  const appendText = (value: string) => {
-    let localOffset = 0;
-    for (const [index, piece] of value.split(/(\s+)/).entries()) {
-      const key = `${base + offset + localOffset}-${index}`;
-      nodes.push(/\S/.test(piece)
-        ? <span key={key} className={animate ? 'w' : undefined}>{piece}</span>
-        : <Fragment key={key}>{piece}</Fragment>);
-      localOffset += piece.length;
-    }
-  };
-
   for (const match of text.matchAll(LINK_PATTERN)) {
     const start = match.index ?? 0;
-    if (start > cursor) {
-      const value = text.slice(cursor, start);
-      appendText(value);
-      offset += value.length;
-    }
-
-    const markdownLabel = match[1];
-    const markdownUrl = match[2];
-    const rawUrl = markdownUrl ?? match[3];
+    if (start > cursor) appendWords(nodes, text.slice(cursor, start), base + cursor, animate);
+    const label = match[1];
+    const rawUrl = match[2] ?? match[3];
     if (!rawUrl) continue;
-
-    if (markdownLabel) {
-      const href = safeHref(rawUrl);
-      if (href) nodes.push(<a key={`${base + offset}`} href={href} target="_blank" rel="noopener noreferrer">{markdownLabel}</a>);
-      else appendText(match[0]);
-      offset += match[0].length;
-    } else {
-      const visibleUrl = trimUrlPunctuation(rawUrl);
-      const href = safeHref(visibleUrl);
-      if (href) nodes.push(<a key={`${base + offset}`} href={href} target="_blank" rel="noopener noreferrer">{visibleUrl}</a>);
-      else appendText(rawUrl);
-      offset += visibleUrl.length;
-
-      const trailing = rawUrl.slice(visibleUrl.length);
-      if (trailing) {
-        appendText(trailing);
-        offset += trailing.length;
-      }
-    }
+    const visibleUrl = label ? rawUrl : trimUrlPunctuation(rawUrl);
+    const href = safeHref(visibleUrl);
+    if (href) nodes.push(<a key={base + start} href={href} target="_blank" rel="noopener noreferrer">{label ?? visibleUrl}</a>);
+    else appendWords(nodes, match[0], base + start, animate);
+    if (!label) appendWords(nodes, rawUrl.slice(visibleUrl.length), base + start + visibleUrl.length, animate);
     cursor = start + match[0].length;
   }
-
-  if (cursor < text.length) appendText(text.slice(cursor));
+  if (cursor < text.length) appendWords(nodes, text.slice(cursor), base + cursor, animate);
   return nodes;
 }
-
-function safeHref(value: string): string | undefined {
-  const href = /^www\./i.test(value) ? `https://${value}` : value;
-  try {
-    const url = new URL(href);
-    return url.protocol === 'http:' || url.protocol === 'https:' ? href : undefined;
-  } catch {
-    return undefined;
+function appendWords(nodes: ReactNode[], value: string, base: number, animate: boolean) {
+  let offset = 0;
+  for (const [index, piece] of value.split(/(\s+)/).entries()) {
+    nodes.push(/\S/.test(piece) ? <span key={`${base + offset}-${index}`} className={animate ? 'w' : undefined}>{piece}</span> : <Fragment key={`${base + offset}-${index}`}>{piece}</Fragment>);
+    offset += piece.length;
   }
 }
-
+function safeHref(value: string): string | undefined {
+  const href = /^www\./i.test(value) ? `https://${value}` : value;
+  try { const url = new URL(href); return url.protocol === 'http:' || url.protocol === 'https:' ? href : undefined; }
+  catch { return undefined; }
+}
 function trimUrlPunctuation(value: string): string {
   let url = value.replace(/[.,!?;:]+$/, '');
-  const pairs: [string, string][] = [['(', ')'], ['[', ']'], ['{', '}']];
-  for (const [open, close] of pairs) {
-    while (url.endsWith(close) && url.split(close).length > url.split(open).length) {
-      url = url.slice(0, -1);
-    }
-  }
+  for (const [open, close] of [['(', ')'], ['[', ']'], ['{', '}']])
+    while (url.endsWith(close) && url.split(close).length > url.split(open).length) url = url.slice(0, -1);
   return url;
 }

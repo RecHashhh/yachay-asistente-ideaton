@@ -161,6 +161,14 @@ button{cursor:pointer}
 .md ul,.md ol{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:4px}
 .md strong{font-weight:700}
 .md a{overflow-wrap:anywhere;text-decoration:underline;text-underline-offset:2px}
+.md h1,.md h2,.md h3,.md h4,.md h5,.md h6{font-size:1.08em;line-height:1.35;margin:12px 0 6px;font-weight:700}
+.md pre{white-space:pre-wrap;overflow-wrap:anywhere;background:rgba(127,127,127,.12);padding:10px 12px;border-radius:8px;margin:8px 0;font-family:ui-monospace,SFMono-Regular,monospace}
+.md :not(pre)>code{font-family:ui-monospace,SFMono-Regular,monospace;background:rgba(127,127,127,.14);padding:1px 4px;border-radius:4px}
+.md blockquote{margin:8px 0;padding:2px 0 2px 12px;border-left:3px solid var(--line);color:var(--muted)}
+.md .md-table-wrap{max-width:100%;overflow-x:auto;margin:10px 0}
+.md table{border-collapse:collapse;width:100%;font-size:.92em}
+.md th,.md td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.md th{font-weight:700;background:rgba(127,127,127,.09)}
 .md .w{animation:wordin .45s var(--ease) both}
 @keyframes wordin{from{opacity:0;filter:blur(3px)}to{opacity:1;filter:none}}
 
