@@ -61,24 +61,26 @@ async def chat(request: ChatRequest, session: AsyncSession = Depends(get_session
 
     async def event_stream() -> AsyncIterator[bytes]:
         final_state: dict = {}
-        searching = "Searching the documents…" if request.lang == "en" else "Buscando en los documentos…"
         answering = "Preparing an answer…" if request.lang == "en" else "Preparando respuesta…"
-        yield encode_sse({"type": "status", "label": searching})
         answer_status_sent = False
         try:
             agent = RagAgent(settings)
             async for mode, payload in agent.stream(request, session):
                 if mode == "custom" and isinstance(payload, dict):
-                    if payload.get("type") in {"token", "unknown"}:
+                    if payload.get("type") in {"status", "token", "unknown"}:
                         yield encode_sse(payload)
                 elif mode == "values" and isinstance(payload, dict):
                     final_state = payload
-                    if payload.get("retrieved") and not answer_status_sent:
+                    if (payload.get("retrieved") or payload.get("reused_sources")) and not answer_status_sent:
                         yield encode_sse({"type": "status", "label": answering})
                         answer_status_sent = True
 
             if not final_state.get("unknown", True):
-                yield encode_sse({"type": "sources", "items": source_events(final_state.get("retrieved", []), request.lang)})
+                sources = source_events(final_state.get("retrieved", []), request.lang)
+                if not sources:
+                    sources = final_state.get("reused_sources", [])
+                if sources:
+                    yield encode_sse({"type": "sources", "items": sources})
                 yield encode_sse({"type": "suggestions", "items": []})
             yield encode_sse({"type": "done", "messageId": request_id, "latencyMs": round((time.monotonic() - started) * 1000)})
         except Exception:

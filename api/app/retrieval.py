@@ -54,6 +54,60 @@ class Retriever:
             for row in result.all()
         ]
 
+    async def validate_history_sources(
+        self,
+        session: AsyncSession,
+        sources: Sequence[dict[str, str | None]],
+        lang: str = "es",
+    ) -> list[dict[str, str | None]]:
+        """Return only prior source records that still match the indexed document and chunk."""
+        validated: list[dict[str, str | None]] = []
+        for source in sources:
+            doc_id = source.get("docId")
+            snippet = source.get("snippet")
+            if not doc_id or not snippet:
+                continue
+
+            conditions = [
+                Document.doc_id == doc_id,
+                func.left(RagChunk.content, len(snippet)) == snippet,
+                RagChunk.section == (source.get("locator") or ""),
+            ]
+            result = await session.execute(
+                select(
+                    Document.doc_id,
+                    Document.title,
+                    Document.validity_period,
+                    RagChunk.section,
+                    RagChunk.content,
+                )
+                .join(Document, Document.doc_id == RagChunk.doc_id)
+                .where(*conditions)
+                .limit(1)
+            )
+            row = result.first()
+            if row is None:
+                continue
+
+            period = row.validity_period
+            allowed_versions = {period} if period else {"Not specified", "Sin período especificado"}
+            if (
+                source.get("title") != row.title
+                or source.get("version") not in allowed_versions
+                or source.get("locator") not in {row.section or None, row.section}
+            ):
+                continue
+
+            validated_source = {
+                "docId": row.doc_id,
+                "title": row.title,
+                "version": period or ("Not specified" if lang == "en" else "Sin período especificado"),
+                "locator": row.section or None,
+                "snippet": row.content[:900],
+            }
+            validated.append(validated_source)
+        return validated
+
     async def search(
         self,
         session: AsyncSession,

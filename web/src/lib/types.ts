@@ -106,6 +106,8 @@ export interface Attachment {
 export interface ChatTurn {
   role: 'user' | 'assistant';
   content: string;
+  /** Fuentes adjuntas a una respuesta previa; el backend las valida antes de reutilizarlas. */
+  sources?: Source[];
 }
 
 export interface ChatRequest {

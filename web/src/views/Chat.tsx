@@ -101,7 +101,11 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
     setInput(''); setFiles([]);
     const user: Msg = { id: uid(), role: 'user', text, files: att.length ? att : undefined };
     const ai: Msg = { id: uid(), role: 'assistant', text: '', streaming: true, status: t('thinking') };
-    const history: ChatTurn[] = base.filter((m) => !m.error && m.text).slice(-HISTORY_TURNS).map((m) => ({ role: m.role, content: m.text }));
+    const history: ChatTurn[] = base.filter((m) => !m.error && m.text).slice(-HISTORY_TURNS).map((m) => ({
+      role: m.role,
+      content: m.text,
+      ...(m.role === 'assistant' && m.sources?.length ? { sources: m.sources } : {}),
+    }));
     setMsgs([...base, user, ai]);
     const ctrl = new AbortController();
     abort.current = ctrl;

@@ -112,3 +112,64 @@ async def test_catalog_returns_document_selection_metadata(monkeypatch) -> None:
             "source_url": "https://example.edu/calendario",
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_history_sources_are_checked_against_current_index(monkeypatch) -> None:
+    import app.retrieval as retrieval_module
+
+    class FakeEmbeddings:
+        def __init__(self, **_kwargs):
+            pass
+
+    row = type("Row", (), {
+        "doc_id": "doc-a",
+        "title": "Calendario académico",
+        "validity_period": "2026SEM02",
+        "section": "Matrícula",
+        "content": "El período de matrícula inicia el 1 de septiembre.",
+    })()
+
+    class FakeResult:
+        def first(self):
+            return row
+
+    class FakeSession:
+        def __init__(self):
+            self.statements = []
+
+        async def execute(self, statement):
+            self.statements.append(statement)
+            return FakeResult()
+
+    monkeypatch.setattr(retrieval_module, "OllamaEmbeddings", FakeEmbeddings)
+    retriever = Retriever(Settings())
+    session = FakeSession()
+    sources = [
+        {
+            "docId": "doc-a",
+            "title": "Calendario académico",
+            "version": "2026SEM02",
+            "locator": "Matrícula",
+            "snippet": "El período de matrícula inicia el 1 de septiembre.",
+        },
+        {
+            "docId": "doc-a",
+            "title": "Título manipulado",
+            "version": "2026SEM02",
+            "locator": "Matrícula",
+            "snippet": "El período de matrícula inicia el 1 de septiembre.",
+        },
+    ]
+
+    validated = await retriever.validate_history_sources(session, sources)
+
+    assert len(session.statements) == 2
+    assert validated == [{
+        "docId": "doc-a",
+        "title": "Calendario académico",
+        "version": "2026SEM02",
+        "locator": "Matrícula",
+        "snippet": "El período de matrícula inicia el 1 de septiembre.",
+    }]
+    assert "left(rag_chunks.content" in str(session.statements[0].compile())
