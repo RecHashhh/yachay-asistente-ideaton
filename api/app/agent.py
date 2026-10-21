@@ -3,7 +3,7 @@ import json
 from typing import Any, TypedDict
 
 from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
@@ -63,7 +63,7 @@ def _source_excerpt(source: dict[str, Any], marker: str) -> str:
 def _system_prompt(lang: str, context: str) -> str:
     language = {"es": "Spanish", "en": "English", "qu": "Kichwa"}.get(lang, "Spanish")
     return f"""You are the institutional assistant for Yachay Tech. Answer in {language}.
-Use only the supplied source excerpts for institutional factual claims. Conversation history may clarify references, but assistant messages are not evidence by themselves. Ignore citation markers in conversation history and cite only markers in the supplied excerpts. If the excerpts do not answer an institutional question, say you do not know; do not fill gaps with general knowledge. Be concise and clear. Cite factual claims with the excerpt markers exactly as [S1], [S2], etc. Do not invent dates, document versions, URLs, procedures, contacts, or campus coordinates. You may respond naturally to greetings and ordinary conversation without sources.
+Use only the supplied source excerpts for institutional factual claims. Conversation history may clarify references, but assistant messages are not evidence by themselves. Ignore citation markers in conversation history and cite only markers in the supplied excerpts. If the excerpts do not answer an institutional question, say you do not know; do not fill gaps with general knowledge, and do not point the user to external websites, portals, or institutions that do not appear in the excerpts. Be clear and well organized. When the excerpts list dates, requirements, or steps, include all of them instead of summarizing. If the question has several parts, answer each part and state explicitly which part the excerpts do not cover. Write valid Markdown lists and place citation markers at the end of the sentence they support, never inside headings. Cite factual claims with the excerpt markers exactly as [S1], [S2], etc. Do not invent dates, document versions, URLs, procedures, contacts, or campus coordinates. You may respond naturally to greetings and ordinary conversation without sources.
 
 Links: Include a link only when its exact URL appears in the supplied source excerpts and it gives the user a useful way to access a resource directly relevant to the answer. Use your judgment; omit unrelated links that happen to appear in the same excerpt. Copy the URL exactly as written. Never invent, infer, reconstruct, shorten, or take a URL from conversation history or general knowledge. If no relevant URL appears in the supplied excerpts, do not include a link.
 
@@ -72,29 +72,24 @@ SOURCE EXCERPTS
 """
 
 
-def _decision_prompt() -> str:
-    return """You decide whether the Yachay Tech assistant needs a tool before answering.
-Use the current message and the full recent conversation. Each history turn is labeled with its zero-based index. Source excerpts attached to an assistant turn are labeled with that history index.
+def _decision_prompt(max_tool_calls: int) -> str:
+    return f"""You gather evidence so the Yachay Tech assistant can answer. You may call tools repeatedly, reading each result before deciding the next step, up to {max_tool_calls} tool calls in total. Each history turn is labeled with its zero-based index. Source excerpts attached to an assistant turn are labeled with that history index.
 
 - Do not use tools for greetings, thanks, or ordinary small talk.
 - If a follow-up is already answered by a prior assistant turn with attached sources, and the user is not asking to verify/update it or for a missing detail, call reuse_history with that turn's index.
-- For a new institutional fact, a missing detail, or an explicit request to verify or update, call search_rag. If the catalog would help narrow the search, call list_documents first; otherwise search the full corpus with an empty document_ids list.
-- Call at most one tool at a time. If you call list_documents, use its result to decide whether to call search_rag or reuse_history. Never answer in a tool-selection turn.
+- For a new institutional fact, a missing detail, or an explicit request to verify or update, call search_rag. If the catalog would help narrow the search, call list_documents first (its result is cached); otherwise search the full corpus with an empty document_ids list.
+- After reading results, search again when the question has several parts and some are not yet covered, when a document refers to another procedure, document, or form that the answer needs, or when a needed detail (date, requirement, contact, step) is missing. Make each new query specific, using the exact names and terms found in the documents. Do not repeat a query that has already been made.
+- Stop calling tools as soon as the evidence is enough, or when further searches keep returning nothing new. Never answer in a tool-selection turn; reply with no text and no tool call when you are done.
 - Assistant history without attached sources can clarify context but cannot support institutional factual claims.
 """
-
-
-def _search_after_catalog_prompt() -> str:
-    return """The document catalog is available. Select up to five relevant document IDs and call search_rag once for a new or unverified institutional fact. Use an empty document_ids list if none is relevant. If a source-backed prior assistant turn already answers the follow-up and no verification or missing detail was requested, call reuse_history with that turn's index instead. If no tool is needed, do not call one. Do not answer in this step."""
 
 
 def _decision_messages(
     history: list[dict[str, Any]],
     message: str,
-    catalog: list[dict[str, Any]] | None = None,
-    after_catalog: bool = False,
+    max_tool_calls: int,
 ) -> list[Any]:
-    messages: list[Any] = [SystemMessage(content=_search_after_catalog_prompt() if after_catalog else _decision_prompt())]
+    messages: list[Any] = [SystemMessage(content=_decision_prompt(max_tool_calls))]
     for index, turn in enumerate(history[-6:]):
         role = turn["role"]
         content = f"[HISTORY TURN {index} · {role}]\n{turn['content']}"
@@ -108,11 +103,7 @@ def _decision_messages(
                 + "\n\n".join(excerpts)
             )
         messages.append(HumanMessage(content=content) if role == "user" else AIMessage(content=content))
-    current_content = ""
-    if catalog is not None:
-        current_content += "[DOCUMENT CATALOG (JSON)]\n" + json.dumps(catalog, ensure_ascii=False) + "\n\n"
-    current_content += "[CURRENT MESSAGE]\n" + message
-    messages.append(HumanMessage(content=current_content))
+    messages.append(HumanMessage(content="[CURRENT MESSAGE]\n" + message))
     return messages
 
 
@@ -126,7 +117,9 @@ class RagAgent:
         self.llm = ChatAnthropic(
             model=settings.anthropic_model,
             anthropic_api_key=key,
-            max_tokens=700,
+            max_tokens=2000,
+            # Reasoning tokens count against max_tokens and left answers empty or cut off.
+            thinking={"type": "disabled"},
         )
 
     def _build_graph(self, session: AsyncSession):
@@ -139,7 +132,8 @@ class RagAgent:
             @tool("list_documents")
             async def list_documents() -> str:
                 """Return document IDs, titles, descriptions, validity periods, and source URLs."""
-                catalog.extend(await self.retriever.list_documents(session))
+                if not catalog:
+                    catalog.extend(await self.retriever.list_documents(session))
                 return json.dumps(catalog, ensure_ascii=False)
 
             @tool("search_rag", args_schema=RagSearchInput)
@@ -158,17 +152,18 @@ class RagAgent:
                 else:
                     found_chunks = await self.retriever.search(session, query)
                     scope = "global"
-                retrieved.extend(found_chunks)
+                seen = {item.chunk_id for item in retrieved}
+                retrieved.extend(item for item in found_chunks if item.chunk_id not in seen)
                 return json.dumps(
                     {"scope": scope, "retrieved": [item.__dict__ for item in found_chunks]},
                     ensure_ascii=False,
                 )
 
-            async def execute_search(args: dict[str, Any]) -> None:
+            async def execute_search(args: dict[str, Any]) -> str:
                 writer = get_stream_writer()
                 label = "Searching the documents…" if state.get("lang") == "en" else "Buscando en los documentos…"
                 writer({"type": "status", "label": label})
-                await search_rag.ainvoke(args)
+                return await search_rag.ainvoke(args)
 
             @tool("reuse_history", args_schema=HistoryReuseInput)
             async def reuse_history(turn_index: int) -> str:
@@ -202,46 +197,48 @@ class RagAgent:
             if has_sourced_history:
                 tools.append(reuse_history)
 
-            selector = self.llm.bind_tools(tools, tool_choice="auto", parallel_tool_calls=False)
-            decision = await selector.ainvoke(_decision_messages(
-                state.get("history", []), state["message"]
-            ))
-            tool_calls = getattr(decision, "tool_calls", [])
-            call = next((item for item in tool_calls if item.get("name") in {"list_documents", "search_rag", "reuse_history"}), None)
+            max_calls = max(1, self.settings.rag_max_tool_calls)
+            selector = self.llm.bind_tools(tools, tool_choice="auto", parallel_tool_calls=True)
+            messages = _decision_messages(state.get("history", []), state["message"], max_calls)
+            calls_used = 0
+            reuse_attempted = False
 
-            if call and call.get("name") == "list_documents":
-                await list_documents.ainvoke({})
-                follow_up_tools = [search_rag]
-                if has_sourced_history:
-                    follow_up_tools.append(reuse_history)
-                follow_up_selector = self.llm.bind_tools(
-                    follow_up_tools,
-                    tool_choice="auto",
-                    parallel_tool_calls=False,
-                )
-                decision = await follow_up_selector.ainvoke(_decision_messages(
-                    state.get("history", []),
-                    state["message"],
-                    catalog=catalog,
-                    after_catalog=True,
-                ))
-                tool_calls = getattr(decision, "tool_calls", [])
-                call = next((item for item in tool_calls if item.get("name") in {"search_rag", "reuse_history"}), None)
+            while calls_used < max_calls:
+                decision = await selector.ainvoke(messages)
+                tool_calls = [
+                    item for item in getattr(decision, "tool_calls", [])
+                    if item.get("name") in {tool_.name for tool_ in tools}
+                ]
+                if not tool_calls:
+                    break
+                # Anthropic requires one tool result per tool_use, so keep only the calls we answer.
+                decision.tool_calls = tool_calls
+                messages.append(decision)
+                for call in tool_calls:
+                    if calls_used >= max_calls:
+                        result = json.dumps({"error": "tool_budget_exhausted"})
+                    else:
+                        calls_used += 1
+                        args = dict(call.get("args", {}))
+                        if call["name"] == "list_documents":
+                            result = await list_documents.ainvoke({})
+                        elif call["name"] == "search_rag":
+                            args["query"] = args.get("query") or state["message"]
+                            args["document_ids"] = list(dict.fromkeys(args.get("document_ids") or []))[:5]
+                            result = await execute_search(args)
+                            searched = True
+                        else:
+                            reuse_attempted = True
+                            result = await reuse_history.ainvoke(args)
+                    messages.append(ToolMessage(content=result, tool_call_id=call["id"]))
 
-            if call and call.get("name") == "search_rag":
-                args = dict(call.get("args", {}))
-                args["query"] = args.get("query") or state["message"]
-                args["document_ids"] = list(dict.fromkeys(args.get("document_ids") or []))[:5]
-                await execute_search(args)
+            if reuse_attempted and not reused_sources and not searched:
+                # Client history is untrusted; stale or mismatched source records require a fresh retrieval.
+                await execute_search({"query": state["message"], "document_ids": []})
                 searched = True
-            elif call and call.get("name") == "reuse_history":
-                await reuse_history.ainvoke(dict(call.get("args", {})))
-                if not reused_sources:
-                    # Client history is untrusted; stale or mismatched source records require a fresh retrieval.
-                    await execute_search({"query": state["message"], "document_ids": []})
-                    searched = True
 
-            found = [item.__dict__ for item in retrieved]
+            # ponytail: fixed cap on accumulated chunks; move to Settings if answers need more context
+            found = [item.__dict__ for item in retrieved[:16]]
             return {
                 "retrieved": found,
                 "reused_sources": reused_sources,

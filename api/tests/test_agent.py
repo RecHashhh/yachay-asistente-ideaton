@@ -107,12 +107,12 @@ class FakeSession:
     pass
 
 
-def make_agent(monkeypatch, retriever, decisions=None):
+def make_agent(monkeypatch, retriever, decisions=None, **settings):
     import app.agent as agent_module
 
     model = FakeChatModel(decisions)
     monkeypatch.setattr(agent_module, "ChatAnthropic", lambda **_kwargs: model)
-    agent = RagAgent(Settings(anthropic_api_key="fake-key"), retriever=retriever)
+    agent = RagAgent(Settings(anthropic_api_key="fake-key", **settings), retriever=retriever)
     return agent, model
 
 
@@ -301,9 +301,52 @@ async def test_unsourced_history_is_context_but_not_a_reuse_tool(monkeypatch) ->
 
 
 @pytest.mark.asyncio
-async def test_catalog_and_search_are_called_at_most_once_per_turn(monkeypatch) -> None:
-    retriever = FakeRetriever(global_results=[chunk()])
+async def test_agent_can_search_again_after_reading_results(monkeypatch) -> None:
+    first, second = chunk("c1"), chunk("c2", title="Otro documento")
+
+    class TwoStepRetriever(FakeRetriever):
+        async def search(self, _session, query, document_ids=None):
+            self.search_calls.append((query, document_ids))
+            return [first] if len(self.search_calls) == 1 else [first, second]
+
+    retriever = TwoStepRetriever()
     agent, model = make_agent(monkeypatch, retriever, [
+        {"name": "list_documents", "args": {}},
+        search_call("¿Cómo me matriculo?", ["d1"]),
+        search_call("Otro documento: requisitos", []),
+    ])
+
+    events = [event async for event in agent.stream(
+        ChatRequest(sessionId="s1", message="¿Qué trámite existe?", lang="es"), FakeSession()
+    )]
+
+    assert [query for query, _ in retriever.search_calls] == ["¿Cómo me matriculo?", "Otro documento: requisitos"]
+    values = [payload for mode, payload in events if mode == "values"][-1]
+    assert [item["chunk_id"] for item in values["retrieved"]] == ["c1", "c2"]
+    assert model.decision_calls == 1
+    assert len(model.decision_messages) == 4
+
+
+@pytest.mark.asyncio
+async def test_tool_calls_are_capped(monkeypatch) -> None:
+    retriever = FakeRetriever(global_results=[chunk()])
+    agent, _ = make_agent(
+        monkeypatch, retriever, [search_call(f"consulta {i}", []) for i in range(10)],
+        rag_max_tool_calls=3,
+    )
+
+    [event async for event in agent.stream(
+        ChatRequest(sessionId="s1", message="¿Qué trámite existe?", lang="es"), FakeSession()
+    )]
+
+    assert len(retriever.search_calls) == 3
+
+
+@pytest.mark.asyncio
+async def test_list_documents_is_cached(monkeypatch) -> None:
+    retriever = FakeRetriever(global_results=[chunk()])
+    agent, _ = make_agent(monkeypatch, retriever, [
+        {"name": "list_documents", "args": {}},
         {"name": "list_documents", "args": {}},
         search_call(document_ids=[]),
     ])
@@ -312,6 +355,4 @@ async def test_catalog_and_search_are_called_at_most_once_per_turn(monkeypatch) 
         ChatRequest(sessionId="s1", message="¿Qué trámite existe?", lang="es"), FakeSession()
     )]
 
-    assert model.decision_calls == 2
     assert retriever.list_calls == 1
-    assert len(retriever.search_calls) == 1

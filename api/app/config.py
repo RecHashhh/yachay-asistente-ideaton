@@ -21,7 +21,8 @@ class Settings(BaseSettings):
 
     rag_min_similarity: float = 0.30
     rag_vector_candidates: int = 20
-    rag_context_chunks: int = 4
+    rag_context_chunks: int = 8
+    rag_max_tool_calls: int = 6
     cors_origins: str = "http://localhost:5180,http://127.0.0.1:5180"
 
     @property
