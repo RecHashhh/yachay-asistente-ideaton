@@ -22,7 +22,7 @@ const saveConsent = () => { try { localStorage.setItem(KEY, '1'); } catch { /* m
 /** Revocar el consentimiento (LOPDP art. 12, num. 13) y borrar lo que este navegador guardó: conversaciones e idioma. */
 export function revokeConsent() {
   try {
-    for (const k of Object.keys(localStorage)) if (k.startsWith('yt-consent-') || k === 'yt-chats' || k === 'yt-lang') localStorage.removeItem(k);
+    for (const k of Object.keys(localStorage)) if (k.startsWith('yt-consent-') || k === 'yt-chats' || k === 'yt-lang' || k === 'yt-procedure-progress-v1') localStorage.removeItem(k);
     sessionStorage.clear();
   } catch { /* sin almacenamiento */ }
   location.reload();

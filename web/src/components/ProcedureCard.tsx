@@ -5,13 +5,27 @@ import { docHref, sendInquiry } from '../lib/api';
 import { locatorLabel, useT } from '../lib/i18n';
 import type { Procedure, Unknown } from '../lib/types';
 import { downloadIcs } from '../lib/ics';
-import { IcCalendar, IcCheck, IcMap, IcSend } from './icons';
+import { IcCalendar, IcCheck, IcCopy, IcMap, IcSend } from './icons';
+import { preparationText, usePreparation } from '../lib/procedureProgress';
 
 /** Guía paso a paso: qué es, qué documentos, en qué orden y dónde. El estudiante puede ir marcando los pasos. */
 export function ProcedureCard({ p, onShowMap }: { p: Procedure; onShowMap: (placeId: string) => void }) {
   const { t, lang } = useT();
-  const [done, setDone] = useState<number[]>([]);
-  const toggle = (i: number) => setDone((d) => (d.includes(i) ? d.filter((x) => x !== i) : [...d, i]));
+  const { value, toggle, reset, saveError } = usePreparation(p);
+  const done = value.steps;
+  const [copyStatus, setCopyStatus] = useState('');
+  const en = lang === 'en';
+  const total = p.documents.length + p.steps.length, completed = done.length + value.documents.length;
+  const nextDocument = p.documents.find((_, i) => !value.documents.includes(i));
+  const nextStep = p.steps.find((_, i) => !done.includes(i));
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(preparationText(p, value, lang)); setCopyStatus(en ? 'Guide copied' : 'Guía copiada'); }
+    catch { setCopyStatus(en ? 'Could not copy. Download the guide instead.' : 'No se pudo copiar. Puedes descargar la guía.'); }
+  };
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([preparationText(p, value, lang)], { type: 'text/plain;charset=utf-8' }));
+    const a = document.createElement('a'); a.href = url; a.download = `yachi-${(p.id ?? 'guia').replace(/[^a-z0-9_-]/gi, '-')}.txt`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
   const place = p.placeId ? placeById(p.placeId) : undefined;
   return (
     <motion.section className="proc" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} aria-label={p.title}>
@@ -20,14 +34,25 @@ export function ProcedureCard({ p, onShowMap }: { p: Procedure; onShowMap: (plac
         <p className="muted">{p.summary}</p>
         <dl className="proc-meta">
           <div><dt>{t('office')}</dt><dd>{p.office}</dd></div>
-          {p.duration && <div><dt>{t('time')}</dt><dd>{p.duration}</dd></div>}
+          <div><dt>{t('time')}</dt><dd>{p.duration || (en ? 'Not specified in the available source' : 'No especificado en la fuente disponible')}</dd></div>
           {place && <div><dt>{t('where')}</dt><dd><button className="linkish" onClick={() => onShowMap(place.id)}><IcMap width={14} height={14} />{placeName(place, lang)}</button></dd></div>}
         </dl>
       </header>
 
+      <div className="preparation-status">
+        <span>{en ? 'Your preparation' : 'Tu preparación'} <b className="mono">{completed}/{total}</b></span>
+        {completed > 0 && <button className="linkish small" onClick={reset}>{en ? 'Clear checks' : 'Limpiar marcas'}</button>}
+        <progress value={completed} max={Math.max(total, 1)} aria-label={en ? 'Personal preparation progress' : 'Progreso de preparación personal'} />
+        <span className="small">{nextDocument ? `${en ? 'Prepare next' : 'Por preparar'}: ${nextDocument}` : nextStep ? `${en ? 'Next step' : 'Siguiente paso'}: ${nextStep.title}` : (en ? 'You have checked every preparation item.' : 'Has marcado todos los elementos de preparación.')}</span>
+        <span className="small muted">{en ? 'Saved on this browser. Checking an item does not submit a request.' : 'Se guarda en este navegador. Marcar una tarea no envía una solicitud.'}</span>
+        {saveError && <span className="err small" role="alert">{en ? 'Could not save on this browser.' : 'No se pudo guardar en este navegador.'}</span>}
+      </div>
+
+      {!!p.requirements?.length && <div className="proc-block"><h3>{en ? 'Before you start' : 'Antes de empezar'}</h3><ul className="proc-docs">{p.requirements.map(r => <li key={r}>{r}</li>)}</ul></div>}
+
       <div className="proc-block">
         <h3>{t('docs')}</h3>
-        <ul className="proc-docs">{p.documents.map((d) => <li key={d}>{d}</li>)}</ul>
+        {p.documents.length ? <ul className="proc-docs checklist-docs">{p.documents.map((d, i) => <li key={d}><label><input type="checkbox" checked={value.documents.includes(i)} onChange={() => toggle('documents', i)} /><span>{d}</span></label></li>)}</ul> : <p className="muted small">{en ? 'The available source does not list specific documents. Check the current call or contact the office.' : 'La fuente disponible no enumera documentos específicos. Revisa la convocatoria vigente o consulta a la dependencia.'}</p>}
       </div>
 
       <div className="proc-block">
@@ -35,7 +60,7 @@ export function ProcedureCard({ p, onShowMap }: { p: Procedure; onShowMap: (plac
         <ol className="proc-steps">
           {p.steps.map((s, i) => (
             <motion.li key={i} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + i * 0.06 }}>
-              <button className="step-check" aria-pressed={done.includes(i)} aria-label={`${t('done')}: ${s.title}`} onClick={() => toggle(i)}>
+              <button className="step-check" aria-pressed={done.includes(i)} aria-label={`${t('done')}: ${s.title}`} onClick={() => toggle('steps', i)}>
                 {done.includes(i) ? <IcCheck /> : <span className="mono">{i + 1}</span>}
               </button>
               <div><b>{s.title}</b>{s.detail && <p className="muted small">{s.detail}</p>}</div>
@@ -50,7 +75,7 @@ export function ProcedureCard({ p, onShowMap }: { p: Procedure; onShowMap: (plac
             {p.deadlines.map((d) => (
               <li key={d.title}>
                 <span><b>{d.title}</b><span className="small muted"> · {fmtRange(d.start, d.end, lang)}</span></span>
-                {!p.deadlinesPast && <button className="btn sm" onClick={() => downloadIcs(d, `${p.title}. ${t('office')}: ${p.office}. ${p.source.title} (${t('version')} ${p.source.version}, ${p.source.locator}).`)}>
+                {!p.deadlinesPast && !deadlineEnded(d.end ?? d.start) && <button className="btn sm" onClick={() => downloadIcs(d, `${p.title}. ${t('office')}: ${p.office}. ${p.source.title} (${t('version')} ${p.source.version}, ${p.source.locator}).`)}>
                   <IcCalendar width={14} height={14} />{t('addCal')}<span className="sr">: {d.title}</span>
                 </button>}
               </li>
@@ -58,6 +83,12 @@ export function ProcedureCard({ p, onShowMap }: { p: Procedure; onShowMap: (plac
           </ul>
         </div>
       )}
+      {(!p.deadlines?.length) && <p className="small muted">{en ? 'No calendar dates are specified in this guide. Check the current call; relative deadlines in the steps still apply.' : 'Esta guía no fija fechas de calendario. Consulta la convocatoria vigente; revisa también los plazos relativos de los pasos.'}</p>}
+      {(!!p.contacts?.length || !!p.links?.length) && <details className="proc-block proc-contacts"><summary>{en ? 'Official contacts and links' : 'Contactos y enlaces oficiales'}</summary>
+        <div className="follow">{p.links?.filter(l => /^https:\/\//i.test(l.url)).map(l => <a className="btn sm" key={l.url} href={l.url} target="_blank" rel="noreferrer">{l.label}<span className="sr">{en ? ' (new tab)' : ' (nueva pestaña)'}</span></a>)}</div>
+        {p.contacts?.filter(c => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)).map(c => <p className="small" key={c.label + c.email}>{c.label}: <a href={`mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent(p.title)}`}>{c.email}</a></p>)}
+      </details>}
+      <div className="row"><button className="btn sm" onClick={() => void copy()}><IcCopy width={14} height={14} />{en ? 'Copy guide' : 'Copiar guía'}</button><button className="btn sm" onClick={download}>{en ? 'Download guide' : 'Descargar guía'}</button><span role="status" className="small">{copyStatus}</span></div>
       <footer className="small muted row">
         <span>{p.source.title} · {t('version')} {p.source.version} · {locatorLabel(p.source.locator, lang)}</span>
         <span className="sp" />
@@ -137,4 +168,10 @@ export function InquiryForm({ office, question, transcript, onCancel }: { office
 function fmtRange(start: string, end: string | undefined, lang: string) {
   const f = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString(lang === 'en' ? 'en-US' : 'es-EC', { day: 'numeric', month: 'short', year: 'numeric' });
   return end && end !== start ? `${f(start)} – ${f(end)}` : f(start);
+}
+
+function deadlineEnded(date: string) {
+  const parts = new Intl.DateTimeFormat('en', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const get = (type: string) => parts.find(p => p.type === type)!.value;
+  return date < `${get('year')}-${get('month')}-${get('day')}`;
 }

@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import filters, graph, processing, rules
+from . import filters, graph, procedures, processing, rules
 from .config import API_DIR, settings
 from .db import conn, open_pool
 from .search import vectors
@@ -101,6 +101,10 @@ async def chat(req: ChatRequest, request: Request):
 
 
 # ------------------------------------------------------------------ público
+
+@app.get('/procedures')
+def public_procedures(lang: str = 'es'):
+    return [graph.procedure_payload(p, 'en' if lang == 'en' else 'es')[0] for p in procedures._all()]
 
 @app.get("/topics")
 def topics():

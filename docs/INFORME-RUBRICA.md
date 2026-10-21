@@ -51,6 +51,14 @@ Verificación: `npm --prefix web run build`; seis pruebas de contratos HTTP con 
 
 ### Comparación con instituciones — fuentes consultadas el 20-10-2026
 
+**Avance funcional posterior en utilidad:** catálogo `#/guias` con búsqueda y pendientes; listas de documentos y pasos persistidas en el navegador; siguiente elemento por preparar; revisión compartida ES/EN que invalida marcas antiguas si cambia el contenido; copia/descarga con fuentes; calendario sin plazos vencidos; contactos/enlaces respaldados por citas. La base local contiene nueve guías: las siete previas más residencias y participación/FEYT. El corpus privado sigue fuera de GitHub. Las fuentes se comprueban de nuevo al ofrecer una guía, para evitar servir guías retiradas o con evidencia cambiada.
+
+Las consultas elípticas reconocibles conservan el trámite y responden al campo solicitado. Se distingue una justificación de ausencia a clase de una ausencia a órganos de cogobierno; si el fragmento no respalda la gestión académica, se deriva como falta de información. Un mapa con coordenadas reales ya no se sustituye por el esquema de ejemplo si comparte un identificador. Se corrigió además la altura del mapa interactivo.
+
+No se llenan con suposiciones tiempos totales, costos, enlaces de formularios ni fechas de nuevas convocatorias. Las tarjetas indican los datos ausentes y ofrecen el original o contacto documentado. La presencia literal de una cita demuestra trazabilidad textual, no corrección semántica absoluta ni superioridad frente a otros asistentes. La validación con estudiantes y la revisión institucional siguen pendientes.
+
+Evidencia de cierre de utilidad: 16 pruebas de backend, dos suites de Playwright, nueve guías activas y 36 comprobaciones de rutas/seguimiento ES/EN contra la base local. Se realizó además un recorrido normal de tres consultas por la API: guía de cambio de carrera, seguimiento de tiempo y mapa de biblioteca. Resultados y límites en `docs/utilidad-2026-10-20/verificacion.json`; las capturas quedan locales por contener información institucional. La compilación pasa con una advertencia de tamaño del paquete principal.
+
 Revisión documental de fuentes primarias, no una prueba de acceso autenticado a los productos. Las publicaciones históricas acreditan funciones descritas en esas fechas; no garantizan que todos los servicios sigan iguales hoy. «No documentado» no significa «inexistente».
 
 | Referente | Qué aporta y qué nos falta | Cómo orientar Yachi |

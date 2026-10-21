@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { LangContext, makeT, type Lang } from './lib/i18n';
 import { Admin } from './views/Admin';
 import { Chat } from './views/Chat';
+import { Guides } from './views/Guides';
 
 type Theme = 'light' | 'dark';
 const THEME_KEY = 'yt-theme';
@@ -25,6 +26,7 @@ const initialLang = (): Lang => {
 const route = () => {
   const h = location.hash;
   if (h.startsWith('#/admin')) return 'admin';
+  if (h.startsWith('#/guias')) return 'guides';
   if (h.startsWith('#/embed')) return 'embed';
   if (h.startsWith('#/voz')) return 'voice';
   return 'chat';
@@ -56,7 +58,7 @@ export function App() {
       <MotionConfig reducedMotion="user">
       {page === 'admin'
         ? <Admin theme={theme} toggleTheme={toggleTheme} />
-        : <Chat theme={theme} toggleTheme={toggleTheme} setLang={setLang} embed={page === 'embed'} voice={page === 'voice'} />}
+        : page === 'guides' ? <Guides setLang={setLang} /> : <Chat theme={theme} toggleTheme={toggleTheme} setLang={setLang} embed={page === 'embed'} voice={page === 'voice'} />}
       </MotionConfig>
     </LangContext.Provider>
   );

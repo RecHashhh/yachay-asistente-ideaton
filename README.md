@@ -47,6 +47,18 @@ Para la regresión visual, instalar Playwright en `web` (`npm --prefix web insta
 
 La comprobación opcional `api/tests/verify_postgres.py`, ejecutada desde `api` con el entorno virtual, usa exclusivamente una tabla temporal de PostgreSQL: verifica guardado y rollback completo si falla una fila durante el reemplazo. Requiere una base configurada con el esquema, pero no modifica el set persistente de la aplicación.
 
+### Utilidad: guías, preparación y seguimiento
+
+`/#/guias` permite buscar las guías respaldadas por el corpus y filtrar las listas personales pendientes. También se accede desde la barra lateral del chat. Documentos y pasos se pueden marcar; se indica qué falta preparar, se conservan las marcas en este navegador y se comparten entre idiomas. Una revisión distinta de la guía reinicia las marcas para evitar trasladar la preparación a instrucciones modificadas. Revocar el consentimiento borra también estas listas locales.
+
+Cada guía se puede copiar o descargar con sus fuentes. Las fechas vencidas no ofrecen «Añadir al calendario»; la exportación ICS valida fechas y respeta las líneas UTF-8 del formato. Los enlaces y contactos solo se cargan si tienen respaldo literal. Los datos no especificados por la fuente se señalan explícitamente. Marcar una lista no tramita, envía ni aprueba una solicitud.
+
+El backend ofrece `GET /procedures?lang=es|en`; vuelve a comprobar que las fuentes estén activas y las citas sigan disponibles. Las preguntas de seguimiento reconocibles, como «¿y los documentos?» o «¿cuánto tarda?», conservan el trámite y responden al campo solicitado. Una consulta de otro tema o de otro período no debe reutilizar automáticamente la guía anterior. Los mapas con coordenadas reales tienen prioridad sobre el plano esquemático del simulador.
+
+En la base local se han curado nueve guías, incluyendo residencias y participación/FEYT. Su contenido y las citas permanecen en el corpus autorizado, excluido del repositorio público. Para otro entorno, cargar el corpus y ejecutar `python -m app.procedures` con un `RAG_DIR/tramites.json` autorizado. El verificador exige evidencia de resumen, dependencia, documentos y pasos; verifica literalmente contactos/enlaces y la estructura ES/EN. No sustituye la revisión semántica humana.
+
+Prueba de interfaz: `node scripts/verificar-utilidad.cjs`, con los mismos requisitos de Playwright de arriba y datos sintéticos. Comprobación opcional de lectura real: `api/tests/verify_guides_live.py` desde `api`; verifica las guías del corpus local y el enrutamiento ES/EN, sin invocar al modelo ni registrar consultas. Las fechas de las convocatorias históricas no se actualizan por inferencia.
+
 ## Incrustar el asistente en cualquier página
 
 ```html

@@ -104,6 +104,8 @@ export const getTopics = (): Promise<Topic[]> => (MOCK ? Promise.resolve([...moc
 
 /** Documentos vigentes visibles para cualquier usuario (vista "Documentos disponibles"). */
 export const listPublicDocs = (): Promise<PublicDoc[]> => (MOCK ? Promise.resolve(mock.publicDocs()) : json('/docs'));
+export const listProcedures = (lang: 'es' | 'en' | 'qu'): Promise<import('./types').Procedure[]> =>
+  MOCK ? Promise.resolve([]) : json(`/procedures?lang=${lang}`);
 
 /** Enlace al original: en un PDF, directo a la página citada. */
 export const docHref = (url: string, page?: number) => (page ? `${url}#page=${page}` : url);

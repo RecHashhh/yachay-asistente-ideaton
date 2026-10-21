@@ -16,7 +16,7 @@ export function CampusMap({ action, scrollIntoView }: { action: MapAction; scrol
   useEffect(() => { if (scrollIntoView) ref.current?.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' }); }, [scrollIntoView, reduce, action.destino]);
   const dest = placeById(action.destino);
   const from = action.origen ? placeById(action.origen) : undefined;
-  if (!dest && action.lat !== undefined && action.lon !== undefined) return <RealPlace action={action} />;
+  if (action.lat !== undefined && action.lon !== undefined) return <RealPlace action={action} />;
   const extra = (action.resaltar ?? []).map(placeById).filter((p) => p && p.id !== dest?.id);
   if (!dest) return null;
 

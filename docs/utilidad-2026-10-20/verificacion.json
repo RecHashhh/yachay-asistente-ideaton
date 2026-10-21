@@ -1,0 +1,19 @@
+{
+  "fecha": "2026-10-20",
+  "alcance": "Utilidad funcional, contratos y recorridos; no es una evaluación factual exhaustiva ni un estudio con estudiantes",
+  "compilacion": { "resultado": "OK", "advertencia": "Paquete principal de JavaScript mayor de 500 kB; pendiente optimización de carga" },
+  "pruebas_backend": { "total": 16, "resultado": "OK", "modo": "Contratos y reglas con datos sintéticos; sin modelo" },
+  "catalogo_real": { "guias_activas": 9, "comprobaciones_es_en": 36, "resultado": "OK", "modo": "Lectura del corpus y PostgreSQL locales; sin generar ni registrar consultas" },
+  "playwright": {
+    "suite_utilidad": "Catálogo, búsqueda, progreso, persistencia, cambio de idioma, exportación, pendientes, revisión de guía, fechas, ICS y mapa",
+    "suite_regresion": "Menú, móvil, feedback, importación CSV, evaluación, costos y consultas administrativas",
+    "modo": "API simulada y datos sintéticos; resultados separados del servicio real"
+  },
+  "recorrido_real": {
+    "resultado": "OK",
+    "consultas_de_prueba": 3,
+    "comprobado": ["Catálogo de nueve guías", "Lectura en escritorio y móvil", "Seguimiento sobre tiempo no documentado sin inventarlo", "Fuentes visibles", "Mapa de biblioteca con altura visible"]
+  },
+  "contenido_privado": "Corpus, curación y capturas con contenido institucional excluidos del repositorio público",
+  "pendiente": ["Revisión factual institucional de cada campo y traducción", "Datos de nuevas convocatorias y tiempos no publicados", "Evaluación con estudiantes", "Voz con hardware real", "Certificación de accesibilidad"]
+}

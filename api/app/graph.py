@@ -155,7 +155,7 @@ async def route(state: State) -> State:
         return {**base, "route": "ood"}
     if t.route == "denuncia":
         return {**base, "route": "retrieve"}
-    proc = procedures.match(q)  # antes que la aclaración: "tercera matrícula" es un trámite concreto, no una consulta ambigua
+    proc = procedures.resolve(q, state.get('history') or [])
     if proc:
         return {"question": q, "route": "procedure", "proc": proc}
     if rules.clarify(q, state["lang"]):
@@ -174,14 +174,25 @@ async def procedure_answer(state: State) -> State:
     """Guía de trámite curada del corpus (cada paso con cita verificada): se responde sin modelo."""
     w = get_stream_writer()
     lang = state["lang"]
-    item, doc_ids = procedures.card(state["proc"], lang)
+    item, sources, doc_ids = procedure_payload(state['proc'], lang)
+    if procedures.is_followup(state['question']):
+        _say(procedures.followup_answer(item, state['question'], lang))
+        w({'type': 'sources', 'items': sources})
+        return {'kind': 'respuesta', 'doc_ids': doc_ids}
     _say(_t(lang, f"Esta es la guía para **{item['title'].lower()}**, armada con el documento oficial. Puedes ir marcando los pasos.",
             f"Here is the guide to **{item['title'].lower()}**, built from the official document. You can tick the steps as you go."))
-    src = _doc_source(doc_ids[0], state["proc"]["locator"], item["summary"])
-    w({"type": "procedure", "item": {**item, "source": src}})
-    sources = [s for s in [src] + [_doc_source(d, "", "") for d in doc_ids[1:]] if s]
+    w({"type": "procedure", "item": item})
     w({"type": "sources", "items": sources})
     return {"kind": "respuesta", "doc_ids": doc_ids}
+
+
+def procedure_payload(proc: dict, lang: str) -> tuple[dict, list[dict], list[str]]:
+    item, doc_ids = procedures.card(proc, lang)
+    quotes = {doc: next((ev['quote'] for ev in proc['evidence'] if ev['chunk_id'].split('#')[0] == doc), '') for doc in doc_ids}
+    sources = [src for doc in doc_ids if (src := _doc_source(doc, proc['locator'] if doc == doc_ids[0] else '', quotes[doc]))]
+    item['source'] = sources[0] if sources else {}
+    item['sources'] = sources
+    return item, sources, doc_ids
 
 
 async def crisis(state: State) -> State:
@@ -257,6 +268,12 @@ async def retrieve(state: State) -> State:
     prev = next((h["content"] for h in reversed(state.get("history") or []) if h.get("role") == "user"), "")
     query = f"{prev} {q}" if prev and len(q.split()) < 6 else q  # preguntas de seguimiento cortas ("¿y los requisitos?")
     hits = hybrid(query, k=5)
+    # Una ausencia de clase no es una ausencia de miembros de un órgano de cogobierno.
+    attendance = re.search(r'justific\w*.*(?:inasisten\w*|falta\w*|ausen\w*)|(?:absence|missed class).*justif|justif.*(?:absence|missed class)', rules.norm(q))
+    council = re.search(r'\b(csu|consejo|cogobierno|sesion\w*)\b', rules.norm(q))
+    if attendance and not council and not any(('clase' in h.texto.lower() or 'asignatura' in h.texto.lower()) and 'justific' in h.texto.lower() for h in hits):
+        w({'type': 'unknown', 'item': {'reason': 'sin_fuente', 'contact': _contact('academico', lang, q)}})
+        return {'hits': [], 'kind': 'sin_fuente', 'doc_ids': []}
     if not hits or (max(h.cos for h in hits) < MIN_COS and max(h.fts for h in hits) == 0):
         topic = "bienestar" if state.get("triage") == "denuncia" else (hits[0].topic_id if hits else None)
         w({"type": "unknown", "item": {"reason": "sin_fuente", "contact": _contact(topic, lang, state["question"])}})

@@ -7,6 +7,8 @@ import { useT } from '../lib/i18n';
 import type { MapAction } from '../lib/types';
 import { IcMap } from './icons';
 
+const tooltipText = (text: string) => { const el = document.createElement('span'); el.textContent = text; return el; };
+
 /**
  * Mapa real del campus (OpenStreetMap + Leaflet) con las coordenadas de los Excel de la universidad:
  * círculo en el destino, flecha desde el origen si la pregunta lo indica ("desde el rectorado") y el resto de lugares de referencia.
@@ -37,17 +39,17 @@ export default function RealMap({ action }: { action: MapAction }) {
       for (const p of ps) {
         if ((p.lat === lat && p.lon === lon) || (from && p.lat === from.lat && p.lon === from.lon)) continue;
         L.circleMarker([p.lat, p.lon], { radius: 4, color: muted, weight: 1, fillOpacity: 0.5 })
-          .bindTooltip(lang === 'en' ? p.nameEn ?? p.name : p.name).addTo(map);
+          .bindTooltip(tooltipText(lang === 'en' ? p.nameEn ?? p.name : p.name)).addTo(map);
       }
     }).catch(() => undefined);
 
     L.circle([lat, lon], { radius: 35, color: brand, weight: 3, fillOpacity: 0.12, className: reduce ? undefined : 'map-pulse' }).addTo(map);
     L.circleMarker([lat, lon], { radius: 8, color: '#fff', weight: 2, fillColor: brand, fillOpacity: 1 })
-      .bindTooltip(name, { permanent: true, direction: 'top', offset: [0, -8], className: 'map-tip' }).addTo(map);
+      .bindTooltip(tooltipText(name), { permanent: true, direction: 'top', offset: [0, -8], className: 'map-tip' }).addTo(map);
 
     if (from) {
       L.circleMarker([from.lat, from.lon], { radius: 6, color: brand, weight: 3, fillColor: '#fff', fillOpacity: 1 })
-        .bindTooltip(from.nombre, { direction: 'bottom' }).addTo(map);
+        .bindTooltip(tooltipText(from.nombre), { direction: 'bottom' }).addTo(map);
       // Flecha: la línea termina antes del círculo del destino y lleva una punta triangular.
       const dy = lat - from.lat, dx = lon - from.lon, len = Math.hypot(dx, dy) || 1e-9;
       const stop = Math.min(0.00035 / len, 0.3);
@@ -75,6 +77,7 @@ export default function RealMap({ action }: { action: MapAction }) {
         <span>
           <b>{name}</b>
           {from && <span className="muted"> · {lang === 'en' ? 'from' : 'desde'} {from.nombre}</span>}
+          {from && <span className="small muted"> · {lang === 'en' ? 'Straight-line reference; use walking directions for the route.' : 'Referencia en línea recta; consulta la ruta peatonal para llegar.'}</span>}
           {action.horario && <span className="muted"> · {t('hours')}: {action.horario}</span>}
         </span>
         <span className="sp" />

@@ -104,6 +104,9 @@ export interface RealPlaceInfo { id: string; name: string; nameEn: string | null
 
 /** Guía paso a paso de un trámite: qué es, qué se necesita, en qué orden y dónde. Sale de un documento fuente, nunca del modelo solo. */
 export interface Procedure {
+  id?: string;
+  revision?: string;
+  period?: string | null;
   title: string;
   summary: string;
   office: string;
@@ -112,6 +115,10 @@ export interface Procedure {
   documents: string[];
   steps: { title: string; detail?: string }[];
   source: Source;
+  sources?: Source[];
+  contacts?: { label: string; email: string }[];
+  links?: { label: string; url: string }[];
+  requirements?: string[];
   /** Plazos del trámite (del calendario académico) para "Añadir al calendario". */
   deadlines?: { title: string; start: string; end?: string }[];
   /** Los plazos son de un período ya terminado: se muestran como referencia, sin "Añadir al calendario". */
