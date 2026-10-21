@@ -5,3 +5,9 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
+rag/*
+!rag/descripciones.csv
+!rag/README.md
+__pycache__/
+.pytest_cache/
+*.py[cod]

@@ -284,7 +284,7 @@ function AssistantMsg({ m, onVote, onRetry, onAsk, onShowMap }: { m: Msg; onVote
           <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div className="sources" aria-label={t('sources')}>
               {m.sources.map((s) => (
-                <button key={srcKey(s)} className="src" aria-expanded={openSrc === srcKey(s)} onClick={() => setOpenSrc(openSrc === srcKey(s) ? null : srcKey(s))} title={`${s.title} · ${s.version} · ${s.docDate}`}>
+                <button key={srcKey(s)} className="src" aria-expanded={openSrc === srcKey(s)} onClick={() => setOpenSrc(openSrc === srcKey(s) ? null : srcKey(s))} title={`${s.title} · ${s.version}${s.docDate ? ` · ${s.docDate}` : ''}`}>
                   <span className="kind">{s.version}</span><span className="t">{s.title}</span>
                 </button>
               ))}
@@ -293,7 +293,7 @@ function AssistantMsg({ m, onVote, onRetry, onAsk, onShowMap }: { m: Msg; onVote
               {src && (
                 <motion.div className="src-detail" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
                   <b>{src.title}</b>
-                  <span className="mono small">{t('version')} {src.version} · {t('docOf')} {src.docDate}{src.locator ? ` · ${src.locator}` : ''}</span>
+                  <span className="mono small">{t('version')} {src.version}{src.docDate ? ` · ${t('docOf')} ${src.docDate}` : ''}{src.locator ? ` · ${src.locator}` : ''}</span>
                   <span>“{src.snippet}”</span>
                 </motion.div>
               )}

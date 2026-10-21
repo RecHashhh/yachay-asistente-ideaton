@@ -1,11 +1,12 @@
 # Asistente institucional Yachay Tech
 
-Chatbot público de la universidad. Responde con los documentos que cargan los administradores (PDF, XLSX, CSV), cita la fuente con su versión y su fecha, y puede marcar lugares en el mapa del campus.
+Prototipo del chatbot público de la universidad. Responde con documentos fuente, cita su período de vigencia y sección, y puede marcar lugares en el mapa del campus.
 
 ```
 IDEATHON/
   web/   Frontend React + Vite + motion (este paso)
-  api/   Backend LangChain + LangGraph (siguiente paso)
+  api/   Backend FastAPI + LangChain/LangGraph
+  rag/   Corpus Markdown y fragmentos para el índice RAG
 ```
 
 ## Correr el frontend
@@ -64,41 +65,49 @@ Aparece un botón con la mascota abajo a la derecha; al tocarlo se abre un chat 
 
 ## Contrato con el backend
 
+El backend inicial implementa `POST /chat` y `GET /health`. Los endpoints de tendencias, temas y administración siguen siendo parte del simulador del frontend.
+
 | Método | Ruta | Uso |
 |---|---|---|
-| POST | `/chat` | `ChatRequest` → `text/event-stream` con `StreamEvent` (`status`, `token`, `tool`, `sources`, `suggestions`, `done`, `error`) |
+| POST | `/chat` | `ChatRequest` → `text/event-stream` (`status`, `token`, `unknown`, `sources`, `suggestions`, `done`, `error`) |
+| GET | `/health` | Estado de PostgreSQL y conteo de documentos y fragmentos indexados |
 | GET | `/trends` | Consultas más frecuentes de los últimos 7 días |
 | GET | `/topics` | Temas consultables |
 | POST | `/admin/login` | Devuelve un token. Sugerido: Microsoft Entra ID con el tenant de la universidad |
 | GET/POST/DELETE | `/admin/docs` | Listar, subir (multipart con metadatos) y quitar documentos |
 | POST | `/admin/topics` | Crear un tema |
 
-## Backend propuesto (LangChain + LangGraph)
+## Backend RAG con Docker Compose
 
-**Ingesta.** Cuando el administrador sube un archivo:
-1. Se lee según el tipo: PDF con `PyPDFLoader` (una página por documento); XLSX y CSV fila por fila, convirtiendo cada fila en texto `columna: valor` con su hoja y número de fila.
-2. Se parte en fragmentos de unos 800 tokens con 100 de traslape. Las tablas se parten por grupos de filas, nunca a mitad de fila.
-3. Cada fragmento lleva los metadatos `doc_id`, `topic_id`, `version`, `doc_date`, `origin`, `url`, `locator` (página, hoja o fila) y `is_current`.
-4. Al subir una versión nueva se marca `is_current=false` en la anterior. No se borra, para poder auditar.
+El Compose levanta PostgreSQL 17 con pgvector, el servicio de carga inicial y la API. El frontend no está dentro de Compose.
 
-**Consulta (grafo LangGraph):**
+1. Copia el archivo de entorno y configura las claves:
+
+```bash
+cp .env.example .env
+# Edita .env: ANTHROPIC_API_KEY
 ```
-entrada → caché semántica ──(acierto)──────────────────────────→ respuesta
-             └─(fallo)→ router de tema (modelo pequeño) → recuperación híbrida filtrada
-                         → reordenar (top 4) → modelo de respuesta con herramienta
-                           mostrar_en_mapa → stream SSE
+
+2. Construye y arranca los servicios:
+
+```bash
+docker compose up --build
 ```
-- La recuperación filtra por `is_current=true` y por el tema que detecta el router, y combina BM25 con vectores.
-- La herramienta `mostrar_en_mapa(destino, origen?, resaltar?)` solo acepta los `id` de `campus.ts`. El modelo nunca ve coordenadas.
-- Si ningún fragmento pasa el umbral de relevancia, el asistente dice que no lo sabe en vez de inventar.
 
-## Estrategias para gastar menos tokens
+Compose levanta Ollama y descarga el modelo de embeddings al volumen persistente `ollama_data`. Después, el servicio `seed` aplica las migraciones y sincroniza `rag/chunks.jsonl`, `rag/fuentes.csv` y `rag/descripciones.csv`. Guarda un resumen por documento en `documents.description` y genera embeddings locales para fragmentos nuevos o modificados; una segunda ejecución sin cambios no vuelve a generarlos. La base de datos conserva sus datos en el volumen `postgres_data`.
 
-1. **Caché semántica.** Si una pregunta nueva es casi igual a una ya respondida (similitud mayor a 0.95, con el mismo tema y la misma versión de los documentos), se devuelve la respuesta guardada sin llamar al modelo. Las preguntas de las tendencias son las que más se repiten.
-2. **Caché de prompt.** El prompt de sistema, la lista de lugares y la definición de la herramienta van primero y no cambian, así se cachean y cuestan una fracción del precio en cada llamada.
-3. **Router barato.** Un modelo pequeño (Haiku) clasifica el tema y descarta saludos y preguntas fuera de alcance. El modelo grande solo responde cuando hay contexto útil.
-4. **Pocos fragmentos y buenos.** Se recuperan unos 20 y el reordenador se queda con 4, en vez de mandar 10 o más al modelo.
-5. **Historial corto.** El frontend envía solo los últimos 6 turnos (`HISTORY_TURNS` en `Chat.tsx`). El backend resume lo anterior en 2 o 3 líneas.
-6. **Tablas precalculadas.** Las preguntas de valores exactos (aranceles, horarios) se responden con una búsqueda estructurada sobre el CSV o XLSX, no metiendo la tabla completa en el prompt.
-7. **Límite de salida.** `max_tokens` de unos 600 y la instrucción de responder breve y con listas.
-8. **Sugerencias sin modelo.** Las preguntas de seguimiento salen de las tendencias del mismo tema, no de otra llamada al modelo.
+Ollama reserva una GPU NVIDIA para calcular embeddings. El host debe tener un driver NVIDIA activo y NVIDIA Container Toolkit configurado para Docker; Compose pasa una GPU al contenedor de Ollama.
+
+```bash
+docker compose run --rm seed  # volver a sincronizar el corpus
+docker compose down           # detener servicios, conservar datos
+docker compose down -v        # eliminar también la base local
+```
+
+API: `http://localhost:8000`; salud: `http://localhost:8000/health`. PostgreSQL se publica solo en `localhost:5432`. La búsqueda combina distancia coseno en pgvector y búsqueda textual PostgreSQL; LangGraph responde con hasta cuatro fragmentos. Sin fragmentos sobre el umbral de relevancia, emite `unknown`.
+
+La configuración de los modelos está en `.env.example`: Ollama usa `bge-m3` para embeddings de 1024 dimensiones y Anthropic usa Haiku para redactar respuestas. `OLLAMA_EMBEDDING_MODEL` se puede cambiar por otro modelo compatible de 1024 dimensiones; si se cambia, la carga vuelve a calcular los vectores. Las claves de Anthropic no deben guardarse en Git.
+
+Para una integración futura del chat web, define `VITE_API_URL=http://localhost:8000` en `web/.env.local` y habilita el origen correspondiente en `CORS_ORIGINS`. El frontend también llama a `/trends` y `/topics`; esas funciones requieren implementar esos endpoints antes de activar la API en toda la interfaz.
+
+`fecha_consulta` se conserva como metadato de la fuente y no se presenta como fecha de publicación. El historial se procesa en la petición, sin almacenarse en PostgreSQL. Esta etapa no incluye adjuntos, autenticación, administración de documentos, tendencias, temas ni feedback.
