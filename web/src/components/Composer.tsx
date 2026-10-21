@@ -31,7 +31,7 @@ interface Props {
  * Caja de texto con lo que ya usa el Help Desk de RIPCON: dictado por voz, adjuntar imagen o PDF,
  * capturar pantalla y pegar capturas con Ctrl+V.
  */
-export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy, disabled, attachmentsEnabled = true, autoFocus, hints = [], onHint, toast }: Props) {
+export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy, disabled, attachmentsEnabled = true, autoFocus, hints = [], onHint, toast, onVoice }: Props) {
   const { t, lang } = useT();
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);

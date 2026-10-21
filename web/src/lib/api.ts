@@ -6,8 +6,23 @@ const API = ((import.meta.env.VITE_API_URL as string | undefined) ?? '').replace
 /** El agente usa el backend si se configura VITE_API_URL; las demás funciones todavía son de ejemplo. */
 export const CHAT_MOCK = !API;
 export const SAMPLE_DATA = true;
+/** Los endpoints de administración, guías y demás aún no existen en este backend: usan datos locales. */
+export const MOCK = true;
 
 const ADMIN_TOKEN_KEY = 'yt-admin-token';
+const adminToken = () => { try { return sessionStorage.getItem(ADMIN_TOKEN_KEY) ?? ''; } catch { return ''; } };
+
+async function json<T>(path: string, init?: RequestInit): Promise<T> {
+  const r = await fetch(API + path, { ...init, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken()}`, ...init?.headers } });
+  if (!r.ok) {
+    // FastAPI responde {"detail": "..."}: se muestra el mensaje, no el JSON.
+    const raw = await r.text();
+    let msg = raw || r.statusText;
+    try { const d = (JSON.parse(raw) as { detail?: unknown }).detail; if (typeof d === 'string') msg = d; } catch { /* texto plano */ }
+    throw new Error(msg);
+  }
+  return r.json() as Promise<T>;
+}
 
 const connectionError = (lang: ChatRequest['lang']) => lang === 'en'
   ? 'Could not connect to the assistant. Check that the backend is running and try again.'
@@ -64,11 +79,14 @@ export async function* streamChat(req: ChatRequest, signal?: AbortSignal): Async
 export const getTrends = (lang: 'es' | 'en' | 'qu' = 'es'): Promise<Trend[]> =>
   Promise.resolve(mock.trends.map((t) => ({ ...t, query: lang === 'en' ? mock.trendsEn[t.query] ?? t.query : t.query })));
 
-/** El backend aún no guarda feedback; se conserva la interacción local de la interfaz. */
-export function sendFeedback(messageId: string, vote: 'up' | 'down'): Promise<void> {
-  void messageId;
-  void vote;
-  return Promise.resolve();
+/** Voto de utilidad de una respuesta; alimenta la revisión semanal de respuestas marcadas como no útiles. */
+export function sendFeedback(messageId: string, vote: 'up' | 'down', ctx?: { question: string; lang: 'es' | 'en' | 'qu'; reason?: inbox.FeedbackReason }): Promise<void> {
+  if (MOCK) {
+    // Un voto negativo también llega a la bandeja "Sin respuesta" para revisarlo.
+    if (vote === 'down' && ctx) inbox.recordUnanswered(ctx.question, ctx.lang, 'voto_negativo', ctx.reason);
+    return Promise.resolve();
+  }
+  return json('/feedback', { method: 'POST', body: JSON.stringify({ messageId, vote, reason: ctx?.reason }) }).then(() => undefined);
 }
 
 export type { FeedbackReason, InboxItem, InboxStatus, Inquiry } from './inbox';
@@ -101,7 +119,14 @@ export type { ControlResult } from './mock';
 export const runControl = (onProgress?: (n: number) => void) =>
   mock.runControl(onProgress);
 export const controlSize = () => mock.controlSet.length;
-export const getTopics = (): Promise<Topic[]> => Promise.resolve([...mock.topics]);
+export const listControlCases = (): Promise<import('./mock').ControlCase[]> =>
+  MOCK ? Promise.resolve([...mock.controlSet]) : json('/admin/validation/cases');
+/** Reemplaza el set de control (importado desde CSV en el portal). */
+export const replaceControlSet = async (cases: import('./mock').ControlCase[]): Promise<void> => {
+  if (MOCK) { mock.controlSet.splice(0, mock.controlSet.length, ...cases); return; }
+  await json('/admin/validation/cases', { method: 'PUT', body: JSON.stringify({ cases }) });
+};
+export const getTopics = (): Promise<Topic[]> => (MOCK ? Promise.resolve([...mock.topics]) : json('/topics'));
 
 /** Documentos vigentes visibles para cualquier usuario (vista "Documentos disponibles"). */
 export const listPublicDocs = (): Promise<PublicDoc[]> => (MOCK ? Promise.resolve(mock.publicDocs()) : json('/docs'));
@@ -171,5 +196,21 @@ export function createTopic(t: Omit<Topic, 'id'>): Promise<Topic> {
 
 /** La administración sigue en modo de ejemplo hasta que existan sus endpoints en el backend. */
 export function uploadDoc(input: UploadInput, onProgress: (p: number) => void): Promise<DocMeta> {
-  return mock.mockUpload(input, onProgress);
+  if (MOCK) return mock.mockUpload(input, onProgress);
+  return new Promise((resolve, reject) => {
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(input)) if (v !== undefined) fd.append(k, v as string | Blob);
+    const x = new XMLHttpRequest();
+    x.open('POST', `${API}/admin/docs`);
+    x.setRequestHeader('Authorization', `Bearer ${adminToken()}`);
+    x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100)); };
+    x.onload = () => {
+      if (x.status < 300) { resolve(JSON.parse(x.responseText) as DocMeta); return; }
+      let msg = x.responseText || `Error ${x.status}`;
+      try { const d = (JSON.parse(x.responseText) as { detail?: unknown }).detail; if (typeof d === 'string') msg = d; } catch { /* texto plano */ }
+      reject(new Error(msg));
+    };
+    x.onerror = () => reject(new Error('No se pudo subir el archivo'));
+    x.send(fd);
+  });
 }
