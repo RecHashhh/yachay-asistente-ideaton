@@ -11,6 +11,17 @@ IDEATHON/
 
 ## Correr el frontend
 
+Para preguntar al agente RAG, configura el frontend y levanta el backend en terminales separadas:
+
+```bash
+cp web/.env.example web/.env.local
+cp .env.example .env
+# Edita .env y agrega ANTHROPIC_API_KEY
+docker compose up --build
+```
+
+En otra terminal:
+
 ```bash
 cd web
 npm install
@@ -21,7 +32,7 @@ npm run dev          # http://localhost:5180
 - Widget incrustado en otra página (estilo Messenger): `http://localhost:5180/demo-sitio.html`
 - Portal de administración: `http://localhost:5180/#/admin`. En modo de ejemplo entra cualquier correo `@yachaytech.edu.ec` con una contraseña de 4 caracteres o más.
 
-Si `VITE_API_URL` está vacío (ver `.env.example`), todo funciona con el simulador `web/src/lib/mock.ts`. Los datos de ejemplo **no son información oficial**.
+`web/.env.local` conecta el chat a `http://localhost:8000`. Para usar el agente simulado, elimina ese archivo o deja `VITE_API_URL` vacío y reinicia Vite. Las sugerencias, tendencias, temas y administración siguen usando datos de ejemplo porque esos endpoints aún no existen en el backend; esos datos **no son información oficial**.
 
 ## Incrustar el asistente en cualquier página
 
@@ -65,17 +76,12 @@ Aparece un botón con la mascota abajo a la derecha; al tocarlo se abre un chat 
 
 ## Contrato con el backend
 
-El backend inicial implementa `POST /chat` y `GET /health`. Los endpoints de tendencias, temas y administración siguen siendo parte del simulador del frontend.
+El backend implementa `POST /chat` y `GET /health`. El chat envía el texto, idioma e historial reciente al agente y consume la respuesta SSE. El resto de las funciones listadas abajo permanece en el simulador del frontend.
 
 | Método | Ruta | Uso |
 |---|---|---|
 | POST | `/chat` | `ChatRequest` → `text/event-stream` (`status`, `token`, `unknown`, `sources`, `suggestions`, `done`, `error`) |
 | GET | `/health` | Estado de PostgreSQL y conteo de documentos y fragmentos indexados |
-| GET | `/trends` | Consultas más frecuentes de los últimos 7 días |
-| GET | `/topics` | Temas consultables |
-| POST | `/admin/login` | Devuelve un token. Sugerido: Microsoft Entra ID con el tenant de la universidad |
-| GET/POST/DELETE | `/admin/docs` | Listar, subir (multipart con metadatos) y quitar documentos |
-| POST | `/admin/topics` | Crear un tema |
 
 ## Backend RAG con Docker Compose
 
@@ -108,6 +114,6 @@ API: `http://localhost:8000`; salud: `http://localhost:8000/health`. PostgreSQL 
 
 La configuración de los modelos está en `.env.example`: Ollama usa `bge-m3` para embeddings de 1024 dimensiones y Anthropic usa Haiku para redactar respuestas. `OLLAMA_EMBEDDING_MODEL` se puede cambiar por otro modelo compatible de 1024 dimensiones; si se cambia, la carga vuelve a calcular los vectores. Las claves de Anthropic no deben guardarse en Git.
 
-Para una integración futura del chat web, define `VITE_API_URL=http://localhost:8000` en `web/.env.local` y habilita el origen correspondiente en `CORS_ORIGINS`. El frontend también llama a `/trends` y `/topics`; esas funciones requieren implementar esos endpoints antes de activar la API en toda la interfaz.
+El frontend ya conecta el chat con `/chat` mediante `VITE_API_URL=http://localhost:8000` en `web/.env.local`. El CORS del backend permite los orígenes locales de Vite. `/health` se puede consultar para verificar que la base y el índice estén disponibles. Las preguntas y respuestas usan el agente real; las tarjetas de sugerencias, tendencias, temas y el portal de administración siguen siendo de ejemplo.
 
 `fecha_consulta` se conserva como metadato de la fuente y no se presenta como fecha de publicación. El historial se procesa en la petición, sin almacenarse en PostgreSQL. Esta etapa no incluye adjuntos, autenticación, administración de documentos, tendencias, temas ni feedback.

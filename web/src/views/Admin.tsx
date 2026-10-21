@@ -4,7 +4,7 @@ import { BRAND } from '../config';
 import { Mascot } from '../components/Mascot';
 import { IcArrowLeft, IcMoon, IcSun, IcTrash, IcUpload } from '../components/icons';
 import { Cost, Validation } from './AdminExtras';
-import { MOCK, adminLogin, adminLogout, createTopic, deleteDoc, getTopics, getTrends, listDocs, uploadDoc, type Admin as AdminUser } from '../lib/api';
+import { SAMPLE_DATA, adminLogin, adminLogout, createTopic, deleteDoc, getTopics, getTrends, listDocs, uploadDoc, type Admin as AdminUser } from '../lib/api';
 import type { DocMeta, Topic, Trend } from '../lib/types';
 
 type Tab = 'docs' | 'upload' | 'topics' | 'trends' | 'validation' | 'cost';
@@ -43,7 +43,7 @@ export function Admin({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggleT
         <a className="icon-btn" href="#/" aria-label="Volver al chat"><IcArrowLeft /></a>
         <Mascot size={28} />
         <b>Base de conocimiento</b>
-        {MOCK && <span className="badge-demo">Datos de ejemplo</span>}
+        {SAMPLE_DATA && <span className="badge-demo">Datos de ejemplo</span>}
         <span className="sp" />
         <nav className="tabs" aria-label="Secciones">
           {([['docs', 'Documentos'], ['upload', 'Subir'], ['topics', 'Temas'], ['trends', 'Tendencias'], ['validation', 'Validación'], ['cost', 'Costo']] as [Tab, string][]).map(([k, l]) => (

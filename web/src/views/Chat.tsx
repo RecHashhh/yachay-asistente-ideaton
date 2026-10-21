@@ -8,7 +8,7 @@ import { Markdown } from '../components/Markdown';
 import { Mascot } from '../components/Mascot';
 import { ProcedureCard, UnknownCard } from '../components/ProcedureCard';
 import { IcChat, IcCheck, IcClose, IcCopy, IcDown, IcExpand, IcGlobe, IcInfo, IcLock, IcMenu, IcMoon, IcPlus, IcRetry, IcShield, IcSun, IcTrend, IcUp } from '../components/icons';
-import { MOCK, getTopics, getTrends, sendFeedback, streamChat } from '../lib/api';
+import { CHAT_MOCK, getTopics, getTrends, sendFeedback, streamChat } from '../lib/api';
 import { LANGS, detectLang, useT, type Lang } from '../lib/i18n';
 import type { Attachment, ChatTurn, MapAction, Procedure, Source, Topic, Trend, Unknown } from '../lib/types';
 
@@ -98,6 +98,10 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
   async function send(raw: string, base: Msg[] = msgs, att: Attachment[] = files) {
     const text = raw.trim();
     if ((!text && !att.length) || busy || !consent) return;
+    if (!CHAT_MOCK && att.length) {
+      setToastMsg(t('chatTextOnly'));
+      return;
+    }
     setInput(''); setFiles([]);
     const user: Msg = { id: uid(), role: 'user', text, files: att.length ? att : undefined };
     const ai: Msg = { id: uid(), role: 'assistant', text: '', streaming: true, status: t('thinking') };
@@ -142,7 +146,7 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
 
   const composer = (
     <Composer value={input} onChange={setInput} files={files} onFiles={setFiles} onSend={() => void send(input)} onStop={stop} busy={busy}
-      disabled={!consent} autoFocus={empty && !embed} hints={empty ? [] : hints} onHint={(q) => void send(q)} toast={setToastMsg} />
+      disabled={!consent} attachmentsEnabled={CHAT_MOCK} autoFocus={empty && !embed} hints={empty ? [] : hints} onHint={(q) => void send(q)} toast={setToastMsg} />
   );
 
   const langBanner = (
@@ -190,7 +194,7 @@ export function Chat({ theme, toggleTheme, setLang, embed }: Props) {
             <button className="icon-btn" aria-label={t('recent')} onClick={() => (window.matchMedia('(max-width: 820px)').matches ? setMobileRail(true) : setRailOpen((o) => !o))}><IcMenu /></button>
           )}
           <span className="title">{BRAND.mascotName}</span>
-          {MOCK && <span className="badge-demo" title="Sin backend: respuestas simuladas con datos de ejemplo">{t('demo')}</span>}
+          {CHAT_MOCK && <span className="badge-demo" title={t('demoTitle')}>{t('demo')}</span>}
           <span className="sp" />
           {langSelect}
           {!empty && <button className="icon-btn" aria-label={t('newChat')} onClick={newChat}><IcPlus /></button>}
@@ -273,7 +277,7 @@ function AssistantMsg({ m, onVote, onRetry, onAsk, onShowMap }: { m: Msg; onVote
         <AnimatePresence mode="wait">
           {m.status && (
             <motion.span key={m.status} className="status" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.2 }}>
-              <span className="shimmer">{m.status}…</span>
+              <span className="shimmer">{m.status.replace(/[.…]+$/, '')}…</span>
             </motion.span>
           )}
         </AnimatePresence>

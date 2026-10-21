@@ -17,6 +17,7 @@ interface Props {
   onStop: () => void;
   busy: boolean;
   disabled?: boolean;
+  attachmentsEnabled?: boolean;
   autoFocus?: boolean;
   /** Preguntas parecidas mientras escribe (de las tendencias). */
   hints?: string[];
@@ -28,7 +29,7 @@ interface Props {
  * Caja de texto con lo que ya usa el Help Desk de RIPCON: dictado por voz, adjuntar imagen o PDF,
  * capturar pantalla y pegar capturas con Ctrl+V.
  */
-export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy, disabled, autoFocus, hints = [], onHint, toast }: Props) {
+export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy, disabled, attachmentsEnabled = true, autoFocus, hints = [], onHint, toast }: Props) {
   const { t, lang } = useT();
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -55,6 +56,7 @@ export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy
 
   // Pegar capturas con Ctrl+V en cualquier parte de la página.
   useEffect(() => {
+    if (!attachmentsEnabled) return;
     const on = (e: ClipboardEvent) => {
       const f = [...(e.clipboardData?.files ?? [])];
       if (f.length) { e.preventDefault(); add(f); }
@@ -125,15 +127,17 @@ export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (canSend) onSend(); } }} />
         <div className="composer-bar">
-          <button type="button" className="icon-btn" title={t('attach')} aria-label={t('attach')} onClick={() => fileRef.current?.click()} disabled={disabled || files.length >= MAX_FILES}><IcClip /></button>
-          <button type="button" className="icon-btn" title={t('capture')} aria-label={t('capture')} onClick={capture} disabled={disabled || files.length >= MAX_FILES}><IcCapture /></button>
+          {attachmentsEnabled && <>
+            <button type="button" className="icon-btn" title={t('attach')} aria-label={t('attach')} onClick={() => fileRef.current?.click()} disabled={disabled || files.length >= MAX_FILES}><IcClip /></button>
+            <button type="button" className="icon-btn" title={t('capture')} aria-label={t('capture')} onClick={capture} disabled={disabled || files.length >= MAX_FILES}><IcCapture /></button>
+          </>}
           <button type="button" className={`icon-btn mic${rec ? ' on' : ''}`} title={t('mic')} aria-label={t('mic')} aria-pressed={!!rec} onClick={mic} disabled={disabled}><IcMic /></button>
           <span className="sp" />
           {busy
             ? <button type="button" className="send" onClick={onStop} aria-label={t('stop')}><IcStop /></button>
             : <button type="submit" className="send" disabled={!canSend} aria-label={t('send')}><IcSend /></button>}
         </div>
-        <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple hidden onChange={(e) => { add([...(e.target.files ?? [])]); e.target.value = ''; }} />
+        {attachmentsEnabled && <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple hidden onChange={(e) => { add([...(e.target.files ?? [])]); e.target.value = ''; }} />}
       </form>
       <AnimatePresence>
         {zoom && (
