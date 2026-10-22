@@ -98,12 +98,35 @@ def test_forwarded_as_attachment_processes_the_original_message() -> None:
     forward.set_content("Reenvío el comunicado.")
     forward.add_attachment(make_email())
 
-    # El remitente que se valida es quien reenvía; el contenido es el del comunicado original.
-    email = parse_email(forward.as_bytes(), ALLOWED | {"kevin@yachaytech.edu.ec"})
+    # Quien reenvía debe estar autorizado; el contenido (fecha, asunto, Message-ID) es el del comunicado original.
+    email = parse_email(forward.as_bytes(), ALLOWED, {"kevin@yachaytech.edu.ec"})
     assert email.subject == "Retiro por caso Fortuito o Fuerza Mayor"
     assert email.message_id == "<abc123@prod.outlook.com>"
-    with pytest.raises(IngestError):
+    assert email.sender == "comunicacion@yachaytech.edu.ec"
+    assert email.forwarded_by == "kevin@yachaytech.edu.ec"
+    with pytest.raises(IngestError, match="remitente no permitido"):
         parse_email(forward.as_bytes(), ALLOWED)
+
+
+def test_inline_forward_is_rejected_because_it_loses_the_original() -> None:
+    inline = EmailMessage()
+    inline["From"] = "Kevin <kevin@yachaytech.edu.ec>"
+    inline["Subject"] = "RV: Entérate- Retiro por caso Fortuito"
+    inline.set_content("De: Comunicación YachayTech\n\n" + BODY)
+
+    with pytest.raises(IngestError, match="como archivo adjunto"):
+        parse_email(inline.as_bytes(), ALLOWED, {"kevin@yachaytech.edu.ec"})
+
+
+def test_forwarded_original_must_come_from_an_official_source() -> None:
+    forward = EmailMessage()
+    forward["From"] = "Kevin <kevin@yachaytech.edu.ec>"
+    forward["Subject"] = "RV: aviso"
+    forward.set_content("Reenvío.")
+    forward.add_attachment(make_email("Compañero <alguien@gmail.com>"))
+
+    with pytest.raises(IngestError, match="fuente oficial"):
+        parse_email(forward.as_bytes(), ALLOWED, {"kevin@yachaytech.edu.ec"})
 
 
 def test_build_documents_titles_body_with_date_and_stable_id() -> None:

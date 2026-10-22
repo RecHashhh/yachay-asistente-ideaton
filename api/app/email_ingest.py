@@ -90,6 +90,7 @@ class ParsedEmail:
     sent_at: date
     body: str
     attachments: list[tuple[str, bytes]]  # (nombre del archivo, bytes del PDF)
+    forwarded_by: str | None = None  # quién lo reenvió al buzón robot, para la trazabilidad
 
 
 @dataclass(frozen=True)
@@ -189,19 +190,33 @@ def same_title(a: str, b: str) -> bool:
     )
 
 
-def parse_email(raw: bytes, allowed_senders: set[str]) -> ParsedEmail:
+def _sender(message: EmailMessage) -> str:
+    return parseaddr(str(message.get("From", "")))[1].lower()
+
+
+def parse_email(raw: bytes, allowed_senders: set[str], forwarders: set[str] = frozenset()) -> ParsedEmail:
+    """Acepta un comunicado enviado por una fuente oficial, o reenviado COMO ADJUNTO por alguien autorizado.
+
+    El reenvío normal pega el texto bajo un "RV:" y pierde fecha, remitente y Message-ID originales; el reenvío
+    como adjunto conserva el correo original intacto, y además se exige que ese original venga de una fuente oficial.
+    """
     outer = BytesParser(policy=policy.default).parsebytes(raw)
-    sender = parseaddr(str(outer.get("From", "")))[1].lower()
-    if sender not in allowed_senders:
-        raise IngestError(f"remitente no permitido: {sender or 'desconocido'}")
+    sender = _sender(outer)
     # ponytail: la confianza en el remitente depende del filtro anti-suplantación del buzón (Gmail);
     # validar la cabecera Authentication-Results (dmarc=pass) si el buzón recibe correo de cualquiera.
-
-    # Un comunicado reenviado "como adjunto" viaja entero dentro del correo: se procesa el original.
-    message: EmailMessage = next(
-        (part.get_content() for part in outer.iter_attachments() if part.get_content_type() == "message/rfc822"),
-        outer,
-    )
+    if sender in allowed_senders:
+        message = outer
+    elif sender in forwarders:
+        message = next(
+            (part.get_content() for part in outer.iter_attachments() if part.get_content_type() == "message/rfc822"),
+            None,
+        )
+        if message is None:
+            raise IngestError("reenvía el comunicado como archivo adjunto para conservar su fecha y remitente originales")
+        if _sender(message) not in allowed_senders:
+            raise IngestError(f"el correo reenviado no viene de una fuente oficial: {_sender(message) or 'desconocido'}")
+    else:
+        raise IngestError(f"remitente no permitido: {sender or 'desconocido'}")
     plain = message.get_body(preferencelist=("plain",))
     if plain is None:
         raise IngestError("el correo no tiene versión en texto plano")
@@ -220,7 +235,8 @@ def parse_email(raw: bytes, allowed_senders: set[str]) -> ParsedEmail:
         for part in message.iter_attachments()
         if part.get_content_type() == "application/pdf"
     ]
-    return ParsedEmail(message_id, sender, subject or "Comunicado sin asunto", category, sent_at, body, attachments)
+    return ParsedEmail(message_id, _sender(message), subject or "Comunicado sin asunto", category, sent_at, body, attachments,
+                       forwarded_by=sender if message is not outer else None)
 
 
 def build_documents(email: ParsedEmail) -> list[EmailDocument]:
@@ -288,10 +304,13 @@ def classify(
     return result["parsed"] or fallback, tokens
 
 
-def ingest_email(raw: bytes, settings: Settings) -> list[dict[str, object]]:
+def ingest_email(raw: bytes, settings: Settings, forwarded_by: str | None = None) -> list[dict[str, object]]:
+    """`forwarded_by`: quién reenvió el comunicado cuando `raw` es el .eml original extraído por n8n (ya validado)."""
     from .search import vectors  # carga perezosa del modelo de embeddings, igual que processing.process
 
-    email = parse_email(raw, settings.allowed_email_senders)
+    email = parse_email(raw, settings.allowed_email_senders, settings.allowed_email_forwarders)
+    if forwarded_by:
+        email = replace(email, forwarded_by=forwarded_by)
     email = replace(email, attachments=_new_attachments(email.attachments))
     documents = build_documents(email)
     classified = [classify(document, email.category, settings) for document in documents]
@@ -303,7 +322,9 @@ def ingest_email(raw: bytes, settings: Settings) -> list[dict[str, object]]:
         vectors_ = [vectors.embed(ch.get("embed") or f"{ch['seccion']}\n{ch['texto'][:2000]}") for ch in chunks]
         prepared.append((document, "comunicado" if index == 0 else label.doc_type, label, usage, chunks, vectors_))
 
-    notes = f"Correo de {email.sender} · {email.message_id}" + (f" · categoría «{email.category}»" if email.category else "")
+    notes = (f"Correo de {email.sender} · {email.message_id}"
+             + (f" · reenviado por {email.forwarded_by}" if email.forwarded_by else "")
+             + (f" · categoría «{email.category}»" if email.category else ""))
     try:
         _store(prepared, topic, email, notes)
     except errors.ForeignKeyViolation as exc:  # los temas los siembra la carga del corpus

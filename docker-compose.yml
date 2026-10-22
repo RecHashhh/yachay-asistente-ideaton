@@ -50,6 +50,7 @@ services:
       RETENTION_DAYS: ${RETENTION_DAYS:-365}
       INGEST_TOKEN: ${INGEST_TOKEN:-}
       EMAIL_ALLOWED_SENDERS: ${EMAIL_ALLOWED_SENDERS:-comunicacion@yachaytech.edu.ec}
+      EMAIL_FORWARDERS: ${EMAIL_FORWARDERS:-}
       # Capa original (perfil "ollama"): base aparte.
       POSTGRES_DB: yachay_rag
       POSTGRES_USER: ${POSTGRES_USER:-yachay}
@@ -87,6 +88,27 @@ services:
       timeout: 3s
       retries: 5
       start_period: 30s
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ---------------------------------------------------------------- perfil opcional: ingesta de correos con n8n
+  # Buzón Gmail (IMAP) → n8n → POST /ingest/email. Editor visual: http://127.0.0.1:5678
+  #   docker compose --profile correo up -d n8n      (flujo para importar: n8n/flujo-correos.json)
+  n8n:
+    profiles: ["correo"]
+    image: docker.n8n.io/n8nio/n8n:2.44.6
+    environment:
+      GENERIC_TIMEZONE: America/Guayaquil
+      TZ: America/Guayaquil
+      N8N_SECURE_COOKIE: "false"             # editor local por http
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"  # el flujo lee INGEST_TOKEN con $env
+      INGEST_TOKEN: ${INGEST_TOKEN:-}
+      YACHI_API_URL: http://api:8000
+    ports:
+      - "127.0.0.1:5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n:/workflows:ro
     restart: unless-stopped
     logging: *default-logging
 
@@ -149,3 +171,4 @@ volumes:
   ollama_data:
   model_cache:
   uploads:
+  n8n_data:

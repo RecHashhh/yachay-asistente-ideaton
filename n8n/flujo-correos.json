@@ -1,0 +1,63 @@
+{
+  "id": "yachiCorreos0001",
+  "name": "Yachi · Comunicados por correo",
+  "nodes": [
+    {
+      "id": "6b0c6c2e-1d1a-4f7e-9a3a-0c1f1d6c0a01",
+      "name": "Correo nuevo en el buzón robot",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "parameters": {
+        "mailbox": "INBOX",
+        "postProcessAction": "read",
+        "format": "resolved",
+        "options": {}
+      }
+    },
+    {
+      "id": "6b0c6c2e-1d1a-4f7e-9a3a-0c1f1d6c0a02",
+      "name": "Extraer el comunicado original (.eml)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 0],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// El comunicado llega reenviado COMO ADJUNTO: el .eml original conserva remitente, fecha y Message-ID.\n// (El formato RAW del nodo IMAP no sirve: entrega el cuerpo sin cabeceras.)\nconst FORWARD = /^\\s*(RV|RE|FW|FWD|ENC|TR)\\s*:/i; // asunto de un reenvío\nconst out = [];\nconst badForwards = [];\nfor (const [i, item] of $input.all().entries()) {\n  const binary = item.binary || {};\n  const key = Object.keys(binary).find((k) => {\n    const b = binary[k];\n    return (b.mimeType || '').includes('rfc822') || (b.fileName || '').toLowerCase().endsWith('.eml');\n  });\n  const forwarder = item.json.from?.value?.[0]?.address || '';\n  if (!key) {\n    // Otros correos del buzón (avisos de Google, etc.) se ignoran; un reenvío sin el .eml es un error de uso.\n    if (FORWARD.test(item.json.subject || '')) badForwards.push(`«${item.json.subject}» de ${forwarder}`);\n    continue;\n  }\n  const eml = await this.helpers.getBinaryDataBuffer(i, key);\n  out.push({ json: { raw: eml.toString('base64'), forwarder, asunto: item.json.subject } });\n}\nif (!out.length && badForwards.length) {\n  throw new Error(`Se reenvió de forma normal, sin el comunicado adjunto (.eml): ${badForwards.join('; ')}. En Outlook usa «Reenviar como datos adjuntos».`);\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "6b0c6c2e-1d1a-4f7e-9a3a-0c1f1d6c0a03",
+      "name": "Enseñar a Yachi (POST /ingest/email)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.YACHI_API_URL }}/ingest/email",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Ingest-Token", "value": "={{ $env.INGEST_TOKEN }}" },
+            { "name": "X-Forwarded-By", "value": "={{ $json.forwarder }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ raw: $json.raw }) }}",
+        "options": { "timeout": 180000 }
+      }
+    }
+  ],
+  "connections": {
+    "Correo nuevo en el buzón robot": {
+      "main": [[{ "node": "Extraer el comunicado original (.eml)", "type": "main", "index": 0 }]]
+    },
+    "Extraer el comunicado original (.eml)": {
+      "main": [[{ "node": "Enseñar a Yachi (POST /ingest/email)", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

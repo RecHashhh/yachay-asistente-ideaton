@@ -224,15 +224,22 @@ class EmailIngestIn(BaseModel):
 
 
 @app.post("/ingest/email")
-def ingest_email(b: EmailIngestIn, x_ingest_token: str = Header(default="")):
-    """Indexa un comunicado de la Dirección de Comunicación (cuerpo + PDF adjuntos) para que Yachi lo use al responder."""
+def ingest_email(b: EmailIngestIn, x_ingest_token: str = Header(default=""), x_forwarded_by: str = Header(default="")):
+    """Indexa un comunicado de la Dirección de Comunicación (cuerpo + PDF adjuntos) para que Yachi lo use al responder.
+
+    `raw` es el .eml del comunicado. Si llegó reenviado como adjunto al buzón robot, n8n manda el .eml original y en
+    X-Forwarded-By quién lo reenvió, que debe estar en EMAIL_FORWARDERS.
+    """
     expected = settings.ingest_token.get_secret_value()
     if not expected:
         raise HTTPException(503, "ingest_disabled")
     if not secrets.compare_digest(x_ingest_token.encode(), expected.encode()):
         raise HTTPException(401, "invalid_ingest_token")
+    forwarder = x_forwarded_by.strip().lower() or None
+    if forwarder and forwarder not in settings.allowed_email_forwarders:
+        raise HTTPException(403, f"No está autorizado para reenviar comunicados: {forwarder}")
     try:
-        documents = email_ingest.ingest_email(email_ingest.decode_raw(b.raw), settings)
+        documents = email_ingest.ingest_email(email_ingest.decode_raw(b.raw), settings, forwarded_by=forwarder)
     except email_ingest.IngestError as exc:
         raise HTTPException(422, str(exc)) from exc
     return {"status": "ok", "documents": documents}

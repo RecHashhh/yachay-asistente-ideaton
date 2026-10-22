@@ -59,7 +59,8 @@ class Settings(BaseSettings):
 
     # Ingesta de correos: sin token el endpoint queda deshabilitado.
     ingest_token: SecretStr = SecretStr("")
-    email_allowed_senders: str = "comunicacion@yachaytech.edu.ec"
+    email_allowed_senders: str = "comunicacion@yachaytech.edu.ec"  # fuentes oficiales
+    email_forwarders: str = ""  # quién puede reenviar (como adjunto) comunicados oficiales al buzón robot
 
     @field_validator("rag_dir")
     @classmethod
@@ -99,6 +100,10 @@ class Settings(BaseSettings):
     @property
     def allowed_email_senders(self) -> set[str]:
         return {sender.strip().lower() for sender in self.email_allowed_senders.split(",") if sender.strip()}
+
+    @property
+    def allowed_email_forwarders(self) -> set[str]:
+        return {sender.strip().lower() for sender in self.email_forwarders.split(",") if sender.strip()}
 
 
 @lru_cache
