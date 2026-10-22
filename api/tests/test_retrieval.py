@@ -172,4 +172,4 @@ async def test_history_sources_are_checked_against_current_index(monkeypatch) ->
         "locator": "Matrícula",
         "snippet": "El período de matrícula inicia el 1 de septiembre.",
     }]
-    assert "left(rag_chunks.content" in str(session.statements[0].compile())
+    assert "left(rag.rag_chunks.content" in str(session.statements[0].compile())

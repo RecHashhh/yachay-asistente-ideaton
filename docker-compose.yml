@@ -5,7 +5,8 @@
 # Perfil opcional "ollama": la capa original de indexación con Ollama/bge-m3 y Alembic, en su propia base (yachay_rag).
 services:
   db:
-    image: pgvector/pgvector:pg17
+    build:
+      context: ./Mapas/docker/postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-yachi}
       POSTGRES_USER: ${POSTGRES_USER:-yachay}
@@ -13,7 +14,7 @@ services:
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_unified_data:/var/lib/postgresql
       - ./api/sql/docker:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
@@ -32,9 +33,11 @@ services:
     build:
       context: .
       dockerfile: api/Dockerfile
-    command: ["sh", "-c", "python -m app.migrate && python -m app.ingest"]
+    command: ["sh", "-c", "cd /app/Mapas && alembic upgrade head && python -m app.importer --osm /data/YACHAY_FINAL.osm && cd /app && python -m app.migrate && python -m app.ingest"]
     environment: &api-environment
       DATABASE_URL: postgresql://${POSTGRES_USER:-yachay}:${POSTGRES_PASSWORD:-local-dev-only-change-me}@db:5432/${POSTGRES_DB:-yachi}
+      MAPS_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-yachay}:${POSTGRES_PASSWORD:-local-dev-only-change-me}@db:5432/${POSTGRES_DB:-yachi}
+      DATABASE_SCHEMA: maps
       RAG_DIR: /app/rag
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-haiku-5-5}
@@ -58,6 +61,7 @@ services:
       OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-bge-m3}
     volumes:
       - ./rag:/app/rag:ro
+      - ./Mapa:/data:ro
       - model_cache:/app/.cache
     depends_on:
       db:
@@ -74,6 +78,7 @@ services:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     volumes:
       - ./rag:/app/rag:ro
+      - ./Mapa:/data:ro
       - model_cache:/app/.cache
       - uploads:/app/uploads
     depends_on:
@@ -134,6 +139,7 @@ services:
     environment: *api-environment
     volumes:
       - ./rag:/app/rag:ro
+      - ./Mapa:/data:ro
     depends_on:
       db:
         condition: service_healthy
@@ -143,7 +149,9 @@ services:
     logging: *default-logging
 
 volumes:
+  # Volumen histórico conservado para no borrar la base preexistente.
   postgres_data:
+  postgres_unified_data:
   ollama_data:
   model_cache:
   uploads:

@@ -1,3 +1,5 @@
+import type { FeatureCollection, Geometry } from 'geojson';
+
 /**
  * Contrato entre este frontend y el backend (LangChain + LangGraph).
  * Si cambias algo aquí, cambia también el backend: es la única fuente de verdad de la forma de los datos.
@@ -136,6 +138,7 @@ export type StreamEvent =
   | { type: 'status'; label: string }
   | { type: 'answer_mode'; mode: 'extractive' }
   | { type: 'token'; text: string }
+  | { type: 'map'; payload: FeatureCollection<Geometry, Record<string, unknown>> }
   | { type: 'tool'; name: 'mostrar_en_mapa'; input: MapAction }
   | { type: 'procedure'; item: Procedure }
   | { type: 'unknown'; item: Unknown }

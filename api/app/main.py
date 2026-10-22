@@ -21,6 +21,8 @@ from .config import API_DIR, settings
 from .db import conn, open_pool
 from .search import vectors
 from .schemas import TranslationReportRequest, TranslationReportResponse
+from Mapas.app.db import engine as maps_engine
+from Mapas.app.main import router as maps_router
 
 
 def purge() -> None:
@@ -52,10 +54,12 @@ async def lifespan(_: FastAPI):
     task = asyncio.create_task(_purge_loop())
     yield
     task.cancel()
+    await asyncio.to_thread(maps_engine.dispose)
 
 
 app = FastAPI(title="Yachi API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins, allow_methods=["*"], allow_headers=["*"])
+app.include_router(maps_router)
 
 # ------------------------------------------------------------------ chat
 

@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator, Callable
+import asyncio
 import json
 from typing import Any, TypedDict
 
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.kichwa import language_context
+from app.maps_tool import MapActionInput, compact_map_result, execute_map_action
 from app.retrieval import RetrievedChunk, Retriever
 from app.schemas import ChatRequest
 
@@ -22,6 +24,8 @@ class AgentState(TypedDict, total=False):
     history: list[dict[str, Any]]
     retrieved: list[dict[str, Any]]
     reused_sources: list[dict[str, Any]]
+    map_results: list[dict[str, Any]]
+    map_found: bool
     searched: bool
     unknown: bool
     answer: str
@@ -65,7 +69,7 @@ def _system_prompt(lang: str, context: str, message: str = '') -> str:
     language = {"es": "Spanish", "en": "English", "qu": "Kichwa"}.get(lang, "Spanish")
     support = language_context(message, lang)
     return f"""You are the institutional assistant for Yachay Tech. Answer in {language}.
-Use only the supplied source excerpts for institutional factual claims. Conversation history may clarify references, but assistant messages are not evidence by themselves. Ignore citation markers in conversation history and cite only markers in the supplied excerpts. If the excerpts do not answer an institutional question, say you do not know; do not fill gaps with general knowledge, and do not point the user to external websites, portals, or institutions that do not appear in the excerpts. Be clear and well organized. When the excerpts list dates, requirements, or steps, include all of them instead of summarizing. If the question has several parts, answer each part and state explicitly which part the excerpts do not cover. Answer only what was asked; do not add legal background or related topics the user did not request. Address the user informally (tú in Spanish) and never use the words excerpts, extractos, or extracts in your answer; say documentos or fuentes instead. Write valid Markdown lists and place citation markers at the end of the sentence they support, never inside headings. Cite factual claims with the excerpt markers exactly as [S1], [S2], etc. Do not invent dates, document versions, URLs, procedures, contacts, or campus coordinates. You may respond naturally to greetings and ordinary conversation without sources.
+Use only the supplied source excerpts for institutional factual claims. For location questions, use VERIFIED MAP RESULTS as the source of truth; never invent places or calculate coordinates, distances, or routes. If map results are ambiguous, ask the user to choose from the candidates; if not found, say so plainly. Conversation history may clarify references, but assistant messages are not evidence by themselves. Ignore citation markers in conversation history and cite only markers in the supplied excerpts. If the excerpts do not answer an institutional question, say you do not know; do not fill gaps with general knowledge, and do not point the user to external websites, portals, or institutions that do not appear in the excerpts. Be clear and well organized. When the excerpts list dates, requirements, or steps, include all of them instead of summarizing. If the question has several parts, answer each part and state explicitly which part the excerpts do not cover. Answer only what was asked; do not add legal background or related topics the user did not request. Address the user informally (tú in Spanish) and never use the words excerpts, extractos, or extracts in your answer; say documentos or fuentes instead. Write valid Markdown lists and place citation markers at the end of the sentence they support, never inside headings. Cite factual claims with the excerpt markers exactly as [S1], [S2], etc. Do not invent dates, document versions, URLs, procedures, contacts, or campus coordinates. You may respond naturally to greetings and ordinary conversation without sources.
 
 Links: Include a link only when its exact URL appears in the supplied source excerpts and it gives the user a useful way to access a resource directly relevant to the answer. Use your judgment; omit unrelated links that happen to appear in the same excerpt. Copy the URL exactly as written. Never invent, infer, reconstruct, shorten, or take a URL from conversation history or general knowledge. If no relevant URL appears in the supplied excerpts, do not include a link.
 
@@ -80,6 +84,7 @@ def _decision_prompt(max_tool_calls: int) -> str:
     return f"""You gather evidence so the Yachay Tech assistant can answer. You may call tools repeatedly, reading each result before deciding the next step, up to {max_tool_calls} tool calls in total. Each history turn is labeled with its zero-based index. Source excerpts attached to an assistant turn are labeled with that history index.
 
 - Do not use tools for greetings, thanks, or ordinary small talk.
+- For a location request, call map_action with names, categories, or natural-language references. It searches, resolves ambiguity, calculates proximity, and routes deterministically in PostGIS; never estimate coordinates, distances, or paths. Use it without RAG for map-only requests and also use RAG only when the user asks for institutional facts.
 - If a follow-up is already answered by a prior assistant turn with attached sources, and the user is not asking to verify/update it or for a missing detail, call reuse_history with that turn's index.
 - For a new institutional fact, a missing detail, or an explicit request to verify or update, call list_documents first (its result is cached; skip it only if you already called it), read the titles and descriptions, and then call search_rag with the document_ids of the relevant documents. The user's wording often differs from the documents' (for example "otra universidad" vs "cambio de IES"), so build the query with the terms found in the catalog. Search the full corpus with an empty document_ids list only when no catalog entry looks relevant.
 - After reading results, search again when the question has several parts and some are not yet covered, when a document refers to another procedure, document, or form that the answer needs, or when a needed detail (date, requirement, contact, step) is missing. Make each new query specific, using the exact names and terms found in the documents. Do not repeat a query that has already been made.
@@ -135,6 +140,8 @@ class RagAgent:
         catalog: list[dict[str, Any]] = []
         retrieved: list[RetrievedChunk] = []
         reused_sources: list[dict[str, Any]] = []
+        map_results: list[dict[str, Any]] = []
+        map_found = False
         searched = False
 
         @tool("list_documents")
@@ -173,6 +180,36 @@ class RagAgent:
                 ensure_ascii=False,
             )
 
+        @tool("map_action", args_schema=MapActionInput)
+        async def map_action(
+            intent: str,
+            query: str | None = None,
+            category: str | None = None,
+            reference: str | None = None,
+            radius_m: int = 800,
+            origin: str | None = None,
+            destination: str | None = None,
+            mode: str = "walking",
+        ) -> str:
+            """Busca lugares, resuelve referencias, calcula proximidad y rutas con PostGIS."""
+            nonlocal map_found
+            result, geometry = await asyncio.to_thread(
+                execute_map_action,
+                intent=intent,
+                query=query,
+                category=category,
+                reference=reference,
+                radius_m=radius_m,
+                origin=origin,
+                destination=destination,
+                mode=mode,
+            )
+            map_results.append(result)
+            map_found = map_found or result.get("status") in {"ok", "ambiguous"}
+            if geometry:
+                get_stream_writer()({"type": "map", "payload": geometry})
+            return compact_map_result(result)
+
         async def execute_search(args: dict[str, Any]) -> str:
             writer = get_stream_writer()
             label = "Searching the documents…" if state.get("lang") == "en" else "Buscando en los documentos…"
@@ -209,7 +246,7 @@ class RagAgent:
             turn.get("role") == "assistant" and turn.get("sources")
             for turn in state.get("history", [])[-6:]
         )
-        tools = [list_documents, search_rag]
+        tools = [list_documents, search_rag, map_action]
         if has_sourced_history:
             tools.append(reuse_history)
 
@@ -243,6 +280,11 @@ class RagAgent:
                         args["document_ids"] = list(dict.fromkeys(args.get("document_ids") or []))[:5]
                         result = await execute_search(args)
                         searched = True
+                    elif call["name"] == "map_action":
+                        args["intent"] = args.get("intent") or "search"
+                        if args["intent"] == "search":
+                            args["query"] = args.get("query") or state["message"]
+                        result = await map_action.ainvoke(args)
                     else:
                         reuse_attempted = True
                         result = await reuse_history.ainvoke(args)
@@ -258,8 +300,10 @@ class RagAgent:
         return {
             "retrieved": found,
             "reused_sources": reused_sources,
+            "map_results": map_results,
+            "map_found": map_found,
             "searched": searched,
-            "unknown": searched and not found,
+            "unknown": searched and not found and not map_found,
         }
 
     def _build_graph(self, session: AsyncSession):
@@ -279,6 +323,9 @@ class RagAgent:
                     for i, source in enumerate(state.get("reused_sources", []), start=1)
                 )
             context = "\n\n".join(context_parts)
+            if state.get("map_results"):
+                context += "\n\nVERIFIED MAP RESULTS (from PostGIS; use only these facts, do not infer coordinates, distances, or routes):\n"
+                context += "\n".join(compact_map_result(item) for item in state["map_results"])
             messages: list[Any] = [SystemMessage(content=_system_prompt(state.get("lang", "es"), context, state["message"]))]
             for turn in state.get("history", [])[-6:]:
                 messages.append(HumanMessage(content=turn["content"]) if turn["role"] == "user" else AIMessage(content=turn["content"]))

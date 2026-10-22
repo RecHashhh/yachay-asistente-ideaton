@@ -1,5 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { FeatureCollection, Geometry, LineString, Point } from 'geojson';
 import { BRAND } from '../config';
 import { CampusMap } from '../components/CampusMap';
 import { Composer } from '../components/Composer';
@@ -20,6 +21,10 @@ import { loadPrefs, speak, stopSpeaking, toSpeech, ttsSupported } from '../lib/s
 import type { FeedbackReason } from '../lib/inbox';
 import type { Attachment, ChatTurn, MapAction, Procedure, ProcessStep, Source, Topic, Trend, Unknown } from '../lib/types';
 import { ActivityPanel } from '../components/ActivityPanel';
+import { createGeoApi, type MapConfig } from '../lib/mapGeoApi';
+import type { MapView } from '../lib/mapConversation';
+
+const GeoMap = lazy(() => import('../components/GeoMap').then((module) => ({ default: module.GeoMap })));
 
 interface Msg {
   id: string;
@@ -34,6 +39,7 @@ interface Msg {
   answerMode?: 'extractive';
   sources?: Source[];
   map?: MapAction;
+  geoMap?: MapView;
   procedure?: Procedure;
   unknown?: Unknown;
   suggestions?: string[];
@@ -56,6 +62,49 @@ const loadChats = (): Conversation[] => { try { return JSON.parse(localStorage.g
 // Los adjuntos no se guardan en el navegador: pesan y pueden tener datos personales.
 const saveChats = (c: Conversation[]) => { try { localStorage.setItem(CHATS_KEY, JSON.stringify(c.slice(0, 20).map((x) => ({ ...x, msgs: x.msgs.map(({ files: _f, ...m }) => m) })))); } catch { /* sin almacenamiento */ } };
 const uid = (): string => crypto.randomUUID();
+
+function mapViewFromPayload(payload: FeatureCollection<Geometry, Record<string, unknown>>): MapView {
+  const places: MapView['places'] = [];
+  let route: MapView['route'];
+
+  for (const feature of payload.features) {
+    const properties = feature.properties ?? {};
+    if (properties.kind === 'route' && feature.geometry?.type === 'LineString') {
+      const geometry = feature.geometry as LineString;
+      route = {
+        geometry,
+        distance_m: Number(properties.distance_m ?? 0),
+        duration_s: Number(properties.duration_s ?? 0),
+        mode: properties.mode === 'driving' ? 'driving' : 'walking',
+      };
+      continue;
+    }
+    if (!feature.geometry || feature.geometry.type === 'LineString') continue;
+    const location = (properties.location as Point | undefined)
+      ?? (feature.geometry.type === 'Point' ? feature.geometry : undefined);
+    if (!location) continue;
+    const role = properties.role === 'origin' || properties.role === 'destination' ? properties.role : 'candidate';
+    const id = String(properties.id ?? feature.id ?? 'place');
+    const name = typeof properties.name === 'string' ? properties.name : null;
+    const displayName = typeof properties.display_name === 'string' ? properties.display_name : name ?? id;
+    places.push({
+      place: {
+        id, name, display_name: displayName,
+        category: typeof properties.category === 'string' ? properties.category : 'place',
+        subcategory: typeof properties.subcategory === 'string' ? properties.subcategory : null,
+        location,
+        osm_type: typeof properties.osm_type === 'string' ? properties.osm_type : 'application',
+        osm_id: Number(properties.osm_id ?? 0),
+        score: Number(properties.score ?? 1),
+        match: typeof properties.match === 'string' ? properties.match : 'exact_name',
+        geometry: feature.geometry,
+      },
+      role,
+    });
+  }
+
+  return { places, ...(route ? { route } : {}) };
+}
 
 /** Título automático según lo consultado: el trámite o lugar que respondió, si no, la pregunta limpia y corta. */
 function autoTitle(msgs: Msg[], lang: Lang): string {
@@ -102,6 +151,9 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
   const [railOpen, setRailOpen] = useState(true);
   const [mobileRail, setMobileRail] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const mapApi = useMemo(() => createGeoApi(), []);
+  const [mapConfig, setMapConfig] = useState<MapConfig | null>(null);
+  useEffect(() => { let active = true; void mapApi.config().then((config) => { if (active) setMapConfig(config); }).catch(() => { if (active) setMapConfig(null); }); return () => { active = false; }; }, [mapApi]);
   useEffect(() => {
     if (!mobileRail) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -220,6 +272,7 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
         else if (ev.type === 'answer_mode') patch(ai.id, () => ({ answerMode: ev.mode }));
         else if (ev.type === 'token') patch(ai.id, (m) => ({ text: m.text + ev.text, status: m.status ?? (lang === 'en' ? 'Responding' : 'Respondiendo') }));
         else if (ev.type === 'tool') patch(ai.id, () => ({ map: ev.input }));
+        else if (ev.type === 'map') patch(ai.id, () => ({ geoMap: mapViewFromPayload(ev.payload) }));
         else if (ev.type === 'procedure') patch(ai.id, () => ({ procedure: ev.item }));
         else if (ev.type === 'unknown') patch(ai.id, () => ({ unknown: ev.item, status: undefined }));
         else if (ev.type === 'clarify') patch(ai.id, () => ({ clarify: { question: ev.question, options: ev.options }, status: undefined }));
@@ -410,7 +463,7 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
                         {m.text}
                       </motion.div>
                     )
-                    : <AssistantMsg key={m.id} m={m}
+                    : <AssistantMsg key={m.id} m={m} theme={theme} mapConfig={mapConfig}
                         onVote={(v) => { patch(m.id, () => ({ vote: v })); if (v === 'up' && m.serverId) void sendFeedback(m.serverId, v).catch(() => { patch(m.id, () => ({ vote: undefined })); setToastMsg(lang === 'en' ? 'Your feedback was not saved. Try again.' : 'No se guardó tu valoración. Intenta de nuevo.'); }); }}
                         onReason={async (r) => { if (!m.serverId) throw new Error('Respuesta sin identificador'); await sendFeedback(m.serverId, 'down', { question: msgs[i - 1]?.text ?? '', lang, reason: r ?? undefined }); }}
                         question={msgs[i - 1]?.text}
@@ -451,7 +504,7 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
   );
 }
 
-function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAsk, onShowMap }: { m: Msg; question?: string; transcript: string; onVote: (v: 'up' | 'down') => void; onReason: (r: FeedbackReason | null) => Promise<void>; onRetry: () => void; onAsk: (q: string) => void; onShowMap: (placeId: string) => void }) {
+function AssistantMsg({ m, question, transcript, theme, mapConfig, onVote, onReason, onRetry, onAsk, onShowMap }: { m: Msg; question?: string; transcript: string; theme: 'light' | 'dark'; mapConfig: MapConfig | null; onVote: (v: 'up' | 'down') => void; onReason: (r: FeedbackReason | null) => Promise<void>; onRetry: () => void; onAsk: (q: string) => void; onShowMap: (placeId: string) => void }) {
   const { t, lang } = useT();
   const [copied, setCopied] = useState(false);
   const [openSrc, setOpenSrc] = useState<string | null>(null);
@@ -487,6 +540,7 @@ function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAs
           )}
         </AnimatePresence>
         {m.map && !mapAfter && <CampusMap action={m.map} />}
+        {m.geoMap && <Suspense fallback={<p className="small muted">{lang === 'en' ? 'Loading map…' : 'Cargando mapa…'}</p>}><GeoMap view={m.geoMap} theme={theme} config={mapConfig} /></Suspense>}
         {m.text && <div className={extractive ? 'extractive-answer' : undefined}>
           {m.lang === 'qu' && <p className="small muted" lang="es">Kichwa · experimental</p>}
           {extractive && <p className="extractive-label">{lang === 'en' ? 'Document excerpt' : 'Fragmento del documento'}</p>}

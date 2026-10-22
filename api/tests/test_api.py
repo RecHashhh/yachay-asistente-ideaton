@@ -45,6 +45,7 @@ def post_chat(monkeypatch, events, history=None, message="¿Cómo es la matrícu
 def test_chat_stream_matches_frontend_sse_contract(monkeypatch) -> None:
     events = [
         {"type": "status", "label": "Buscando en los documentos oficiales"},
+        {"type": "map", "payload": {"type": "FeatureCollection", "features": []}},
         {"type": "step", "id": "search", "label": "Busqué en 75 documentos oficiales", "state": "done"},
         {"type": "token", "text": "La respuesta está respaldada."},
         {"type": "sources", "items": [SOURCE]},
@@ -55,8 +56,9 @@ def test_chat_stream_matches_frontend_sse_contract(monkeypatch) -> None:
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
     out = parse_events(response)
-    assert [e["type"] for e in out] == ["status", "step", "token", "sources", "done"]
-    assert out[3]["items"][0]["locator"] == "Matrícula"
+    assert [e["type"] for e in out] == ["status", "map", "step", "token", "sources", "done"]
+    assert out[1]["payload"]["type"] == "FeatureCollection"
+    assert out[4]["items"][0]["locator"] == "Matrícula"
     assert out[-1]["messageId"]
 
 
@@ -70,7 +72,6 @@ def test_chat_request_accepts_and_forwards_history_sources(monkeypatch) -> None:
 def test_greeting_does_not_reach_search() -> None:
     assert rules.triage("Hola", "es").route == "smalltalk"
     assert rules.triage("hola yachi", "es").route == "smalltalk"
-
 
 class FakeAgent:
     def __init__(self, retrieved=None, reused=None):
