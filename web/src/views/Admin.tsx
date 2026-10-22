@@ -137,25 +137,34 @@ function Login({ onLogin }: { onLogin: (u: AdminUser) => void }) {
   const [busy, setBusy] = useState(false);
   return (
     <main className="adm-login">
-      <section className="adm-login-side" aria-labelledby="adm-login-inst">
-        <span className="adm-inst" id="adm-login-inst">{BRAND.university}</span>
-        <h1>Portal de la base de conocimiento</h1>
-        <p>Aquí se publican los documentos oficiales con los que {BRAND.mascotName} responde a los estudiantes, se revisan las preguntas sin respuesta y se mide la veracidad del asistente.</p>
-        <ul className="adm-login-facts">
-          <li>Solo responde con documentos vigentes cargados aquí.</li>
-          <li>Cada cambio queda en la bitácora con quién y cuándo.</li>
-          <li>Acceso para personal autorizado de la universidad.</li>
-        </ul>
-      </section>
-      <motion.form className="adm-login-form" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-        onSubmit={async (e) => { e.preventDefault(); setBusy(true); setErr(null); try { onLogin(await adminLogin(email.trim(), pw)); } catch (x) { setErr((x as Error).message); } finally { setBusy(false); } }}>
-        <div className="row" style={{ gap: 12 }}><Mascot size={40} decorative /><h2>Iniciar sesión</h2></div>
-        <label className="field"><span>Correo institucional</span><input className="inp" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nombre@yachaytech.edu.ec" required /></label>
-        <label className="field"><span>Contraseña</span><input className="inp" type="password" autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} required /></label>
-        {err && <p className="err" role="alert">{err}</p>}
-        <button className="btn primary" disabled={busy}>{busy ? 'Entrando…' : 'Entrar'}</button>
-        <a className="small muted" href="#/">Volver al chat</a>
-      </motion.form>
+      <motion.div className="adm-login-shell" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+        {/* Panel de marca (mismo patrón que el Hub): foto institucional bajo un degradado y el propósito del portal. */}
+        <aside className="adm-login-brand" aria-labelledby="adm-login-title">
+          <div className="adm-login-photo" aria-hidden="true" />
+          <div className="adm-login-body">
+            <span className="adm-login-eyebrow">{BRAND.university} · Portal de administración</span>
+            <h2 id="adm-login-title">La información oficial que {BRAND.mascotName} entrega a los estudiantes.</h2>
+            <ul className="adm-login-points">
+              <li>Documentos vigentes, con versión y fecha</li>
+              <li>Preguntas sin respuesta y validación de veracidad</li>
+              <li>Cada cambio queda en la bitácora</li>
+            </ul>
+          </div>
+          <small className="adm-login-credit">Foto: Biblioteca de la Universidad Yachay Tech · yachaytech.edu.ec</small>
+        </aside>
+
+        <form className="adm-login-card"
+          onSubmit={async (e) => { e.preventDefault(); setBusy(true); setErr(null); try { onLogin(await adminLogin(email.trim(), pw)); } catch (x) { setErr((x as Error).message); } finally { setBusy(false); } }}>
+          <Mascot size={64} decorative />
+          <h1>Bienvenido</h1>
+          <p className="adm-login-sub">Inicia sesión con tu correo institucional para administrar la base de conocimiento de {BRAND.mascotName}.</p>
+          <label className="field"><span>Correo institucional</span><input className="inp" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nombre@yachaytech.edu.ec" required /></label>
+          <label className="field"><span>Contraseña</span><input className="inp" type="password" autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} required /></label>
+          {err && <p className="err" role="alert">{err}</p>}
+          <button className="btn primary adm-login-btn" disabled={busy}>{busy ? 'Entrando…' : 'Entrar'}</button>
+          <p className="adm-login-note">Acceso solo para personal autorizado de la universidad.<a href="#/">Volver al chat</a></p>
+        </form>
+      </motion.div>
     </main>
   );
 }

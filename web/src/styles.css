@@ -613,17 +613,32 @@ select option{background:var(--surface);color:var(--ink)}
 .adm-split{display:grid;grid-template-columns:minmax(0,2fr) minmax(300px,1fr);gap:18px;align-items:start}
 .adm-split form.card{gap:14px}
 
-/* Inicio de sesión institucional */
-.adm-login{min-height:100dvh;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(380px,.85fr);background:var(--bg)}
-.adm-login-side{display:flex;flex-direction:column;justify-content:center;gap:18px;padding:clamp(32px,6vw,104px);background:var(--band);color:var(--band-ink);border-right:4px solid var(--brand-2)}
-.adm-login-side h1{font-family:var(--f-display);font-weight:600;font-size:clamp(32px,3.4vw,52px);line-height:1.08;letter-spacing:-.015em;max-width:16ch}
-.adm-login-side p{color:var(--band-muted);font-size:17px;line-height:1.6;max-width:52ch}
-.adm-login-facts{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:10px;font-size:15px}
-.adm-login-facts li{display:flex;gap:12px;align-items:baseline}
-.adm-login-facts li::before{content:"";flex:none;width:8px;height:8px;background:var(--brand-2);transform:translateY(-1px)}
-.adm-login-form{align-self:center;justify-self:center;width:min(400px,100% - 32px);display:flex;flex-direction:column;gap:16px;padding:32px 0}
-.adm-login-form h2{font-size:22px;font-weight:700}
-.adm-login-form :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* Inicio de sesión: mismo patrón que el login del Hub (tarjeta de dos columnas, foto bajo degradado, viñetas ✓) */
+.adm-login{position:relative;min-height:100dvh;display:grid;place-items:center;padding:24px;background:var(--bg);overflow:hidden}
+.adm-login::before{content:"";position:absolute;width:640px;height:640px;top:-220px;right:-220px;pointer-events:none;
+  background:radial-gradient(circle,color-mix(in srgb,var(--accent) 12%,transparent) 0%,transparent 70%)}
+.adm-login-shell{position:relative;display:grid;grid-template-columns:1.05fr 1fr;width:100%;max-width:980px;background:var(--surface);
+  border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:var(--shadow-lg)}
+.adm-login-brand{position:relative;min-height:540px;display:flex;flex-direction:column;justify-content:flex-end;background:var(--band);color:#fff}
+.adm-login-photo{position:absolute;inset:0;background-size:cover;background-position:center 35%;
+  background-image:linear-gradient(180deg,rgba(23,63,95,.10) 0%,rgba(23,63,95,.28) 32%,rgba(14,38,58,.82) 62%,rgba(9,24,38,.95) 100%),url('/brand/biblioteca-yachay.jpg')}
+:root[data-theme="dark"] .adm-login-photo{background-image:linear-gradient(160deg,rgba(9,24,38,.55) 0%,rgba(9,24,38,.88) 60%,rgba(5,13,21,.97) 100%),url('/brand/biblioteca-yachay.jpg')}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .adm-login-photo{background-image:linear-gradient(160deg,rgba(9,24,38,.55) 0%,rgba(9,24,38,.88) 60%,rgba(5,13,21,.97) 100%),url('/brand/biblioteca-yachay.jpg')} }
+.adm-login-body{position:relative;padding:44px 40px 18px}
+.adm-login-eyebrow{display:inline-block;margin-bottom:12px;font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.78)}
+.adm-login-body h2{margin:0 0 22px;max-width:17ch;font-family:var(--f-display);font-size:clamp(26px,2.4vw,32px);font-weight:600;line-height:1.15;letter-spacing:-.01em}
+.adm-login-points{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.adm-login-points li{position:relative;padding-left:24px;font-size:15px;color:rgba(255,255,255,.92)}
+.adm-login-points li::before{content:"✓";position:absolute;left:0;top:-1px;font-weight:700;color:#7fd4f7}
+.adm-login-credit{position:relative;padding:0 40px 18px;font-size:11.5px;color:rgba(255,255,255,.62)}
+.adm-login-card{display:flex;flex-direction:column;justify-content:center;gap:14px;padding:52px 48px;text-align:left}
+.adm-login-card > svg,.adm-login-card > .mascot,.adm-login-card > :first-child{align-self:center}
+.adm-login-card h1{margin:4px 0 0;text-align:center;font-family:var(--f-display);font-size:28px;font-weight:600}
+.adm-login-sub{margin:0 auto 10px;max-width:32ch;text-align:center;font-size:14.5px;line-height:1.5;color:var(--muted)}
+.adm-login-btn{width:100%;padding:12px;font-size:15px;margin-top:4px}
+.adm-login-note{margin:6px 0 0;text-align:center;font-size:12.5px;line-height:1.7;color:var(--muted)}
+.adm-login-note a{display:block}
+.adm-login-card :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* Pantallas medianas: índice más angosto; en laptops chicas se oculta la columna Origen para que la tabla quepa */
 @media (max-width: 1366px){ .adm{--rail-w:232px} }
@@ -644,8 +659,12 @@ select option{background:var(--surface);color:var(--ink)}
   .adm-cur{left:10px;right:10px;top:auto;bottom:0;width:auto;height:3px;border-radius:3px 3px 0 0}
   .adm-upload,.adm-split{grid-template-columns:minmax(0,1fr)}
   .adm-upload .drop{min-height:160px}
-  .adm-login{grid-template-columns:minmax(0,1fr)}
-  .adm-login-side{border-right:0;border-bottom:4px solid var(--brand-2);padding:32px 20px}
-  .adm-login-side p,.adm-login-facts{display:none}
+  .adm-login{padding:16px}
+  .adm-login-shell{grid-template-columns:minmax(0,1fr)}
+  .adm-login-brand{min-height:220px}
+  .adm-login-body{padding:28px 24px 12px}
+  .adm-login-points{display:none}
+  .adm-login-credit{padding:0 24px 14px}
+  .adm-login-card{padding:32px 24px}
 }
 @media (max-width: 560px){ .adm-summary,.adm .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .adm-summary button:nth-child(2n),.adm .kpi:nth-child(2n){border-right:0} .adm-summary button,.adm .kpi{border-bottom:1px solid var(--line)} }
