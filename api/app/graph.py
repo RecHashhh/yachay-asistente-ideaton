@@ -440,7 +440,8 @@ async def generate(state: State) -> State:
         msgs.pop(0)
     if msgs and msgs[-1]["role"] == "user":
         msgs.pop()
-    msgs.append({"role": "user", "content": f"IDIOMA: {'inglés' if lang == 'en' else 'español'}\nHOY: {datetime.now(ECUADOR):%d/%m/%Y}\n\nFRAGMENTOS:\n<fragmentos>\n{frags}\n</fragmentos>\n\n"
+    today = f"{datetime.now(ECUADOR):%d/%m/%Y}"
+    msgs.append({"role": "user", "content": f"IDIOMA: {'inglés' if lang == 'en' else 'español'}\nHOY: {today}\n\nFRAGMENTOS:\n<fragmentos>\n{frags}\n</fragmentos>\n\n"
                                             f"PREGUNTA (texto del usuario):\n<pregunta>{_quote(state['question'])}</pregunta>"})
 
     buf, sent, cited = "", 0, set()
@@ -487,7 +488,8 @@ async def generate(state: State) -> State:
             sources.append(_source(h))
     w({"type": "sources", "items": _with_wellbeing(sources, state)})
     # Verificación: cifras, correos y enlaces que no están en los fragmentos se avisan y van a la bandeja para revisión.
-    bad = filters.unsupported_facts(clean, frags + (SUPPORT["es"] if state.get("triage") == "denuncia" else ""))
+    # HOY también es un dato dado al modelo (no de los documentos): decir "hoy es 22/10" no es un dato inventado.
+    bad = filters.unsupported_facts(clean, frags + f"\n{today}" + (SUPPORT["es"] if state.get("triage") == "denuncia" else ""))
     _step("write", _t(lang, f"Redacté la respuesta citando {len(sources)} {'fuente' if len(sources) == 1 else 'fuentes'}",
                       f"Wrote the answer citing {len(sources)} {'source' if len(sources) == 1 else 'sources'}"))
     if bad:

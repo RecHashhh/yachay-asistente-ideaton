@@ -9,11 +9,13 @@ import hashlib
 import logging
 import re
 import sys
-from dataclasses import dataclass
+import unicodedata
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from email import policy
 from email.message import EmailMessage
 from email.parser import BytesParser
+from difflib import SequenceMatcher
 from email.utils import parseaddr, parsedate_to_datetime
 from pathlib import Path
 from typing import Literal
@@ -32,6 +34,11 @@ logger = logging.getLogger(__name__)
 SUBJECT_PREFIX = re.compile(r"(Servicios|Eventos|Invitaci[oó]n|Ent[eé]rate|Convocatoria)\s*-\s*", re.IGNORECASE)
 FOOTER_MARK = "footermailing"  # imagen con la que empieza el pie común de la plantilla
 ECUADOR = timezone(timedelta(hours=-5))  # sin horario de verano; los correos llegan con hora UTC
+# El modelo de embeddings solo lee 128 tokens; el encabezado «Documento: <título>» usa ~25. Medido con el tokenizador:
+# ~4,2 caracteres/token en prosa, menos con nombres y URLs → 300 caracteres de cuerpo caben con margen.
+BODY_CHUNK_CHARS = 300
+MIN_PIECE_CHARS = 60  # un trozo final más corto (la firma) se une al anterior: solo no aporta contenido
+SAME_WORD = 0.85  # errata tolerada por palabra («Estuidantes» ≈ «Estudiantes» 0,91; «posgrado» ≠ «pregrado» 0,75)
 
 
 class IngestError(ValueError):
@@ -126,6 +133,60 @@ def clean_body(text: str) -> str:
         line = re.sub(r"<(https?://[^>]+)>", r" (\1)", line)
         lines.append(line.rstrip())
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
+def body_chunks(document: "EmailDocument") -> list[dict]:
+    """"Buscar en chico, leer en grande": se indexa un trozo corto y el redactor recibe el trozo con sus vecinos.
+
+    - make_chunks junta hasta ~800 tokens, pero el modelo de embeddings solo lee ~128: un dato a mitad de un
+      bloque largo (la excepción de plazo, "16 horas") quedaba invisible para la búsqueda por significado.
+    - Con trozos sueltos, en cambio, un encabezado ("Lista A – …") quedaba separado de su lista y el redactor
+      atribuía nombres a la lista equivocada. Por eso el texto que se lee incluye el trozo anterior y el siguiente.
+    Mismo formato que processing.make_chunks, más "embed": el texto del que se calcula el embedding.
+    """
+    units: list[str] = []
+    for paragraph in re.split(r"\n\s*\n", document.text):
+        # Párrafo largo (o tabla): por líneas y luego por oraciones, para que ningún dato quede fuera de la ventana.
+        for line in paragraph.split("\n") if len(paragraph) > BODY_CHUNK_CHARS else [paragraph]:
+            parts = re.split(r"(?<=[.;:!?])\s+", line) if len(line) > BODY_CHUNK_CHARS else [line]
+            units.extend(part.strip() for part in parts if part.strip())
+    pieces: list[str] = []
+    for unit in units:
+        if pieces and len(pieces[-1]) + 2 + len(unit) <= BODY_CHUNK_CHARS:
+            pieces[-1] += "\n\n" + unit
+        else:
+            pieces.append(unit)
+    if len(pieces) > 1 and len(pieces[-1]) < MIN_PIECE_CHARS:
+        pieces[-2] += "\n\n" + pieces.pop()
+    context = f"Documento: {document.title}"
+    chunks = []
+    for i, piece in enumerate(pieces):
+        window = "\n\n".join(pieces[max(0, i - 1): i + 2])
+        chunks.append({
+            "id": f"{document.doc_id}#{i + 1}", "seccion": "", "texto": f"{context}\n\n{window}",
+            "tokens": (len(window) + len(context)) // 4, "embed": f"{context}\n\n{piece}",
+        })
+    return chunks
+
+
+def normalized_title(title: str) -> str:
+    """Título comparable: sin tildes, numeración inicial («1. »), copias («(1)») ni signos."""
+    text = unicodedata.normalize("NFKD", title).encode("ascii", "ignore").decode().lower()
+    text = re.sub(r"^\s*\d+[.)]\s*|\(\d+\)", " ", text)
+    return " ".join(re.findall(r"[a-z0-9]+", text))
+
+
+def same_title(a: str, b: str) -> bool:
+    """Mismo documento: mismas palabras salvo erratas leves, y las palabras con números idénticas (versión, período).
+
+    Sin la regla de los números, «V5.0» o «2027SEM01» pasarían por copia de «V4.0» o «2026SEM02» y la versión
+    nueva que manda Comunicación se descartaría.
+    """
+    wa, wb = normalized_title(a).split(), normalized_title(b).split()
+    return len(wa) == len(wb) and all(
+        x == y or (not re.search(r"\d", x + y) and SequenceMatcher(None, x, y).ratio() >= SAME_WORD)
+        for x, y in zip(wa, wb)
+    )
 
 
 def parse_email(raw: bytes, allowed_senders: set[str]) -> ParsedEmail:
@@ -231,14 +292,15 @@ def ingest_email(raw: bytes, settings: Settings) -> list[dict[str, object]]:
     from .search import vectors  # carga perezosa del modelo de embeddings, igual que processing.process
 
     email = parse_email(raw, settings.allowed_email_senders)
+    email = replace(email, attachments=_new_attachments(email.attachments))
     documents = build_documents(email)
     classified = [classify(document, email.category, settings) for document in documents]
     # Los adjuntos heredan el tema del correo para que el comunicado quede agrupado en el catálogo.
     topic = classified[0][0].topic
     prepared = []
     for index, (document, (label, usage)) in enumerate(zip(documents, classified, strict=True)):
-        chunks = make_chunks(document.doc_id, document.title, document.text)
-        vectors_ = [vectors.embed(f"{ch['seccion']}\n{ch['texto'][:2000]}") for ch in chunks]
+        chunks = body_chunks(document) if index == 0 else make_chunks(document.doc_id, document.title, document.text)
+        vectors_ = [vectors.embed(ch.get("embed") or f"{ch['seccion']}\n{ch['texto'][:2000]}") for ch in chunks]
         prepared.append((document, "comunicado" if index == 0 else label.doc_type, label, usage, chunks, vectors_))
 
     notes = f"Correo de {email.sender} · {email.message_id}" + (f" · categoría «{email.category}»" if email.category else "")
@@ -258,6 +320,21 @@ def ingest_email(raw: bytes, settings: Settings) -> list[dict[str, object]]:
         }
         for document, tipo, _, usage, chunks, _ in prepared
     ]
+
+
+def _new_attachments(attachments: list[tuple[str, bytes]]) -> list[tuple[str, bytes]]:
+    """Omite los PDF que ya están en el corpus: una copia duplica fragmentos y desplaza otros en la búsqueda."""
+    # ponytail: compara títulos; si el corpus crece mucho o los nombres de archivo no dicen nada, comparar contenido
+    with conn() as c:
+        titles = [r["title"] for r in c.execute("SELECT title FROM documents WHERE uploaded_by = 'corpus' AND is_current").fetchall()]
+    kept = []
+    for filename, data in attachments:
+        twin = next((title for title in titles if same_title(Path(filename).stem, title)), None)
+        if twin:
+            logger.warning("Adjunto omitido, ya está en el corpus como «%s»: %s", twin, filename)
+        else:
+            kept.append((filename, data))
+    return kept
 
 
 def _store(prepared: list, topic: str, email: ParsedEmail, notes: str) -> None:

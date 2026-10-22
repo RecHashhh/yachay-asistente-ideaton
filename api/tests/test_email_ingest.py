@@ -4,8 +4,11 @@ from email.message import EmailMessage
 import pytest
 
 from app.email_ingest import (
+    BODY_CHUNK_CHARS,
     IngestError,
+    body_chunks,
     build_documents,
+    same_title,
     clean_body,
     clean_subject,
     decode_raw,
@@ -111,6 +114,52 @@ def test_build_documents_titles_body_with_date_and_stable_id() -> None:
     assert first[0].title == "Comunicado 16/10/2026: Retiro por caso Fortuito o Fuerza Mayor"
     assert first[0].kind == "email"
     assert first[0].doc_id.startswith("email_") and first[0].doc_id == second[0].doc_id
+
+
+def test_body_chunks_are_short_enough_for_the_embedding_window() -> None:
+    document = build_documents(parse_email(make_email().as_bytes(), ALLOWED))[0]
+    long_body = "\n\n".join(f"Párrafo {i}: " + "dato " * 20 for i in range(12))
+    chunks = body_chunks(type(document)(document.doc_id, document.title, "email", "comunicado", long_body, 1))
+
+    assert len(chunks) > 1
+    assert [c["id"] for c in chunks] == [f"{document.doc_id}#{i}" for i in range(1, len(chunks) + 1)]
+    for c in chunks:
+        header, searched = c["embed"].split("\n\n", 1)
+        assert header == f"Documento: {document.title}"
+        assert len(searched) <= BODY_CHUNK_CHARS  # lo que se indexa cabe en la ventana del modelo
+        assert c["texto"].startswith(header + "\n\n")  # mismo formato «Documento: …\n\n» que espera la búsqueda
+        assert searched in c["texto"]  # lo que se lee incluye lo indexado
+
+
+def test_body_chunks_keep_a_list_with_its_heading() -> None:
+    document = build_documents(parse_email(make_email().as_bytes(), ALLOWED))[0]
+    text = ("Listas participantes:\n\nLista A – Movimiento Sinergia\n\n" + "• Candidata A1 y su alterna\n\n" * 6
+            + "Lista D – Movimiento Wankurina\n\n" + "• Candidato D1 y su alterno\n\n" * 6)
+    chunks = body_chunks(type(document)(document.doc_id, document.title, "email", "comunicado", text, 1))
+
+    # Todo trozo indexado con candidatas de la Lista A se lee junto con su encabezado.
+    for c in chunks:
+        if "Candidata A1" in c["embed"]:
+            assert "Lista A – Movimiento Sinergia" in c["texto"]
+
+
+def test_long_paragraph_is_split_so_late_facts_are_indexed() -> None:
+    document = build_documents(parse_email(make_email().as_bytes(), ALLOWED))[0]
+    text = "Importante: " + "texto de relleno sobre co-requisitos. " * 12 + "El plazo para atender una devolución es de 16 horas."
+    chunks = body_chunks(type(document)(document.doc_id, document.title, "email", "comunicado", text, 1))
+
+    assert any("16 horas" in c["embed"] and len(c["embed"].split("\n\n", 1)[1]) <= BODY_CHUNK_CHARS for c in chunks)
+
+
+def test_same_title_detects_corpus_copies_but_not_new_versions() -> None:
+    corpus = "Procedimiento de Retiro de Estudiantes de Carrera V4.0"
+    assert same_title("1. Procedimiento de Retiro de Estuidantes de Carrera V4.0 (1)", corpus)  # copia con errata
+    assert not same_title("Instructivo Retiro Carrera 2026SEM02 (1)", "Instructivo Retiro Carrera 14 03 2025")
+    assert not same_title("UITEY-REC-2026-0304-M", corpus)
+    # Versiones nuevas: casi el mismo título, distinto número.
+    assert not same_title("Procedimiento de Retiro de Estudiantes de Carrera V5.0", corpus)
+    assert not same_title("Calendario Academico 2027Sem01", "Calendario Academico 2026Sem02")
+    assert not same_title("FORMATO ENTREGA TRABAJO DE TITULACION POSGRADO", "FORMATO ENTREGA TRABAJO DE TITULACION PREGRADO")
 
 
 def test_attachment_without_text_is_skipped_not_fatal() -> None:
