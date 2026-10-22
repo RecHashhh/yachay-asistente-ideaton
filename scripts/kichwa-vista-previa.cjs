@@ -10,12 +10,14 @@ const policy = JSON.parse(fs.readFileSync(path.join(base, 'politica-vista-previa
 const blocked = new Set(policy.blockedKeys);
 const allowed = new Set(policy.allowedProposals ?? []);
 const catalogue = JSON.parse(fs.readFileSync(path.join(base, 'catalogo-documentado.json'), 'utf8'));
+const complementary = JSON.parse(fs.readFileSync(path.join(base, 'borradores-complementarios.json'), 'utf8'));
 const preview = {}, omitted = [];
 const markers = text => JSON.stringify([...text.matchAll(/\{(\w+)\}/g)].map(x => x[1]).sort());
 for (const item of samples) {
   if (!(item.key in current)) continue; // Las preguntas de ejemplo no son etiquetas de interfaz.
-  const reason = blocked.has(item.key) ? 'discrepancia_en_revision' : !allowed.has(item.key) ? 'sin_respaldo_suficiente_en_contexto' : item.es !== current[item.key] ? 'origen_modificado' :
+  const reason = blocked.has(item.key) ? 'discrepancia_en_revision' : (!allowed.has(item.key) && !policy.allowUnreviewedDrafts) ? 'sin_respaldo_suficiente_en_contexto' : item.es !== current[item.key] ? 'origen_modificado' :
     !item.qu?.trim() ? 'traduccion_vacia' :
+      /proporciona (?:el|un)|lo siento, no puedo|texto que deseas traducir/i.test(item.qu) ? 'respuesta_meta_no_traduccion' :
       item.flags?.length ? item.flags.join(',') :
         markers(item.es) !== markers(item.qu) ? 'variables_alteradas' : null;
   if (reason) omitted.push({ key: item.key, reason });
@@ -35,7 +37,17 @@ for (const item of catalogue.entries) {
   if (item.es !== current[item.key] || !item.refs?.length || markers(item.es) !== markers(item.qu)) throw Error('Entrada documentada incompatible: ' + item.key);
   preview[item.key] = item.qu;
 }
+if (policy.allowUnreviewedDrafts) for (const item of complementary.entries) {
+  if (item.es !== current[item.key] || !item.qu.trim() || markers(item.es) !== markers(item.qu)) throw Error('Borrador complementario incompatible: ' + item.key);
+  preview[item.key] = item.qu;
+}
 fs.writeFileSync(path.join(root, 'web/src/lib/kichwa.preview.json'), JSON.stringify(preview, null, 2) + '\n');
 const report = { sources: ['PDF aportados por el usuario', 'https://alki.ec/'], mode: 'catalogo_documentado_y_propuestas_limitadas', approvedLinguistically: false, documentedInterfaceKeys: catalogue.entries.length, experimentalPhraseKeys: [...allowed], activeInterfaceKeys: Object.keys(preview).length, omittedScope: 'Propuestas originales de Alki omitidas; algunas claves cuentan con un reemplazo de diccionario activo.', omitted, exampleQuestionsStored: samples.filter(x => !(x.key in current)).length, institutionalAnswersTranslated: false };
+report.mode = policy.allowUnreviewedDrafts ? 'borrador_amplio_solicitado_por_usuario' : report.mode;
+report.totalNonemptyInterfaceKeys = Object.values(current).filter(text => text.trim()).length;
+report.pendingInterfaceKeys = Object.keys(current).filter(key => current[key].trim() && !(key in preview));
+report.coverageIsNotLinguisticAccuracy = true;
+report.complementaryDraftCount = policy.allowUnreviewedDrafts ? complementary.entries.length : 0;
+report.complementaryDraftSource = complementary.source;
 fs.writeFileSync(path.join(base, 'vista-previa.json'), JSON.stringify(report, null, 2) + '\n');
 console.log(JSON.stringify(report, null, 2));

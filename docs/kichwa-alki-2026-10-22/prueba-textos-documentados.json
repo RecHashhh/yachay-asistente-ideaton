@@ -8,7 +8,7 @@
   ],
   "delete": "Pichana",
   "undoRestoredChat": true,
-  "unreviewedDeletionNoticeUsesSpanish": true,
+  "deletionNotice": "Rimanakuy pichashka",
   "themes": [
     "Amsa",
     "Achik"

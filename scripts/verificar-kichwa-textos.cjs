@@ -7,6 +7,7 @@ const fs = require('node:fs');
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     const errors = [];
+    const preview = JSON.parse(fs.readFileSync('web/src/lib/kichwa.preview.json', 'utf8'));
     page.on('pageerror', error => errors.push(error.message));
     await page.addInitScript(() => {
       localStorage.setItem('yt-consent-2026-10c', '1');
@@ -21,10 +22,10 @@ const fs = require('node:fs');
     const headings = await page.locator('.chat-group h4').allTextContents();
     assert.ok(headings.includes('Kunan'));
     assert.ok(headings.includes('Kayna'));
-    await page.getByRole('button', { name: 'Opciones: Control de hoy', exact: true }).click();
+    await page.getByRole('button', { name: `${preview.options ?? 'Opciones'}: Control de hoy`, exact: true }).click();
     await page.getByRole('menuitem', { name: 'Pichana', exact: true }).click();
-    await page.getByText('Conversación eliminada', { exact: false }).waitFor();
-    await page.getByRole('button', { name: 'Deshacer', exact: true }).click();
+    await page.getByText(preview.deleted ?? 'Conversación eliminada', { exact: false }).waitFor();
+    await page.getByRole('button', { name: preview.undo ?? 'Deshacer', exact: true }).click();
     await page.getByRole('button', { name: 'Control de hoy', exact: true }).waitFor();
     await page.getByRole('button', { name: 'Amsa', exact: true }).click();
     await page.getByRole('button', { name: 'Achik', exact: true }).waitFor();
@@ -34,7 +35,7 @@ const fs = require('node:fs');
     assert.deepEqual(errors, []);
     fs.writeFileSync('docs/kichwa-alki-2026-10-22/prueba-textos-documentados.json', JSON.stringify({
       syntheticData: true, realModelCalled: false, send: 'Kachana', dateGroups: headings,
-      delete: 'Pichana', undoRestoredChat: true, unreviewedDeletionNoticeUsesSpanish: true,
+      delete: 'Pichana', undoRestoredChat: true, deletionNotice: preview.deleted ?? 'Conversación eliminada',
       themes: ['Amsa', 'Achik'], pageErrors: errors
     }, null, 2) + '\n');
     console.log('Etiquetas, agrupación por fecha, eliminación, deshacer y cambio de tema: correctos.');

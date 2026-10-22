@@ -12,7 +12,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || require.resolve('p
       const errors = [];
       page.on('pageerror', e => errors.push(e.message));
       await page.goto(base + '#/?lang=' + lang, { waitUntil: 'networkidle' });
-      const welcome = lang === 'en' ? /Which Yachay Tech procedure or place do you need\?/ : /¿Qué trámite o lugar de Yachay Tech necesitas\?/;
+      const preview = JSON.parse(fs.readFileSync('web/src/lib/kichwa.preview.json', 'utf8'));
+      const welcome = lang === 'qu' ? preview.helloSub.replace('{uni}', 'Yachay Tech') : lang === 'en' ? /Which Yachay Tech procedure or place do you need\?/ : /¿Qué trámite o lugar de Yachay Tech necesitas\?/;
       await page.getByText(welcome).waitFor({ state: 'visible', timeout: 10000 });
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2);
       assert.equal(overflow, false, 'Desbordamiento horizontal');
