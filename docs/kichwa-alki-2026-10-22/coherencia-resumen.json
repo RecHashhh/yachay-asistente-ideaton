@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-22",
+  "source": "https://alki.ec/",
+  "initialReverseTests": 12,
+  "contextualAlternatives": 4,
+  "contextualAlternativesAccepted": 0,
+  "initialReverseDiscrepancies": 11,
+  "ambiguousInitialResults": 1,
+  "linguisticApprovals": 0,
+  "scope": "Muestra dirigida de botones y bienvenida; no se evaluaron las 101 etiquetas publicadas.",
+  "limitation": "Comparar español con la salida inversa detecta discrepancias del sistema; no demuestra por sí solo el significado real de cada frase kichwa ni identifica qué dirección falla.",
+  "nextStep": "Contrastar con diccionario y revisión de hablantes, registrando variedad y contexto. No sustituir automáticamente las propuestas ni aceptar por coincidencia superficial.",
+  "productionChangedByThisAudit": false
+}

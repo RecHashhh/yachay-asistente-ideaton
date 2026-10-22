@@ -87,6 +87,61 @@ En la base local se han curado nueve guías, incluyendo residencias y participac
 
 Prueba de interfaz: `node scripts/verificar-utilidad.cjs`, con los mismos requisitos de Playwright de arriba y datos sintéticos. Comprobación opcional de lectura real: `api/tests/verify_guides_live.py` desde `api`; verifica las guías del corpus local y el enrutamiento ES/EN, sin invocar al modelo ni registrar consultas. Las fechas de las convocatorias históricas no se actualizan por inferencia.
 
+### Kichwa: propuestas de Alki y revisión humana
+
+El 22-10-2026 se probó [Alki](https://alki.ec/) mediante su formulario público, con ocho textos breves de interfaz. Las propuestas y su procedencia están en `docs/kichwa-alki-2026-10-22/muestras.json`. Se detectaron resultados iguales al original y una respuesta en español pidiendo texto en vez de traducir. Las muestras no tienen aprobación lingüística. Por solicitud del usuario, se activó una vista previa de interfaz con las propuestas sin alertas técnicas. La etiqueta visible «GEMINI» identifica lo que muestra la interfaz, no demuestra qué entrenamiento o arquitectura usa el proveedor.
+
+Se preparó una cola de **110 textos actuales** en `cola-es-qu.json` y `revision.csv`. El CSV anterior de 81 textos se conserva como material histórico. Cada propuesta guarda clave, texto español, variables, procedencia y estado. No se descargó el diccionario completo ni se enviaron conversaciones, adjuntos o documentos institucionales.
+
+Flujo de revisión:
+
+1. `node scripts/kichwa-preparar.cjs` exporta los textos actuales. Si ya existe `revision.csv`, escribe `revision-propuestas.csv` para conservar la revisión anterior. `--replace-review` reemplaza el CSV: usar solo si no contiene trabajo humano que conservar.
+2. Un revisor competente en la variedad de kichwa ecuatoriano elegida completa `kichwa_revisado`, `revisado_por`, `fecha` (AAAA-MM-DD) y `aprobada=si`. La propuesta automática no cuenta como revisión.
+3. `python scripts/kichwa-aprobar.py --check` comprueba el CSV contra los textos actuales y sus variables.
+4. `python scripts/kichwa-aprobar.py` importa únicamente filas aprobadas al catálogo completo `web/src/lib/kichwa.approved.json`. Usar el CSV completo, no uno parcial. Con cero aprobaciones conserva la interfaz existente. Después ejecutar la compilación.
+
+El importador rechaza claves duplicadas, textos españoles que cambiaron, traducciones vacías, revisiones sin responsable/fecha y variables ausentes o repetidas. Cuatro pruebas verifican estas condiciones (`python -m unittest discover -s scripts -p test_kichwa_aprobar.py`). Esto verifica el contrato técnico, no la corrección lingüística.
+
+El muestreo acotado de `scripts/kichwa-muestrear-alki.cjs` usa Playwright y el formulario visible, reutiliza lo guardado y se detiene ante errores; no califica resultados, crea cuentas ni elude límites. La web usa una llamada a `https://api.alki.ec/translate`, observada en el navegador. No se encontró documentación pública de integración, licencia o límites en las páginas revisadas: confirmar con el equipo de Alki antes de conectar el servicio a producción o redistribuir conjuntos de datos. No hay dependencia de Alki en tiempo de ejecución del chat. Las respuestas institucionales, voz y corpus no se traducen mediante este flujo de interfaz.
+
+Ampliación solicitada: `node scripts/kichwa-muestrear-alki.cjs --all` consulta secuencialmente los 110 textos de interfaz y 12 ejemplos genéricos de consulta, reutilizando propuestas ya guardadas. `python scripts/kichwa-exportar-consultas.py` crea una hoja separada para revisar esas preguntas: no las confunde con claves de interfaz ni convierte por sí sola al backend en un chatbot conversacional kichwa. Se trabaja con frases completas, porque traducir palabras aisladas no conserva necesariamente la gramática ni el sentido de un botón o una consulta.
+
+Recopilación completada el 22-10-2026: **121 propuestas guardadas** (109 de interfaz y 12 preguntas); la clave `originalQuote` tiene texto español vacío y no se envió al traductor. Las 13 frases con variables conservaron sus marcadores. Seis resultados tienen alertas técnicas: tres iguales al original y tres respuestas meta en español. Esto no constituye una tasa de precisión lingüística. Las hojas finales son `revision.csv` (110 claves, incluida la vacía) y `consultas-revision.csv` (12 preguntas); el inventario comprobado está en `cobertura.json`. No quedan frases con contenido sin consultar dentro de este alcance. No se atribuyeron revisiones humanas. Se activaron 101 textos de interfaz en vista previa mediante scripts/kichwa-vista-previa.cjs; el informe está en vista-previa.json. Se conservan en español los fallos técnicos y las claves cuyo original cambió. Las traducciones aprobadas tienen prioridad sobre la vista previa. Los aportes del usuario obtenidos de Alki se conservan en aportes-conversacion.json.
+
+Según la descripción del proyecto compartida por el usuario, Alki emplea RAG, Qdrant y FastAPI/Gemini, y las correcciones aportadas por usuarios pasan por lingüistas/hablantes antes de incorporarse a la memoria. Ese proceso respalda la curación de su base; no documenta una revisión humana individual de cada salida nueva. Se conserva esa distinción en `contexto-alki.json` y en el registro de propuestas. Las alertas registran fallos observables, no una evaluación lingüística automática completa.
+
+### Avance de kichwa: consulta documentada y límites actuales
+
+La revisión posterior detectó pérdidas de intención en la traducción inversa. Se conservan las evidencias en `coherencia-revision.csv`, `retrotraduccion.json` y `evidencia-diccionarios.json`, dentro de `docs/kichwa-alki-2026-10-22/`. La vuelta por el mismo proveedor no certifica el significado real de una frase; por eso se contrastaron además las entradas de los PDF aportados. Son extractos sin portada bibliográfica y no se asume que sean publicaciones independientes.
+
+La vista previa actual contiene **92 etiquetas**, no 101: nueve equivalencias con discrepancias vuelven a español y dos etiquetas se sustituyen por términos documentados: `Achik` (claro) y `Amsa` (oscuro). El bloqueo y sus excepciones están en `politica-vista-previa.json`, y el generador impide reactivar esas propuestas por accidente. Las restantes propuestas siguen pendientes de revisión lingüística; no se les atribuye aprobación humana. `revision.csv` conserva el trabajo previo y no se sobrescribe con aprobaciones automáticas.
+
+El backend incorpora una memoria léxica separada del corpus institucional (`api/app/kichwa.py`): trae 13 términos documentados con páginas y un resumen selectivo de gramática de Alki. Solo se utiliza con `lang=qu`, tanto para interpretar la pregunta antes de buscar como para redactar la respuesta. Las definiciones no se convierten en fuentes de requisitos, fechas o políticas universitarias. No se llama a Alki ni se entrena un modelo durante el chat. Mientras no existan respuestas conversacionales revisadas, el agente recibe instrucciones de responder en español, indicar que el kichwa está en revisión y pedir aclaración si no comprende la pregunta. Esto es una salvaguarda de instrucciones, no una certificación automática de lo que genere el modelo.
+
+Para ampliar la consulta con los PDF locales (requiere Python y `pypdf` para la extracción):
+
+```powershell
+python scripts/kichwa-extraer-diccionarios.py "RUTA/DICCIONARIO EN PDF ESPAÑOL A KICHWA.pdf" "RUTA/DICCIONARIO EN PDF KICHWA a ESPAÑOL.pdf"
+python scripts/kichwa-consultar-fuentes.py preguntar claro oscuro
+python scripts/kichwa-compilar-memoria.py --source docs/rag/kichwa-fuentes-locales/diccionario-2.json
+```
+
+La compilación realizada produjo **1.973 entradas** detectadas por formato, con referencia de página; no se afirma que cubra todo el diccionario ni que la extracción sea perfecta. `api/app/data/kichwa.local.json` se carga automáticamente si existe al iniciar el backend; también se puede indicar una ruta mediante `KICHWA_MEMORY_PATH` en el entorno del servidor. Reiniciar el proceso tras cambiar el índice. Sin el archivo local, la aplicación conserva las 13 referencias incluidas. Los PDF, sus extracciones completas y el índice local están excluidos de Git: los compañeros pueden reconstruirlo con los archivos originales, sin depender de rutas de este equipo. El índice no se añade a la búsqueda de documentos universitarios ni altera las citas institucionales.
+
+Validación sin servicios externos ni claves reales:
+
+```powershell
+node scripts/kichwa-vista-previa.cjs
+node --test scripts/test-kichwa-preview.cjs
+python -m unittest discover -s scripts -p test_kichwa_aprobar.py
+# Desde api/, con las dependencias del backend instaladas:
+python -m pytest tests/test_kichwa.py tests/test_agent.py tests/test_api.py -q
+# Desde la raíz:
+npm --prefix web run build
+```
+
+Para continuar, `consultas-revision.csv` contiene 12 preguntas pendientes: falta redactar y validar sus respuestas bilingües con fuentes institucionales y hablantes de la variedad escogida. Guardar vocabulario y recuperar referencias no equivale a entrenar un modelo ni demuestra todavía calidad conversacional en kichwa.
+
 ## Incrustar el asistente en cualquier página
 
 ```html

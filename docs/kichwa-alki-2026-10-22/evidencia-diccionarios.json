@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-22",
+  "scope": "Contraste léxico inicial de los PDF aportados por el usuario; no entrenamiento ni activación automática.",
+  "pageNumbering": "Página del archivo PDF, no numeración impresa. Son extractos sin portada bibliográfica; no se asumen autores, fecha ni independencia editorial.",
+  "documents": {
+    "esQu": "DICCIONARIO EN PDF ESPAÑOL A KICHWA.pdf",
+    "quEs": "DICCIONARIO EN PDF KICHWA a ESPAÑOL.pdf"
+  },
+  "entries": [
+    { "form": "kawsay", "meaning": "vida; también cultura", "references": [{ "document": "esQu", "pdfPage": 47 }, { "document": "quEs", "pdfPage": 37 }], "uiKey": "cancel", "decision": "Descartar equivalencia con Cancelar: las fuentes documentan otro sentido." },
+    { "form": "pukllay", "meaning": "juego", "references": [{ "document": "esQu", "pdfPage": 25 }], "uiKey": "steps", "decision": "Descartar equivalencia con Pasos de un trámite." },
+    { "form": "tatki", "meaning": "paso físico; también medida", "references": [{ "document": "esQu", "pdfPage": 34 }, { "document": "quEs", "pdfPage": 93 }], "uiKey": "steps", "decision": "No sustituir automáticamente: el contexto de instrucciones requiere una equivalencia adicional." },
+    { "form": "achik", "meaning": "luz, claridad, claro", "references": [{ "document": "esQu", "pdfPage": 9 }, { "document": "quEs", "pdfPage": 1 }], "uiKey": "themeLight", "candidateShortLabel": "Achik", "decision": "Propuesta breve con respaldo léxico, pendiente de revisión de uso en interfaz." },
+    { "form": "amsa", "meaning": "oscuro", "references": [{ "document": "esQu", "pdfPage": 33 }, { "document": "quEs", "pdfPage": 4 }], "uiKey": "themeDark", "candidateShortLabel": "Amsa", "decision": "Propuesta breve con respaldo léxico; la entrada marca variantes regionales, revisar con hablante." },
+    { "form": "tapuna", "meaning": "preguntar, averiguar, interrogar", "references": [{ "document": "esQu", "pdfPage": 36 }, { "document": "quEs", "pdfPage": 92 }], "uiKey": "placeholder", "decision": "Raíz documentada para elaborar una invitación a preguntar; no equivale por sí sola a Pregúntale a Yachi." },
+    { "form": "mushuk / rimanakuy", "meaning": "nuevo / dialogar, conversar", "references": [{ "document": "quEs", "pdfPage": 60 }, { "document": "esQu", "pdfPage": 62 }], "uiKey": "newChat", "decision": "Hay respaldo léxico de los componentes de Mushuk rimanakuy. La vuelta Nuevo lenguaje no basta para rechazarla; falta revisión de la frase en contexto." },
+    { "form": "llakta", "meaning": "pueblo, ciudad, comarca", "references": [{ "document": "quEs", "pdfPage": 48 }], "uiKey": "helloSub", "decision": "No asumir equivalencia genérica con cualquier lugar del campus." },
+    { "form": "yuyay", "meaning": "pensamiento, idea, memoria", "references": [{ "document": "quEs", "pdfPage": 118 }], "uiKey": "themeLight", "decision": "No respalda el sentido Tema claro." }
+  ],
+  "integration": {
+    "localSearch": "python scripts/kichwa-consultar-fuentes.py preguntar claro oscuro",
+    "fullExtraction": "docs/rag/kichwa-fuentes-locales/ (local e ignorado por Git)",
+    "grammarSummary": "gramatica-referencia.json",
+    "runtimeConnected": false,
+    "modelTrained": false,
+    "humanLinguisticApprovals": 0,
+    "reviewCsvOverwritten": false
+  }
+}

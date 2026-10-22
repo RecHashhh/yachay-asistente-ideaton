@@ -75,7 +75,7 @@ Leyenda: ✅ hecho y verificado · 🟡 hecho en parte o sin verificar con el si
 
 | Métrica | Dónde se mide | Valor actual |
 |---|---|---|
-| Exactitud total | Portal → Validación | 100 % **en el simulador** (26 casos); set real: **119 preguntas** cargadas, ejecución con el modelo pendiente (clave). Sin modelo: recall@5 86 %, reglas 26/26 |
+| Exactitud total | Portal → Validación | **Sin modelo (22/10, $0):** 87/119 = 73 % (documento correcto en 1.er lugar 78/101 = 77 %; aclaración 6/6; ES 72 % · EN 77 %; 0 alertas de respuesta sin fuente; p50 213 ms · p95 463 ms). «Sin información» correcto solo 3/12: sin modelo se muestra el fragmento más cercano aunque no responda; con la clave, el modelo responde SIN_INFORMACION. Con modelo: pendiente (clave) |
 | Citación correcta | Portal → Validación | 100 % simulador; real: pendiente |
 | "Sin información" correcto | Portal → Validación | 100 % simulador; real: pendiente |
 | Alucinaciones (respuestas sin fuente) | Portal → Validación | 0 simulador; real: pendiente |

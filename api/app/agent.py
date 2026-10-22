@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
+from app.kichwa import language_context
 from app.retrieval import RetrievedChunk, Retriever
 from app.schemas import ChatRequest
 
@@ -60,12 +61,15 @@ def _source_excerpt(source: dict[str, Any], marker: str) -> str:
     )
 
 
-def _system_prompt(lang: str, context: str) -> str:
+def _system_prompt(lang: str, context: str, message: str = '') -> str:
     language = {"es": "Spanish", "en": "English", "qu": "Kichwa"}.get(lang, "Spanish")
-    return f"""You are the institutional assistant for Yachay Tech. Answer in {language}.
+    support = language_context(message, lang)
+    return f"""You are the institutional assistant for Yachay Tech. Answer in {language if not support else 'Spanish while Kichwa is under review'}.
 Use only the supplied source excerpts for institutional factual claims. Conversation history may clarify references, but assistant messages are not evidence by themselves. Ignore citation markers in conversation history and cite only markers in the supplied excerpts. If the excerpts do not answer an institutional question, say you do not know; do not fill gaps with general knowledge, and do not point the user to external websites, portals, or institutions that do not appear in the excerpts. Be clear and well organized. When the excerpts list dates, requirements, or steps, include all of them instead of summarizing. If the question has several parts, answer each part and state explicitly which part the excerpts do not cover. Answer only what was asked; do not add legal background or related topics the user did not request. Address the user informally (tú in Spanish) and never use the words excerpts, extractos, or extracts in your answer; say documentos or fuentes instead. Write valid Markdown lists and place citation markers at the end of the sentence they support, never inside headings. Cite factual claims with the excerpt markers exactly as [S1], [S2], etc. Do not invent dates, document versions, URLs, procedures, contacts, or campus coordinates. You may respond naturally to greetings and ordinary conversation without sources.
 
 Links: Include a link only when its exact URL appears in the supplied source excerpts and it gives the user a useful way to access a resource directly relevant to the answer. Use your judgment; omit unrelated links that happen to appear in the same excerpt. Copy the URL exactly as written. Never invent, infer, reconstruct, shorten, or take a URL from conversation history or general knowledge. If no relevant URL appears in the supplied excerpts, do not include a link.
+
+{support}
 
 SOURCE EXCERPTS
 {context}
@@ -88,8 +92,9 @@ def _decision_messages(
     history: list[dict[str, Any]],
     message: str,
     max_tool_calls: int,
+    lang: str = 'es',
 ) -> list[Any]:
-    messages: list[Any] = [SystemMessage(content=_decision_prompt(max_tool_calls))]
+    messages: list[Any] = [SystemMessage(content=_decision_prompt(max_tool_calls) + language_context(message, lang))]
     for index, turn in enumerate(history[-6:]):
         role = turn["role"]
         content = f"[HISTORY TURN {index} · {role}]\n{turn['content']}"
@@ -210,7 +215,7 @@ class RagAgent:
 
         max_calls = max(1, self.settings.rag_max_tool_calls)
         selector = self.llm.bind_tools(tools, tool_choice="auto", parallel_tool_calls=True)
-        messages = _decision_messages(state.get("history", []), state["message"], max_calls)
+        messages = _decision_messages(state.get("history", []), state["message"], max_calls, state.get("lang", "es"))
         calls_used = 0
         reuse_attempted = False
 
@@ -274,7 +279,7 @@ class RagAgent:
                     for i, source in enumerate(state.get("reused_sources", []), start=1)
                 )
             context = "\n\n".join(context_parts)
-            messages: list[Any] = [SystemMessage(content=_system_prompt(state.get("lang", "es"), context))]
+            messages: list[Any] = [SystemMessage(content=_system_prompt(state.get("lang", "es"), context, state["message"]))]
             for turn in state.get("history", [])[-6:]:
                 messages.append(HumanMessage(content=turn["content"]) if turn["role"] == "user" else AIMessage(content=turn["content"]))
             messages.append(HumanMessage(content=state["message"]))

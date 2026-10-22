@@ -1,0 +1,16 @@
+{
+  "source": "https://alki.ec/gramatica",
+  "consultedOn": "2026-10-22",
+  "type": "Resumen selectivo, no copia completa ni gramática validada por el equipo",
+  "rules": [
+    { "form": "-manta", "summary": "Indica origen o asunto; no expresa por sí solo necesitar." },
+    { "form": "-ta", "summary": "Marca el objeto directo." },
+    { "form": "-tak", "summary": "Se emplea con pronombres interrogativos." },
+    { "form": "-chu", "summary": "Interviene en preguntas cerradas y negaciones." },
+    { "form": "-kuna", "summary": "Marca plural." },
+    { "form": "-nchik", "summary": "Corresponde a primera persona plural." }
+  ],
+  "usage": "Contrastar estructura y significado con los diccionarios. No concatenar raíces y sufijos para declarar una traducción aprobada.",
+  "runtimeIntegrated": false,
+  "humanReviewed": false
+}
