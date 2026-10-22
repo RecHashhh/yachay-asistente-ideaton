@@ -1,0 +1,61 @@
+{
+  "model": "ctaguchi/killkan_asr",
+  "revision": "2d00fbbb610ea6f7579d3a008cfe6aa4fbb95251",
+  "dataset": "ctaguchi/killkan",
+  "split": "test",
+  "scope": "Only first three test samples; not a representative accuracy estimate or microphone validation.",
+  "normalization": "lowercase, remove punctuation, preserve accents",
+  "results": [
+    {
+      "row": 0,
+      "reference": "Ari ari, kikin.",
+      "hypothesis": "Ari ari, kikin.",
+      "audioSeconds": 2.37,
+      "inferenceSeconds": 22.51,
+      "wordErrors": 0,
+      "referenceWords": 3
+    },
+    {
+      "row": 1,
+      "reference": "Policíakunata ama manchaychu.",
+      "hypothesis": "Policíakunata ama manchaychu.",
+      "audioSeconds": 1.6,
+      "inferenceSeconds": 32.39,
+      "wordErrors": 0,
+      "referenceWords": 3
+    },
+    {
+      "row": 2,
+      "reference": "Nachu pachamama, allpamama nikunchik?",
+      "hypothesis": "Nachu pachamama, allpamama nikunchik?",
+      "audioSeconds": 3.23,
+      "inferenceSeconds": 8.32,
+      "wordErrors": 0,
+      "referenceWords": 4
+    }
+  ],
+  "wer": 0.0,
+  "apiSmoke": {
+    "status": 200,
+    "hypothesis": "Ari ari, kikin.",
+    "reference": "Ari ari, kikin.",
+    "seconds": 41.19
+  },
+  "attribution": {
+    "authors": [
+      "Chihiro Taguchi",
+      "Jefferson Saransig",
+      "Dayana Velasquez",
+      "David Chiang"
+    ],
+    "modelLicense": "CC-BY-4.0",
+    "datasetUrl": "https://huggingface.co/datasets/ctaguchi/killkan",
+    "modelUrl": "https://huggingface.co/ctaguchi/killkan_asr"
+  },
+  "runtime": {
+    "torch": "2.14.1",
+    "transformers": "4.57.6",
+    "soundfile": "0.14.0"
+  },
+  "microphoneValidatedByNativeSpeaker": false
+}

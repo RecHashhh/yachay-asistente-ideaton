@@ -30,6 +30,11 @@ const assert = require('node:assert/strict');
     await page.waitForFunction(() => document.querySelector('#ask')?.value === 'alli puncha');
     assert.equal(requests, 1);
     assert.equal(await page.locator('.msg.user').count(), 0, 'Must not send the transcript automatically');
+    await mic.click();
+    await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await page.waitForFunction(() => !document.querySelector('#ask')?.disabled);
+    assert.equal(requests, 1, 'Cancelled recording must not be uploaded');
+    assert.equal(await page.locator('#ask').inputValue(), 'alli puncha');
     const spoken = await page.evaluate(async () => {
       const module = await import('/src/lib/speech.ts');
       let calls = 0;

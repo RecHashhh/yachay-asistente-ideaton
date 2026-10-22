@@ -17,7 +17,7 @@ import { ChatList } from '../components/ChatList';
 import { ClarifyCard, FeedbackPanel } from '../components/Feedback';
 import { TranslationReport } from '../components/TranslationReport';
 import { VoiceMode } from '../components/VoiceMode';
-import { loadPrefs, speak, stopSpeaking, toSpeech, ttsSupported } from '../lib/speech';
+import { loadPrefs, speak, stopSpeaking, toSpeech, ttsSupported, voicesFor, whenVoicesReady } from '../lib/speech';
 import type { FeedbackReason } from '../lib/inbox';
 import type { Attachment, ChatTurn, MapAction, Procedure, ProcessStep, Source, Topic, Trend, Unknown } from '../lib/types';
 import { ActivityPanel } from '../components/ActivityPanel';
@@ -509,10 +509,16 @@ function AssistantMsg({ m, question, transcript, theme, mapConfig, onVote, onRea
   const [copied, setCopied] = useState(false);
   const [openSrc, setOpenSrc] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
+  const [readingError, setReadingError] = useState('');
   useEffect(() => () => { if (reading) stopSpeaking(); }, [reading]);
   // Lectura completa de la respuesta (incluye los pasos del trámite y la fuente).
   const readAloud = async () => {
     if (reading) { stopSpeaking(); setReading(false); return; }
+    setReadingError('');
+    if (lang === 'qu') {
+      await whenVoicesReady();
+      if (!voicesFor(lang).length) { setReadingError('No hay una voz Kichwa instalada para leer esta respuesta.'); return; }
+    }
     const s = toSpeech(m, lang, t('unknownTitle'), t('unknownBody'));
     setReading(true);
     await speak([s.intro.replace(/Di "siguiente"[^.]*\.|Say "next"[^.]*\./, ''), ...s.steps, s.outro].join(' '), lang, loadPrefs());
@@ -594,6 +600,7 @@ function AssistantMsg({ m, question, transcript, theme, mapConfig, onVote, onRea
           </div>
         )}
 
+        {readingError && <p className="small muted" role="status">{readingError}</p>}
         {m.vote === 'down' && !m.streaming && (
           <FeedbackPanel office={m.procedure?.office ?? (lang === 'en' ? "Registrar's Office" : 'Secretaría General')} question={question ?? ''} transcript={transcript} onReason={onReason} />
         )}
