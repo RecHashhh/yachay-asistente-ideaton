@@ -504,3 +504,148 @@ select option{background:var(--surface);color:var(--ink)}
 :root[data-theme="dark"] .real-map .leaflet-tile{filter:brightness(.62) invert(1) contrast(.9) hue-rotate(180deg) saturate(.6)}
 .real-map figcaption>span:nth-child(2){min-width:0;overflow-wrap:anywhere}
 @media(max-width:600px){.guides-main{padding:24px 16px 48px}.guide-result{padding:14px}}
+
+/* ==========================================================================
+   Portal de administración institucional (Universidad Yachay Tech)
+   Franja azul institucional con filete celeste, índice lateral tipo registro con contadores reales,
+   títulos en Source Serif 4, interfaz en Public Sans y cifras en IBM Plex Mono. Ocupa toda la ventana en PC.
+   ========================================================================== */
+.adm,.adm-login{
+  --f-ui:"Public Sans","Segoe UI",sans-serif; --f-display:"Source Serif 4",Georgia,serif;
+  --band:#173f5f; --band-ink:#ffffff; --band-muted:#c3d4e3; --band-line:rgba(255,255,255,.18);
+  --band-ok:#86efac; --band-warn:#fcd34d; --band-crit:#fca5a5; --ok-ink:#166534;
+  --rail-w:260px; --band-h:62px;
+  font-family:var(--f-ui);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .adm, :root:not([data-theme="light"]) .adm-login{ --band:#0f2436; --band-muted:#a9c0d3; --ok-ink:#86efac } }
+:root[data-theme="dark"] .adm, :root[data-theme="dark"] .adm-login{ --band:#0f2436; --band-muted:#a9c0d3; --ok-ink:#86efac }
+
+.adm{min-height:100dvh;display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);grid-template-rows:auto 1fr;grid-template-areas:"band band" "index main";background:var(--bg)}
+.adm button,.adm input,.adm select,.adm textarea{font-family:inherit}
+.adm > *{min-width:0} /* la franja de secciones en móvil se desplaza dentro de sí, sin ensanchar la página */
+.adm .table-wrap,.adm-index{position:relative} /* los textos solo para lector de pantalla (.sr) quedan recortados dentro de su zona con desplazamiento */
+
+/* Franja institucional */
+.adm-band{grid-area:band;position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;min-height:var(--band-h);padding:8px clamp(16px,2vw,28px);background:var(--band);color:var(--band-ink);border-bottom:3px solid var(--brand-2)}
+.adm-brand{display:flex;align-items:center;gap:12px;min-width:0}
+.adm-brand > div{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.adm-brand b{font-size:15.5px;font-weight:600;white-space:nowrap}
+.adm-inst{font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--band-muted)}
+.adm-icon{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:var(--r);border:0;background:none;color:var(--band-ink);cursor:pointer}
+.adm-icon:hover{background:rgba(255,255,255,.12)}
+.adm-icon svg{width:18px;height:18px}
+.adm-seal{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border:1px solid var(--band-line);border-radius:999px;font-size:13px;white-space:nowrap}
+.adm-seal i{width:8px;height:8px;border-radius:50%;background:var(--band-ok);box-shadow:0 0 0 3px rgba(134,239,172,.18)}
+.adm-seal.warn i{background:var(--band-warn);box-shadow:0 0 0 3px rgba(252,211,77,.2)}
+.adm-seal.crit i{background:var(--band-crit);box-shadow:0 0 0 3px rgba(252,165,165,.2)}
+.adm-user{font-size:13px;color:var(--band-muted);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adm-out{border:1px solid var(--band-line);background:none;color:var(--band-ink);border-radius:var(--r);padding:6px 14px;font-size:13.5px;font-weight:600;cursor:pointer}
+.adm-out:hover{background:rgba(255,255,255,.12)}
+.adm-band :focus-visible{outline:2px solid #fff;outline-offset:2px}
+.adm-band .badge-demo{background:var(--band-warn);color:#3b2a00}
+
+/* Índice lateral tipo registro */
+.adm-index{grid-area:index;position:sticky;top:var(--band-h);align-self:start;height:calc(100dvh - var(--band-h));overflow:auto;padding:24px 12px;background:var(--surface);border-right:1px solid var(--line)}
+.adm-group + .adm-group{margin-top:22px}
+.adm-group-h{display:block;padding:0 12px 8px;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.adm-index ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.adm-index button{position:relative;display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px 9px 14px;border:0;border-radius:var(--r);background:none;font-size:14.5px;color:var(--ink);text-align:left;cursor:pointer}
+.adm-index button:hover{background:var(--surface-2)}
+.adm-index button[aria-current="page"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.adm-index button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.adm-cur{position:absolute;left:0;top:7px;bottom:7px;width:4px;border-radius:0 3px 3px 0;background:var(--accent)}
+.adm-label{flex:1;min-width:0}
+.adm-count{font-family:var(--f-mono);font-size:12px;min-width:26px;text-align:center;padding:1px 7px;border-radius:999px;background:var(--surface-2);color:var(--muted);font-variant-numeric:tabular-nums}
+.adm-count.warn{background:var(--warm-soft);color:var(--warm-ink);font-weight:600}
+.adm-count.crit{background:var(--crit-soft);color:var(--crit);font-weight:600}
+
+/* Contenido: fluido, ocupa el ancho disponible */
+.adm-main{grid-area:main;min-width:0;display:flex;flex-direction:column;gap:18px;padding:clamp(20px,2.4vw,36px) clamp(16px,2.8vw,48px) 72px}
+.adm-eyebrow{margin:0 0 -10px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.adm-main > header{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;padding-bottom:18px;border-bottom:1px solid var(--line)}
+.adm-main > header h2{font-family:var(--f-display);font-weight:600;font-size:clamp(26px,2.1vw,34px);letter-spacing:-.01em;line-height:1.15}
+.adm-main > header p{margin-top:6px;max-width:82ch;color:var(--muted);font-size:15px;line-height:1.55}
+.adm-main h3{font-size:16px;font-weight:600}
+.adm .card{border-radius:var(--r-lg);box-shadow:none;padding:20px}
+
+/* Resumen que filtra (Documentos) y KPI de las demás secciones con la misma lectura */
+.adm-summary,.adm .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);overflow:hidden}
+.adm-summary button,.adm .kpi{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:14px 18px;border:0;border-right:1px solid var(--line);border-radius:0;background:none;color:var(--ink);text-align:left}
+.adm-summary button{cursor:pointer;position:relative}
+.adm-summary button:last-child,.adm .kpi:last-child{border-right:0}
+.adm-summary b,.adm .kpi b{font-family:var(--f-mono);font-weight:500;font-size:clamp(22px,1.8vw,28px);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.adm-summary span,.adm .kpi span{font-size:13px;color:var(--muted)}
+.adm-summary button:hover{background:var(--surface-2)}
+.adm-summary button[aria-pressed="true"]{background:var(--accent-soft);box-shadow:inset 0 -3px 0 var(--accent)}
+.adm-summary button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.adm-summary .crit b{color:var(--crit)} .adm-summary .warn b{color:var(--warm-ink)}
+
+.adm-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.adm-tools .inp{width:auto;flex:1 1 300px;max-width:460px}
+.adm-tools select.inp{flex:0 1 260px}
+
+/* Tablas de registro */
+.adm .table-wrap{border-radius:var(--r-lg)}
+.adm .table-wrap table{font-size:14px}
+.adm .table-wrap th{background:var(--surface-2);font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:11px 16px}
+.adm .table-wrap td{padding:12px 16px}
+.adm .table-wrap tbody tr:hover{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
+.adm-table .mono{font-variant-numeric:tabular-nums;white-space:nowrap}
+.adm-table .num{text-align:right}
+.adm-table .nowrap{white-space:nowrap}
+.adm-doc{display:flex;align-items:baseline;gap:10px;min-width:220px}
+.adm-doc .t{display:block}
+.adm-sub{display:block;margin-top:2px;font-size:12.5px;color:var(--muted)}
+.adm-table .adm-st{white-space:nowrap}
+.adm-note{white-space:normal;max-width:280px}
+.adm-kind{flex:none;font-family:var(--f-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border:1px solid var(--line-hi);border-radius:3px;padding:0 5px}
+.adm-old{color:var(--warm-ink)}
+.adm-actions{display:flex;justify-content:flex-end;gap:6px;flex-wrap:nowrap}
+.adm-empty{text-align:center;padding:36px 16px !important;color:var(--muted)}
+.adm-tag{display:inline-block;padding:2px 9px;border-radius:4px;font-size:12px;font-weight:600;white-space:nowrap}
+.adm-tag.indexado{background:var(--ok-soft);color:var(--ok-ink)}
+.adm-tag.procesando{background:var(--warm-soft);color:var(--warm-ink)}
+.adm-tag.error{background:var(--crit-soft);color:var(--crit)}
+
+/* Subir y Temas: dos columnas en PC */
+.adm-upload{display:grid;grid-template-columns:minmax(260px,1fr) minmax(0,2fr);gap:18px;align-items:start}
+.adm-upload .drop{min-height:280px;justify-content:center;background:var(--surface)}
+.adm-split{display:grid;grid-template-columns:minmax(0,2fr) minmax(300px,1fr);gap:18px;align-items:start}
+.adm-split form.card{gap:14px}
+
+/* Inicio de sesión institucional */
+.adm-login{min-height:100dvh;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(380px,.85fr);background:var(--bg)}
+.adm-login-side{display:flex;flex-direction:column;justify-content:center;gap:18px;padding:clamp(32px,6vw,104px);background:var(--band);color:var(--band-ink);border-right:4px solid var(--brand-2)}
+.adm-login-side h1{font-family:var(--f-display);font-weight:600;font-size:clamp(32px,3.4vw,52px);line-height:1.08;letter-spacing:-.015em;max-width:16ch}
+.adm-login-side p{color:var(--band-muted);font-size:17px;line-height:1.6;max-width:52ch}
+.adm-login-facts{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:10px;font-size:15px}
+.adm-login-facts li{display:flex;gap:12px;align-items:baseline}
+.adm-login-facts li::before{content:"";flex:none;width:8px;height:8px;background:var(--brand-2);transform:translateY(-1px)}
+.adm-login-form{align-self:center;justify-self:center;width:min(400px,100% - 32px);display:flex;flex-direction:column;gap:16px;padding:32px 0}
+.adm-login-form h2{font-size:22px;font-weight:700}
+.adm-login-form :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Pantallas medianas: índice más angosto; en laptops chicas se oculta la columna Origen para que la tabla quepa */
+@media (max-width: 1366px){ .adm{--rail-w:232px} }
+@media (max-width: 1320px){ .adm-col-origin{display:none} }
+@media (max-width: 1180px){ .adm{--rail-w:224px} .adm-user{display:none} }
+/* Tableta y móvil: el índice pasa a una franja deslizable bajo la cabecera */
+@media (max-width: 900px){
+  .adm{grid-template-columns:minmax(0,1fr);grid-template-areas:"band" "index" "main"}
+  .adm-band{position:static;flex-wrap:wrap;gap:10px}
+  .adm-seal{order:5;flex-basis:100%;justify-content:center}
+  .adm-brand b{white-space:normal}
+  .adm-index{position:sticky;top:0;z-index:15;height:auto;width:100%;display:flex;gap:4px;overflow-x:auto;padding:8px;border-right:0;border-bottom:1px solid var(--line);scrollbar-width:none}
+  .adm-group{flex:none}
+  .adm-group + .adm-group{margin-top:0}
+  .adm-group-h{display:none}
+  .adm-index ul{flex-direction:row;gap:4px}
+  .adm-index button{white-space:nowrap;padding:8px 12px}
+  .adm-cur{left:10px;right:10px;top:auto;bottom:0;width:auto;height:3px;border-radius:3px 3px 0 0}
+  .adm-upload,.adm-split{grid-template-columns:minmax(0,1fr)}
+  .adm-upload .drop{min-height:160px}
+  .adm-login{grid-template-columns:minmax(0,1fr)}
+  .adm-login-side{border-right:0;border-bottom:4px solid var(--brand-2);padding:32px 20px}
+  .adm-login-side p,.adm-login-facts{display:none}
+}
+@media (max-width: 560px){ .adm-summary,.adm .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .adm-summary button:nth-child(2n),.adm .kpi:nth-child(2n){border-right:0} .adm-summary button,.adm .kpi{border-bottom:1px solid var(--line)} }

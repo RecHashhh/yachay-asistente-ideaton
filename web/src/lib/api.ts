@@ -107,6 +107,10 @@ export interface RegisteredInquiry {
   transcript: string | null; status: 'nueva' | 'en_atencion' | 'resuelta'; created_at: string;
 }
 export const listInquiries = (): Promise<RegisteredInquiry[]> => MOCK ? Promise.resolve([]) : json('/admin/inquiries');
+
+/** Bitácora del Portal: quién cambió la base de conocimiento y cuándo (últimas 200 acciones). */
+export interface AuditEntry { at: string; email: string; action: string; target: string | null }
+export const listAudit = (): Promise<AuditEntry[]> => (MOCK ? Promise.resolve([]) : json('/admin/audit'));
 export const updateInquiry = (code: string, status: RegisteredInquiry['status']): Promise<void> =>
   json(`/admin/inquiries/${encodeURIComponent(code)}`, { method: 'PATCH', body: JSON.stringify({ status }) });
 export function updateInbox(id: string, patch: Partial<Pick<inbox.InboxItem, 'status' | 'controlId'>>): Promise<void> {
