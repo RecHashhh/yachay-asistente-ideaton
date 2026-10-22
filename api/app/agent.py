@@ -127,6 +127,8 @@ class RagAgent:
             raise RuntimeError("ANTHROPIC_API_KEY es necesaria para generar respuestas")
         self.settings = settings
         self.retriever = retriever or Retriever(settings)
+        # Se llama con el uso de tokens de cada decisión (registro de gasto real); opcional.
+        self.usage_hook = None
         self.llm = ChatAnthropic(
             model=settings.anthropic_model,
             anthropic_api_key=key,
@@ -265,6 +267,8 @@ class RagAgent:
 
         while calls_used < max_calls:
             decision = await selector.ainvoke(messages)
+            if self.usage_hook:
+                self.usage_hook(getattr(decision, "usage_metadata", None))
             tool_calls = [
                 item for item in getattr(decision, "tool_calls", [])
                 if item.get("name") in {tool_.name for tool_ in tools}

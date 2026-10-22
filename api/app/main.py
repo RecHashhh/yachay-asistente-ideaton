@@ -308,6 +308,13 @@ def admin_logout(authorization: str = Header(default="")):
     return {"ok": True}
 
 
+@app.get("/admin/usage")
+def admin_usage(_: str = Depends(admin)):
+    """Gasto real del modelo (tokens y USD) frente al tope, y estado del interruptor YACHI_LLM."""
+    from . import usage
+    return usage.summary()
+
+
 @app.get("/admin/audit")
 def admin_audit_log(_: str = Depends(admin)):
     with conn() as c:

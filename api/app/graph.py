@@ -25,13 +25,14 @@ import anthropic
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
 
-from . import contacts, filters, procedures, rules
+from . import contacts, filters, procedures, rules, usage
 from .config import settings
 from .db import conn
 from .kichwa import language_context
 from .search import Hit, expand, hits_by_ids, hybrid
 
-client = anthropic.AsyncAnthropic() if settings.has_anthropic_key else None
+# Cliente del modelo solo con clave y con YACHI_LLM encendido; además, cada uso pasa por usage.budget_ok() (tope de gasto).
+client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key.get_secret_value()) if settings.has_anthropic_key else None
 
 MARK = re.compile(r"\s?\[F\d+(?:\s*,\s*F?\d+)*\]")
 MIN_COS = 0.42  # por debajo, y sin coincidencias de texto, no hay fuente suficiente (calibrar con el set de control)
@@ -358,6 +359,7 @@ def _agent():
         from .yachi_retriever import YachiRetriever
 
         _agent_instance = RagAgent(settings, YachiRetriever(settings))
+        _agent_instance.usage_hook = lambda md: usage.record_langchain("agente", md)  # tokens reales de cada decisión
     return _agent_instance
 
 
@@ -420,7 +422,7 @@ async def retrieve(state: State) -> State:
         q = f"{q} violencia consejería de derechos"
     prev = next((h["content"] for h in reversed(state.get("history") or []) if h.get("role") == "user"), "")
     query = f"{prev} {q}" if prev and len(q.split()) < 6 else q  # preguntas de seguimiento cortas ("¿y los requisitos?")
-    if settings.agent_enabled:
+    if settings.agent_enabled and usage.budget_ok():
         return await _agent_retrieve(state, q, lang, where_es, where_en)
     t_search = time.time()
     hits = hybrid(query, k=5)
@@ -456,7 +458,7 @@ async def generate(state: State) -> State:
     w = get_stream_writer()
     lang = state["lang"]
     hits = state["hits"]
-    if client is None:
+    if client is None or not usage.budget_ok():  # sin clave, interruptor apagado o tope de gasto alcanzado
         # Sin clave de API: modo extractivo (muestra el fragmento más relevante, sin redactar). Útil para probar la búsqueda.
         h = hits[0]
         if state.get("triage") == "denuncia":
@@ -525,12 +527,13 @@ async def generate(state: State) -> State:
                 w({"type": "token", "text": safe[sent:]})
                 sent = len(safe)
         final = await stream.get_final_message()
-    usage = final.usage
+    usage_ = final.usage
+    usage.record_anthropic("redaccion", usage_)
     if buf.strip().startswith("SIN_INFORMACION"):
         _step("write", _t(lang, "Los fragmentos no responden tu pregunta", "The excerpts don't answer your question"), "warn",
               detail=_t(lang, "Prefiero no responder antes que adivinar.", "I'd rather not answer than guess."))
         w({"type": "unknown", "item": {"reason": "sin_fuente", "contact": _contact(hits[0].topic_id, lang, state["question"])}})
-        return {"kind": "sin_fuente", "doc_ids": [], "tokens_in": usage.input_tokens, "tokens_out": usage.output_tokens}
+        return {"kind": "sin_fuente", "doc_ids": [], "tokens_in": usage_.input_tokens, "tokens_out": usage_.output_tokens}
     clean = MARK.sub("", buf)
     if len(clean) > sent:
         w({"type": "token", "text": clean[sent:]})
@@ -556,7 +559,7 @@ async def generate(state: State) -> State:
                                                          + ", ".join(bad[:4]) + "). Verifícalos en la fuente.",
                                                          "Some details in this answer do not appear verbatim in the cited documents (" + ", ".join(bad[:4]) + "). Check them in the source.")})
     return {"kind": "respuesta_no_verificada" if bad else "respuesta" if cited else "respuesta_sin_marcas", "doc_ids": [h.doc_id for h in used],
-            "tokens_in": usage.input_tokens, "tokens_out": usage.output_tokens}
+            "tokens_in": usage_.input_tokens, "tokens_out": usage_.output_tokens}
 
 
 async def finish(state: State) -> State:

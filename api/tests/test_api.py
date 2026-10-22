@@ -103,6 +103,8 @@ async def test_agent_results_become_yachi_hits_with_real_steps(monkeypatch) -> N
     monkeypatch.setattr(graph, "hits_by_ids", lambda ids, scores=None: seen_ids.extend(ids) or [fake_hit()])
     monkeypatch.setattr(graph, "get_stream_writer", lambda: events.append)
     monkeypatch.setattr(graph.settings, "anthropic_api_key", SecretStr("fake-key"))
+    monkeypatch.setattr(graph.settings, "llm_switch", "on")  # independiente del YACHI_LLM del .env local
+    monkeypatch.setattr(graph.usage, "budget_ok", lambda: True)  # sin base en estas pruebas
     monkeypatch.setattr(graph, "_n_docs", lambda: 75)
 
     result = await graph.retrieve({"question": "¿Cómo me matriculo?", "lang": "es", "history": []})
@@ -123,6 +125,8 @@ async def test_agent_without_evidence_answers_unknown(monkeypatch) -> None:
     monkeypatch.setattr(graph, "hits_by_ids", lambda ids, scores=None: [])
     monkeypatch.setattr(graph, "get_stream_writer", lambda: events.append)
     monkeypatch.setattr(graph.settings, "anthropic_api_key", SecretStr("fake-key"))
+    monkeypatch.setattr(graph.settings, "llm_switch", "on")  # independiente del YACHI_LLM del .env local
+    monkeypatch.setattr(graph.usage, "budget_ok", lambda: True)  # sin base en estas pruebas
     monkeypatch.setattr(graph, "_n_docs", lambda: 75)
     monkeypatch.setattr(graph, "_contact", lambda *a, **k: {"office": "Secretaría General"})
 
