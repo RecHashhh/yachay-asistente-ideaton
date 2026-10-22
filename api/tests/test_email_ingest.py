@@ -1,0 +1,130 @@
+import base64
+from email.message import EmailMessage
+
+import pytest
+
+from app.email_ingest import (
+    IngestError,
+    build_documents,
+    clean_body,
+    clean_subject,
+    decode_raw,
+    parse_email,
+    split_chunks,
+)
+
+ALLOWED = {"comunicacion@yachaytech.edu.ec"}
+
+# Réplica sintética de la plantilla de Comunicación (encabezado gif, imagen inline, firma y pie).
+BODY = """
+[https://yachaytech.edu.ec/wp-content/uploads/2024/09/head-enterate.gif]
+
+Estimada Comunidad Universitaria:
+
+Los retiros se realizan en COBUS BPM en el siguiente link:
+https://bpm.yachaytech.edu.ec/cobusbpm/
+
+[cid:350ee35d-f7a9-4b91-9d80-69e6ff7401e3]
+
+Consultas: soporte@yachaytech.edu.ec<mailto:soporte@yachaytech.edu.ec> o en el portal<https://www.yachaytech.edu.ec/estudiantes/>
+
+
+
+DIRECCIÓN DE SERVICIOS ACADÉMICOS
+
+[https://ezhreon.stripocdn.email/content/guids/CABINET_x/images/footermailing.png]
+
+Hacienda San José S/N Urcuquí - Ecuador | Telf: +593 3 2 999 500
+[Fb]<https://www.facebook.com/universidadyachaytech/>
+"""
+
+
+def make_email(sender: str = "Comunicación YachayTech <comunicacion@yachaytech.edu.ec>") -> EmailMessage:
+    message = EmailMessage()
+    message["From"] = sender
+    message["Subject"] = "💻👩‍💻 Entérate- Retiro por caso Fortuito o Fuerza Mayor"
+    message["Date"] = "Fri, 16 Oct 2026 21:53:38 +0000"
+    message["Message-ID"] = "<abc123@prod.outlook.com>"
+    message.set_content(BODY)
+    message.add_alternative("<p>versión html</p>", subtype="html")
+    return message
+
+
+def test_clean_subject_removes_emojis_and_category_prefix() -> None:
+    assert clean_subject("🌐 🛠️ Servicios- Ventana de mantenimiento ") == ("Ventana de mantenimiento", "servicio")
+    assert clean_subject("🍛🎉Invitación - Feria Gastronómica") == ("Feria Gastronómica", "evento")
+    assert clean_subject("📌✅ Entérate- Encargo de funciones") == ("Encargo de funciones", "aviso")
+    assert clean_subject("🗳️ 📋 Convocatoria-Conoce a los candidatos") == ("Conoce a los candidatos", "convocatoria")
+    assert clean_subject("Sin prefijo") == ("Sin prefijo", None)
+
+
+def test_clean_body_keeps_content_and_signature_but_drops_template() -> None:
+    body = clean_body(BODY)
+
+    assert body.startswith("Estimada Comunidad Universitaria:")
+    assert body.endswith("DIRECCIÓN DE SERVICIOS ACADÉMICOS")
+    assert "https://bpm.yachaytech.edu.ec/cobusbpm/" in body
+    # La URL de un enlace se conserva literal para que el agente pueda citarla; el mailto se descarta.
+    assert "portal (https://www.yachaytech.edu.ec/estudiantes/)" in body
+    assert "<mailto:" not in body
+    for template_noise in ("head-enterate.gif", "cid:", "footermailing", "Hacienda San José", "facebook"):
+        assert template_noise not in body
+    assert "\n\n\n" not in body
+
+
+def test_parse_email_reads_metadata_and_plain_body() -> None:
+    email = parse_email(make_email().as_bytes(), ALLOWED)
+
+    assert email.subject == "Retiro por caso Fortuito o Fuerza Mayor"
+    assert email.topic_hint == "aviso"
+    assert email.sent_at.isoformat() == "2026-10-16"
+    assert email.message_id == "<abc123@prod.outlook.com>"
+    assert "versión html" not in email.body
+    assert email.attachments == []
+
+
+def test_parse_email_rejects_senders_outside_allowlist() -> None:
+    with pytest.raises(IngestError, match="remitente no permitido"):
+        parse_email(make_email("Alguien <falso@gmail.com>").as_bytes(), ALLOWED)
+
+
+def test_forwarded_as_attachment_processes_the_original_message() -> None:
+    forward = EmailMessage()
+    forward["From"] = "Kevin <kevin@yachaytech.edu.ec>"
+    forward["Subject"] = "RV: comunicado"
+    forward.set_content("Reenvío el comunicado.")
+    forward.add_attachment(make_email())
+
+    # El remitente que se valida es quien reenvía; el contenido es el del comunicado original.
+    email = parse_email(forward.as_bytes(), ALLOWED | {"kevin@yachaytech.edu.ec"})
+    assert email.subject == "Retiro por caso Fortuito o Fuerza Mayor"
+    assert email.message_id == "<abc123@prod.outlook.com>"
+    with pytest.raises(IngestError):
+        parse_email(forward.as_bytes(), ALLOWED)
+
+
+def test_build_documents_titles_body_with_date_and_stable_id() -> None:
+    email = parse_email(make_email().as_bytes(), ALLOWED)
+    first, second = build_documents(email), build_documents(email)
+
+    assert len(first) == 1
+    assert first[0].title == "Comunicado 16/10/2026: Retiro por caso Fortuito o Fuerza Mayor"
+    assert first[0].doc_id.startswith("email_") and first[0].doc_id == second[0].doc_id
+
+
+def test_split_chunks_respects_limit_and_keeps_all_text() -> None:
+    paragraphs = [f"Párrafo {i} " + "x" * 300 for i in range(30)]
+    text = "\n\n".join(paragraphs)
+    chunks = split_chunks(text, max_chars=1000)
+
+    assert len(chunks) > 1
+    assert all(len(chunk) <= 1000 for chunk in chunks)
+    assert all(paragraph in "\n\n".join(chunks) for paragraph in paragraphs)
+    # Un párrafo gigante (p. ej., una tabla de PDF) también se parte.
+    assert all(len(chunk) <= 1000 for chunk in split_chunks("línea\n" * 500, max_chars=1000))
+
+
+def test_decode_raw_accepts_standard_and_url_safe_base64() -> None:
+    raw = make_email().as_bytes()
+    assert decode_raw(base64.b64encode(raw).decode()) == raw
+    assert decode_raw(base64.urlsafe_b64encode(raw).decode().rstrip("=")) == raw

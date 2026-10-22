@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     rag_max_tool_calls: int = 6
     cors_origins: str = "http://localhost:5180,http://127.0.0.1:5180"
 
+    # Ingesta de correos: sin token el endpoint queda deshabilitado.
+    ingest_token: SecretStr = SecretStr("")
+    email_allowed_senders: str = "comunicacion@yachaytech.edu.ec"
+
     @property
     def database_url(self) -> URL:
         return URL.create(
@@ -39,6 +43,10 @@ class Settings(BaseSettings):
     @property
     def allowed_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def allowed_email_senders(self) -> set[str]:
+        return {sender.strip().lower() for sender in self.email_allowed_senders.split(",") if sender.strip()}
 
 
 @lru_cache

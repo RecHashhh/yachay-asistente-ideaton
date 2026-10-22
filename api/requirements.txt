@@ -5,6 +5,7 @@ langchain>=0.3,<2
 langchain-anthropic>=0.3,<2
 langchain-ollama>=0.3,<2
 langgraph>=0.2,<2
+markitdown[pdf]>=0.1,<1
 pgvector>=0.4,<1
 pydantic-settings>=2.7,<3
 sqlalchemy[asyncio]>=2.0.36,<3

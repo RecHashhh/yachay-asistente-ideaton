@@ -74,6 +74,8 @@ services:
       RAG_VECTOR_CANDIDATES: ${RAG_VECTOR_CANDIDATES:-20}
       RAG_CONTEXT_CHUNKS: ${RAG_CONTEXT_CHUNKS:-4}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5180,http://127.0.0.1:5180}
+      INGEST_TOKEN: ${INGEST_TOKEN:-}
+      EMAIL_ALLOWED_SENDERS: ${EMAIL_ALLOWED_SENDERS:-comunicacion@yachaytech.edu.ec}
     volumes:
       - ./rag:/app/rag:ro
     depends_on:

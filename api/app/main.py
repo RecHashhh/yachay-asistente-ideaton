@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import secrets
 import time
 import uuid
 import logging
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select, text
@@ -15,9 +16,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agent import RagAgent, source_events
 from app.config import get_settings
 from app.db import engine, get_session
+from app.email_ingest import IngestError, decode_raw, ingest_email
 from app.events import encode_sse
 from app.models import Document, RagChunk
-from app.schemas import ChatRequest, HealthResponse
+from app.schemas import ChatRequest, EmailIngestRequest, HealthResponse
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -92,3 +94,21 @@ async def chat(request: ChatRequest, session: AsyncSession = Depends(get_session
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.post("/ingest/email")
+async def ingest_email_endpoint(
+    request: EmailIngestRequest,
+    x_ingest_token: str = Header(default=""),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    expected = settings.ingest_token.get_secret_value()
+    if not expected:
+        raise HTTPException(status_code=503, detail="ingest_disabled")
+    if not secrets.compare_digest(x_ingest_token.encode(), expected.encode()):
+        raise HTTPException(status_code=401, detail="invalid_ingest_token")
+    try:
+        documents = await ingest_email(decode_raw(request.raw), session, settings)
+    except IngestError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"status": "ok", "documents": documents}
