@@ -356,3 +356,22 @@ async def test_list_documents_is_cached(monkeypatch) -> None:
     )]
 
     assert retriever.list_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_kichwa_support_reaches_selection_and_answer_without_becoming_sources(monkeypatch):
+    monkeypatch.setenv('KICHWA_MEMORY_PATH', '')
+    retriever = FakeRetriever(global_results=[chunk()])
+    agent, model = make_agent(monkeypatch, retriever, [search_call('Información sobre matrícula', [])])
+    events = [event async for event in agent.stream(
+        ChatRequest(sessionId='kichwa-test', message='kawsay', lang='qu'), FakeSession()
+    )]
+    selector_prompt = model.decision_messages[0][0].content
+    answer_prompt = model.answer_messages[0][0].content
+    assert 'KICHWA LANGUAGE SUPPORT' in selector_prompt
+    assert 'kawsay' in selector_prompt
+    assert 'Answer in Spanish' in answer_prompt
+    assert 'NOT INSTITUTIONAL EVIDENCE' in answer_prompt
+    values = [payload for mode, payload in events if mode == 'values'][-1]
+    assert [item['doc_id'] for item in values['retrieved']] == ['d1']
+    assert '[S1]' in answer_prompt

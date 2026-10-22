@@ -1,0 +1,11 @@
+{
+  "reason": "No reactivar automáticamente las equivalencias cuya intención falló en las pruebas del 22-10-2026. No es una evaluación lingüística completa.",
+  "blockedKeys": ["cancel", "retry", "steps", "docs", "helloSub", "placeholder", "notice", "themeLight", "themeDark", "attach", "disclaimer"],
+  "documentedOverrides": {
+    "themeLight": "Achik",
+    "themeDark": "Amsa"
+  },
+  "overrideEvidence": "evidencia-diccionarios.json: claro (PDF español-kichwa p. 9; kichwa-español p. 1), oscuro (p. 33 y p. 4). Etiquetas abreviadas con respaldo léxico, sin atribuir revisión de un hablante.",
+  "ambiguousNotRejected": ["newChat"],
+  "humanApproved": false
+}

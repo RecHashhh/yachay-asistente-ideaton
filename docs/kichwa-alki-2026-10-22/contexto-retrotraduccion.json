@@ -1,0 +1,47 @@
+{
+  "source": "https://alki.ec/",
+  "method": "Formulario público con dirección Kichwa a Español",
+  "limitation": "El mismo traductor puede reproducir sus errores. No es validación humana ni puntuación de calidad.",
+  "items": [
+    {
+      "key": "cancel",
+      "es": "Cancelar",
+      "qu": "«Ñukay»",
+      "backEs": "«Yo»",
+      "direction": "qu-es",
+      "observedAt": "2026-10-22T15:50:43.684Z",
+      "status": "pendiente_comparacion",
+      "approved": false
+    },
+    {
+      "key": "steps",
+      "es": "Pasos",
+      "qu": "«Rishunchik»",
+      "backEs": "«Despertar»",
+      "direction": "qu-es",
+      "observedAt": "2026-10-22T15:50:47.305Z",
+      "status": "pendiente_comparacion",
+      "approved": false
+    },
+    {
+      "key": "helloSub",
+      "es": "¿Qué trámite o lugar de Yachay Tech necesitas?",
+      "qu": "«¿Ima trámite o llakta Yachay Techmanta yuyayki?»",
+      "backEs": "«¿Qué trámite o lugar Yachay Techmanta recuerdas?»",
+      "direction": "qu-es",
+      "observedAt": "2026-10-22T15:50:51.154Z",
+      "status": "pendiente_comparacion",
+      "approved": false
+    },
+    {
+      "key": "copy",
+      "es": "Copiar respuesta",
+      "qu": "«Rikch'ari rimanakuy»",
+      "backEs": "«Despertar la palabra»",
+      "direction": "qu-es",
+      "observedAt": "2026-10-22T15:50:54.861Z",
+      "status": "pendiente_comparacion",
+      "approved": false
+    }
+  ]
+}

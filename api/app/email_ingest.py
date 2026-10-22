@@ -1,16 +1,16 @@
-"""Ingesta de comunicados institucionales recibidos por correo: cuerpo en texto plano y PDF adjuntos."""
+"""Ingesta de comunicados institucionales recibidos por correo: cuerpo en texto plano y PDF adjuntos.
 
-from __future__ import annotations
+Reutiliza el procesamiento del Portal (processing.py): misma extracción de PDF, mismos fragmentos y mismos embeddings,
+así un comunicado queda en `documents`/`chunks` igual que un documento subido a mano.
+"""
 
-import asyncio
 import base64
 import hashlib
-import io
 import logging
 import re
 import sys
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from email import policy
 from email.message import EmailMessage
 from email.parser import BytesParser
@@ -19,31 +19,19 @@ from pathlib import Path
 from typing import Literal
 
 from langchain_anthropic import ChatAnthropic
-from langchain_ollama import OllamaEmbeddings
-from markitdown import MarkItDown, StreamInfo
+from psycopg import errors
 from pydantic import BaseModel, Field
-from sqlalchemy import delete
-from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import Settings, get_settings
-from app.corpus import content_hash
-from app.models import Document, RagChunk
+from .config import Settings, get_settings
+from .db import conn, open_pool
+from .processing import extract, make_chunks, tipo_for
 
 logger = logging.getLogger(__name__)
 
-# Comunicación ya etiqueta sus asuntos ("Entérate-", "Eventos-"…); sirve de tema cuando no hay IA.
+# Comunicación ya etiqueta sus asuntos ("Entérate-", "Eventos-"…): se guarda como pista para clasificar.
 SUBJECT_PREFIX = re.compile(r"(Servicios|Eventos|Invitaci[oó]n|Ent[eé]rate|Convocatoria)\s*-\s*", re.IGNORECASE)
-PREFIX_TOPIC = {
-    "servicios": "servicio",
-    "eventos": "evento",
-    "invitación": "evento",
-    "invitacion": "evento",
-    "convocatoria": "convocatoria",
-}
 FOOTER_MARK = "footermailing"  # imagen con la que empieza el pie común de la plantilla
-MAX_CHUNK_CHARS = 3200  # ≈ 800 tokens con la regla chars/4 del corpus
-MIN_PDF_CHARS = 50  # menos texto que esto = PDF escaneado (sin OCR) o vacío
+ECUADOR = timezone(timedelta(hours=-5))  # sin horario de verano; los correos llegan con hora UTC
 
 
 class IngestError(ValueError):
@@ -51,23 +39,30 @@ class IngestError(ValueError):
 
 
 class Classification(BaseModel):
-    # Mismo vocabulario que la columna `tipo` de rag/fuentes.csv, para que el catálogo hable un solo idioma.
+    # Mismo vocabulario que documents.tipo (rag/fuentes.csv y los valores de processing.tipo_for).
     doc_type: Literal[
         "procedimiento", "reglamento", "instructivo", "guia", "calendario", "convocatoria", "plan", "programa",
-        "documento",
+        "estatuto", "ley", "codigo", "documento",
     ] = Field(
         description=(
             "Qué clase de documento es: procedimiento, reglamento, instructivo, guia, calendario, "
-            "convocatoria (bases de una convocatoria), plan, programa; documento si no encaja "
+            "convocatoria (bases de una convocatoria), plan, programa, estatuto, ley, codigo; documento si no encaja "
             "(memorandos, oficios, formularios u otros)."
         )
     )
-    topic: Literal["tramite", "evento", "servicio", "autoridades", "convocatoria", "aviso"] = Field(
+    # Los temas del catálogo (tabla topics, app/catalog.py).
+    topic: Literal[
+        "tramites", "academico", "bienestar", "campus", "representacion", "admision", "normativa", "investigacion",
+        "institucional",
+    ] = Field(
         description=(
-            "tramite: procedimientos, requisitos o plazos académicos/administrativos; "
-            "evento: charlas, ferias, invitaciones; servicio: cortes, mantenimientos o servicios del campus; "
-            "autoridades: designaciones y encargos de funciones; convocatoria: becas, concursos, postulaciones; "
-            "aviso: cualquier otro."
+            "tramites: cambio de carrera, retiro, terceras matrículas, reingresos, certificados, titulación; "
+            "academico: calendario académico; bienestar: becas, salud, prevención, clubes, seguros; "
+            "campus: aulas, laboratorios, biblioteca, residencias, servicios del campus; "
+            "representacion: FEYT, cogobierno, elecciones y canales de participación estudiantil; "
+            "admision: postulación, carreras, escuelas, posgrado, inglés; normativa: LOES, estatuto, ética, transparencia; "
+            "investigacion: proyectos, ética en investigación; institucional: autoridades, planes, vinculación, "
+            "eventos y avisos generales."
         )
     )
     description: str = Field(
@@ -82,8 +77,9 @@ class Classification(BaseModel):
 @dataclass(frozen=True)
 class ParsedEmail:
     message_id: str
+    sender: str
     subject: str
-    topic_hint: str | None
+    category: str | None  # prefijo del asunto que pone Comunicación
     sent_at: date
     body: str
     attachments: list[tuple[str, bytes]]  # (nombre del archivo, bytes del PDF)
@@ -93,8 +89,10 @@ class ParsedEmail:
 class EmailDocument:
     doc_id: str
     title: str
-    section: str
+    kind: str  # formato, como en documents.kind: "email" o "pdf"
+    tipo_hint: str  # tipo si la IA no está disponible
     text: str
+    size_kb: int
 
 
 def decode_raw(value: str) -> bytes:
@@ -107,12 +105,12 @@ def decode_raw(value: str) -> bytes:
 
 
 def clean_subject(subject: str) -> tuple[str, str | None]:
-    """Quita emojis iniciales y el prefijo de categoría; devuelve (asunto limpio, tema sugerido)."""
+    """Quita emojis iniciales y el prefijo de categoría; devuelve (asunto limpio, categoría de Comunicación)."""
     text = re.sub(r"^[^\w¿¡]+", "", subject).strip()
     match = SUBJECT_PREFIX.match(text)
     if not match:
         return text, None
-    return text[match.end():].strip(), PREFIX_TOPIC.get(match.group(1).lower(), "aviso")
+    return text[match.end():].strip(), match.group(1)
 
 
 def clean_body(text: str) -> str:
@@ -124,37 +122,10 @@ def clean_body(text: str) -> str:
         if re.fullmatch(r"\s*\[(?:https?://\S+|cid:\S+)\]\s*", line):
             continue
         line = re.sub(r"<mailto:[^>]*>", "", line)
-        # Conserva la URL exacta: el agente solo enlaza URLs que aparecen literalmente en las fuentes.
+        # Conserva la URL exacta: el asistente solo enlaza URLs que aparecen literalmente en las fuentes.
         line = re.sub(r"<(https?://[^>]+)>", r" (\1)", line)
         lines.append(line.rstrip())
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
-
-
-def split_chunks(text: str, max_chars: int = MAX_CHUNK_CHARS) -> list[str]:
-    """Agrupa párrafos completos hasta ~800 tokens; un párrafo más largo se corta por líneas."""
-    # ponytail: sin solape entre chunks; agregarlo si las respuestas pierden ideas cortadas en el borde
-    chunks: list[str] = []
-    current = ""
-    for paragraph in re.split(r"\n\s*\n", text):
-        paragraph = paragraph.strip()
-        while len(paragraph) > max_chars:
-            if current:
-                chunks.append(current)
-                current = ""
-            cut = paragraph.rfind("\n", 0, max_chars)
-            cut = cut if cut > max_chars // 2 else max_chars
-            chunks.append(paragraph[:cut].strip())
-            paragraph = paragraph[cut:].strip()
-        if not paragraph:
-            continue
-        if current and len(current) + 2 + len(paragraph) > max_chars:
-            chunks.append(current)
-            current = paragraph
-        else:
-            current = f"{current}\n\n{paragraph}" if current else paragraph
-    if current:
-        chunks.append(current)
-    return chunks
 
 
 def parse_email(raw: bytes, allowed_senders: set[str]) -> ParsedEmail:
@@ -177,170 +148,159 @@ def parse_email(raw: bytes, allowed_senders: set[str]) -> ParsedEmail:
     if not body:
         raise IngestError("el correo no tiene contenido después de limpiarlo")
 
-    subject, topic_hint = clean_subject(str(message.get("Subject", "")))
+    subject, category = clean_subject(str(message.get("Subject", "")))
     try:
-        sent_at = parsedate_to_datetime(str(message["Date"])).date()
+        sent_at = parsedate_to_datetime(str(message["Date"])).astimezone(ECUADOR).date()
     except (TypeError, ValueError):
-        sent_at = date.today()
+        sent_at = datetime.now(ECUADOR).date()
     message_id = str(message.get("Message-ID") or "").strip() or hashlib.sha256(raw).hexdigest()
     attachments = [
         (part.get_filename() or "adjunto.pdf", part.get_payload(decode=True) or b"")
         for part in message.iter_attachments()
         if part.get_content_type() == "application/pdf"
     ]
-    return ParsedEmail(message_id, subject or "Comunicado sin asunto", topic_hint, sent_at, body, attachments)
-
-
-def pdf_to_text(data: bytes) -> str:
-    markdown = MarkItDown().convert_stream(io.BytesIO(data), stream_info=StreamInfo(extension=".pdf")).markdown
-    return re.sub(r"[ \t]{2,}", " ", markdown).strip()
+    return ParsedEmail(message_id, sender, subject or "Comunicado sin asunto", category, sent_at, body, attachments)
 
 
 def build_documents(email: ParsedEmail) -> list[EmailDocument]:
     """Un documento para el cuerpo y uno por cada PDF con texto; los ID hacen la ingesta idempotente."""
     stamp = email.sent_at.strftime("%d/%m/%Y")
-    title = f"Comunicado {stamp}: {email.subject}"
     documents = [EmailDocument(
         doc_id="email_" + hashlib.sha256(email.message_id.encode()).hexdigest()[:16],
-        title=title,
-        section="Cuerpo del correo",
+        title=f"Comunicado {stamp}: {email.subject}",
+        kind="email",
+        tipo_hint="comunicado",
         text=email.body,
+        size_kb=max(1, len(email.body.encode()) // 1024),
     )]
     for filename, data in email.attachments:
-        text = pdf_to_text(data)
-        if len(text) < MIN_PDF_CHARS:
-            logger.warning("Adjunto sin texto extraíble (¿escaneado?): %s", filename)
+        title = f"{Path(filename).stem} (adjunto al comunicado del {stamp}: {email.subject})"
+        try:
+            text, _pages = extract(data, "pdf", title)  # misma extracción que una subida del Portal
+        except Exception as exc:  # escaneado (ProcessingError) o dañado: el comunicado se indexa igual
+            logger.warning("Adjunto omitido %s: %s", filename, exc)
             continue
         documents.append(EmailDocument(
             # El mismo PDF en dos correos es el mismo documento.
             doc_id="email_adj_" + hashlib.sha256(data).hexdigest()[:16],
-            title=f"{Path(filename).stem} (adjunto al comunicado del {stamp}: {email.subject})",
-            section="Adjunto PDF",
+            title=title,
+            kind="pdf",
+            tipo_hint=tipo_for(filename),
             text=text,
+            size_kb=max(1, len(data) // 1024),
         ))
     return documents
 
 
-async def classify(
-    document: EmailDocument, topic_hint: str | None, settings: Settings
+def classify(
+    document: EmailDocument, category: str | None, settings: Settings
 ) -> tuple[Classification, dict[str, int]]:
-    """Etiqueta y describe con IA; si no hay clave o falla, usa el prefijo del asunto y el inicio del texto.
+    """Tipo, tema y descripción con IA; sin clave o si falla, tipo por nombre del archivo y tema institucional.
 
     Devuelve también los tokens consumidos, para controlar el costo de la ingesta.
     """
     fallback = Classification(
-        doc_type="documento",
-        topic=topic_hint or "aviso",
+        doc_type=document.tipo_hint if document.kind == "pdf" else "documento",  # el cuerpo siempre se guarda como comunicado
+        topic="institucional",
         description=f"{document.title}. {document.text[:300]}",
     )
     no_usage = {"input_tokens": 0, "output_tokens": 0}
-    key = settings.anthropic_api_key.get_secret_value()
-    if not key:
+    if not settings.has_anthropic_key:
         return fallback, no_usage
     # 400 tokens cortaron la respuesta de un correo largo y la clasificación cayó al plan B.
-    llm = ChatAnthropic(model=settings.anthropic_model, anthropic_api_key=key, max_tokens=1024)
+    llm = ChatAnthropic(
+        model=settings.anthropic_model, anthropic_api_key=settings.anthropic_api_key.get_secret_value(), max_tokens=1024
+    )
     prompt = (
         "Clasifica este comunicado institucional de la Universidad Yachay Tech y descríbelo para el catálogo "
-        f"que usa un asistente para decidir dónde buscar.\n\nTítulo: {document.title}\n\n{document.text[:6000]}"
+        "que usa un asistente para decidir dónde buscar."
+        + (f"\n\nCategoría que le puso la Dirección de Comunicación: {category}" if category else "")
+        + f"\n\nTítulo: {document.title}\n\n{document.text[:6000]}"
     )
     try:
-        result = await llm.with_structured_output(Classification, include_raw=True).ainvoke(prompt)
+        result = llm.with_structured_output(Classification, include_raw=True).invoke(prompt)
     except Exception:
-        logger.exception("No se pudo clasificar %s; se usa la etiqueta del asunto", document.doc_id)
+        logger.exception("No se pudo clasificar %s; se usa el plan B", document.doc_id)
         return fallback, no_usage
     usage = getattr(result["raw"], "usage_metadata", None) or {}
     tokens = {key: int(usage.get(key, 0)) for key in no_usage}
     return result["parsed"] or fallback, tokens
 
 
-async def ingest_email(raw: bytes, session: AsyncSession, settings: Settings) -> list[dict[str, object]]:
+def ingest_email(raw: bytes, settings: Settings) -> list[dict[str, object]]:
+    from .search import vectors  # carga perezosa del modelo de embeddings, igual que processing.process
+
     email = parse_email(raw, settings.allowed_email_senders)
     documents = build_documents(email)
-    classified = [await classify(document, email.topic_hint, settings) for document in documents]
-    # kind = "tipo:tema". El cuerpo siempre es un comunicado; los adjuntos heredan el tema del correo
-    # para quedar agrupados. Un filtro futuro por tipo debe usar kind LIKE 'procedimiento%', no igualdad.
+    classified = [classify(document, email.category, settings) for document in documents]
+    # Los adjuntos heredan el tema del correo para que el comunicado quede agrupado en el catálogo.
     topic = classified[0][0].topic
-    kinds = [
-        f"{'comunicado' if index == 0 else label.doc_type}:{topic}"
-        for index, (label, _) in enumerate(classified)
-    ]
+    prepared = []
+    for index, (document, (label, usage)) in enumerate(zip(documents, classified, strict=True)):
+        chunks = make_chunks(document.doc_id, document.title, document.text)
+        vectors_ = [vectors.embed(f"{ch['seccion']}\n{ch['texto'][:2000]}") for ch in chunks]
+        prepared.append((document, "comunicado" if index == 0 else label.doc_type, label, usage, chunks, vectors_))
 
-    chunks = [
-        (document, index, f"Documento: {document.title} | Sección: {document.section}\n{text}")
-        for document in documents
-        for index, text in enumerate(split_chunks(document.text), start=1)
-    ]
-    embedder = OllamaEmbeddings(model=settings.ollama_embedding_model, base_url=settings.ollama_base_url)
-    vectors = await embedder.aembed_documents([content for _, _, content in chunks])
-
-    now = datetime.now(timezone.utc)
-    rows = [
-        {
-            "doc_id": document.doc_id,
-            "title": document.title,
-            "description": label.description,
-            "kind": kind,
-            "source_url": None,
-            "validity_period": f"Comunicado del {email.sent_at:%d/%m/%Y}",
-            "consulted_at": email.sent_at,
-            "source_path": f"correo:{email.message_id}",
-            "source_kind": "email",
-            "updated_at": now,
-        }
-        for document, (label, _), kind in zip(documents, classified, kinds, strict=True)
-    ]
-    statement = insert(Document).values(rows)
-    await session.execute(statement.on_conflict_do_update(
-        index_elements=[Document.doc_id],
-        set_={key: getattr(statement.excluded, key) for key in rows[0] if key != "doc_id"},
-    ))
-    # Reingerir el mismo correo reemplaza sus chunks en vez de duplicarlos.
-    doc_ids = [document.doc_id for document in documents]
-    await session.execute(delete(RagChunk).where(RagChunk.doc_id.in_(doc_ids)))
-    await session.execute(insert(RagChunk).values([
-        {
-            "chunk_id": f"{document.doc_id}#{index}",
-            "doc_id": document.doc_id,
-            "section": document.section,
-            "content": content,
-            "tokens_approx": len(content) // 4,
-            "content_hash": content_hash(content, settings.ollama_embedding_model),
-            "embedding_model": settings.ollama_embedding_model,
-            "embedding": vector,
-        }
-        for (document, index, content), vector in zip(chunks, vectors, strict=True)
-    ]))
-    await session.commit()
+    notes = f"Correo de {email.sender} · {email.message_id}" + (f" · categoría «{email.category}»" if email.category else "")
+    try:
+        _store(prepared, topic, email, notes)
+    except errors.ForeignKeyViolation as exc:  # los temas los siembra la carga del corpus
+        raise IngestError("faltan los temas del catálogo: primero carga el corpus (python -m app.ingest)") from exc
     return [
         {
             "docId": document.doc_id,
             "title": document.title,
-            "kind": kind,
-            "chunks": sum(1 for chunk_document, _, _ in chunks if chunk_document is document),
+            "tipo": tipo,
+            "topic": topic,
+            "chunks": len(chunks),
             "inputTokens": usage["input_tokens"],
             "outputTokens": usage["output_tokens"],
         }
-        for document, (_, usage), kind in zip(documents, classified, kinds, strict=True)
+        for document, tipo, _, usage, chunks, _ in prepared
     ]
 
 
-async def main(paths: list[str]) -> None:
-    from app.db import SessionLocal
-
-    settings = get_settings()
-    async with SessionLocal() as session:
-        for path in paths:
-            try:
-                result = await ingest_email(Path(path).read_bytes(), session, settings)
-            except IngestError as exc:
-                print(f"✗ {Path(path).name}: {exc}")
-                continue
-            for document in result:
-                print(
-                    f"✓ {document['docId']} [{document['kind']}] {document['chunks']} chunks · "
-                    f"{document['inputTokens']}+{document['outputTokens']} tokens · {document['title']}"
+def _store(prepared: list, topic: str, email: ParsedEmail, notes: str) -> None:
+    with conn() as c:
+        for document, tipo, label, _, chunks, vectors_ in prepared:
+            # Si un administrador retiró el documento en el Portal, reingerir el correo no lo revive.
+            c.execute(
+                """INSERT INTO documents (id, title, tipo, topic_id, version, fecha_consulta, acceso, kind, status, is_current,
+                                          uploaded_by, size_kb, notes, description)
+                   VALUES (%s,%s,%s,%s,%s,%s,'institucional',%s,'indexado',true,%s,%s,%s,%s)
+                   ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, tipo = EXCLUDED.tipo, topic_id = EXCLUDED.topic_id,
+                     version = EXCLUDED.version, fecha_consulta = EXCLUDED.fecha_consulta, kind = EXCLUDED.kind,
+                     status = 'indexado', is_current = true, uploaded_by = EXCLUDED.uploaded_by, size_kb = EXCLUDED.size_kb,
+                     notes = EXCLUDED.notes, description = EXCLUDED.description
+                   WHERE documents.status <> 'retirado'""",
+                (document.doc_id, document.title, tipo, topic, f"Comunicado del {email.sent_at:%d/%m/%Y}", email.sent_at,
+                 document.kind, f"correo:{email.sender}", document.size_kb, notes, label.description),
+            )
+            # Reingerir el mismo correo reemplaza sus fragmentos en vez de duplicarlos.
+            c.execute("DELETE FROM chunks WHERE doc_id = %s", (document.doc_id,))
+            with c.cursor() as cur:
+                cur.executemany(
+                    "INSERT INTO chunks (id, doc_id, ord, seccion, texto, tokens, embedding) VALUES (%s,%s,%s,%s,%s,%s,%s::vector)",
+                    [(ch["id"], document.doc_id, i + 1, ch["seccion"], ch["texto"], ch["tokens"], "[" + ",".join(f"{x:.6f}" for x in v) + "]")
+                     for i, (ch, v) in enumerate(zip(chunks, vectors_, strict=True))],
                 )
 
 
+def main(paths: list[str]) -> None:
+    settings = get_settings()
+    open_pool()
+    for path in paths:
+        try:
+            result = ingest_email(Path(path).read_bytes(), settings)
+        except IngestError as exc:
+            print(f"✗ {Path(path).name}: {exc}")
+            continue
+        for document in result:
+            print(
+                f"✓ {document['docId']} [{document['tipo']} · {document['topic']}] {document['chunks']} chunks · "
+                f"{document['inputTokens']}+{document['outputTokens']} tokens · {document['title']}"
+            )
+
+
 if __name__ == "__main__":
-    asyncio.run(main(sys.argv[1:]))
+    main(sys.argv[1:])

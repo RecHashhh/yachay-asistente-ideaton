@@ -10,7 +10,6 @@ from app.email_ingest import (
     clean_subject,
     decode_raw,
     parse_email,
-    split_chunks,
 )
 
 ALLOWED = {"comunicacion@yachaytech.edu.ec"}
@@ -50,11 +49,11 @@ def make_email(sender: str = "Comunicación YachayTech <comunicacion@yachaytech.
     return message
 
 
-def test_clean_subject_removes_emojis_and_category_prefix() -> None:
-    assert clean_subject("🌐 🛠️ Servicios- Ventana de mantenimiento ") == ("Ventana de mantenimiento", "servicio")
-    assert clean_subject("🍛🎉Invitación - Feria Gastronómica") == ("Feria Gastronómica", "evento")
-    assert clean_subject("📌✅ Entérate- Encargo de funciones") == ("Encargo de funciones", "aviso")
-    assert clean_subject("🗳️ 📋 Convocatoria-Conoce a los candidatos") == ("Conoce a los candidatos", "convocatoria")
+def test_clean_subject_removes_emojis_and_keeps_communication_category() -> None:
+    assert clean_subject("🌐 🛠️ Servicios- Ventana de mantenimiento ") == ("Ventana de mantenimiento", "Servicios")
+    assert clean_subject("🍛🎉Invitación - Feria Gastronómica") == ("Feria Gastronómica", "Invitación")
+    assert clean_subject("📌✅ Entérate- Encargo de funciones") == ("Encargo de funciones", "Entérate")
+    assert clean_subject("🗳️ 📋 Convocatoria-Conoce a los candidatos") == ("Conoce a los candidatos", "Convocatoria")
     assert clean_subject("Sin prefijo") == ("Sin prefijo", None)
 
 
@@ -76,7 +75,8 @@ def test_parse_email_reads_metadata_and_plain_body() -> None:
     email = parse_email(make_email().as_bytes(), ALLOWED)
 
     assert email.subject == "Retiro por caso Fortuito o Fuerza Mayor"
-    assert email.topic_hint == "aviso"
+    assert email.category == "Entérate"
+    assert email.sender == "comunicacion@yachaytech.edu.ec"
     assert email.sent_at.isoformat() == "2026-10-16"
     assert email.message_id == "<abc123@prod.outlook.com>"
     assert "versión html" not in email.body
@@ -109,19 +109,18 @@ def test_build_documents_titles_body_with_date_and_stable_id() -> None:
 
     assert len(first) == 1
     assert first[0].title == "Comunicado 16/10/2026: Retiro por caso Fortuito o Fuerza Mayor"
+    assert first[0].kind == "email"
     assert first[0].doc_id.startswith("email_") and first[0].doc_id == second[0].doc_id
 
 
-def test_split_chunks_respects_limit_and_keeps_all_text() -> None:
-    paragraphs = [f"Párrafo {i} " + "x" * 300 for i in range(30)]
-    text = "\n\n".join(paragraphs)
-    chunks = split_chunks(text, max_chars=1000)
+def test_attachment_without_text_is_skipped_not_fatal() -> None:
+    message = make_email()
+    message.add_attachment(b"%PDF-1.4 sin texto", maintype="application", subtype="pdf", filename="escaneado.pdf")
+    email = parse_email(message.as_bytes(), ALLOWED)
 
-    assert len(chunks) > 1
-    assert all(len(chunk) <= 1000 for chunk in chunks)
-    assert all(paragraph in "\n\n".join(chunks) for paragraph in paragraphs)
-    # Un párrafo gigante (p. ej., una tabla de PDF) también se parte.
-    assert all(len(chunk) <= 1000 for chunk in split_chunks("línea\n" * 500, max_chars=1000))
+    assert [name for name, _ in email.attachments] == ["escaneado.pdf"]
+    # Un PDF escaneado o dañado no impide indexar el comunicado.
+    assert [document.kind for document in build_documents(email)] == ["email"]
 
 
 def test_decode_raw_accepts_standard_and_url_safe_base64() -> None:

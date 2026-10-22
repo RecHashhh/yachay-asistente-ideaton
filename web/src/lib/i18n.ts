@@ -1,4 +1,6 @@
 import { createContext, useContext } from 'react';
+import approvedKichwa from './kichwa.approved.json';
+import previewKichwa from './kichwa.preview.json';
 
 export type Lang = 'es' | 'en' | 'qu';
 
@@ -65,7 +67,7 @@ const es = {
   langAuto: 'Detecté que escribes en {lang}. ¿Cambiar el idioma?',
   change: 'Cambiar',
   open: 'Abrir asistente', close: 'Cerrar',
-  kichwaNote: 'Kichwa en preparación: por ahora solo el saludo está en kichwa y está pendiente de revisión por un hablante nativo. El resto se muestra en español.',
+  kichwaNote: 'Kichwa en revisión: la interfaz combina propuestas de Alki y términos de diccionario. Los textos con discrepancias y las respuestas institucionales se muestran en español mientras se revisan.',
   docsNav: 'Documentos disponibles',
   docsTitle: 'Documentos disponibles',
   docsSub: 'Todo lo que {name} usa para responder. Solo se usa la versión vigente de cada documento.',
@@ -141,7 +143,7 @@ const en: Dict = {
   langAuto: 'Looks like you are writing in {lang}. Switch language?',
   change: 'Switch',
   open: 'Open assistant', close: 'Close',
-  kichwaNote: 'Kichwa in progress: only the greeting is in Kichwa for now, pending review by a native speaker. Everything else is shown in Spanish.',
+  kichwaNote: 'Kichwa under review: the interface combines Alki proposals and dictionary terms. Labels with discrepancies and institutional answers remain in Spanish pending review.',
   docsNav: 'Available documents',
   docsTitle: 'Available documents',
   docsSub: 'Everything {name} uses to answer. Only the current version of each document is used.',
@@ -160,7 +162,7 @@ const en: Dict = {
   originalQuote: 'original quote in Spanish',
 };
 
-const qu: Dict = { ...es, hello: '¡Imanalla! Ñuka shutika {name}.' };
+const qu: Dict = Object.assign({}, es, { hello: '¡Imanalla! Ñuka shutika {name}.' }, previewKichwa, approvedKichwa);
 
 export const DICTS: Record<Lang, Dict> = { es, en, qu };
 

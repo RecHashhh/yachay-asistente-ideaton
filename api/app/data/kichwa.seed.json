@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "locale": "qu-EC",
+  "humanApprovedConversationalPairs": 0,
+  "sourceNote": "Selección léxica de los PDF aportados; páginas del archivo, no numeración impresa. No son reglas institucionales.",
+  "grammar": {
+    "source": "https://alki.ec/gramatica",
+    "rules": { "-manta": "origen o asunto", "-ta": "objeto directo", "-tak": "interrogación con pronombres", "-chu": "pregunta cerrada o negación", "-kuna": "plural", "-nchik": "primera persona plural" },
+    "limitation": "Resumen orientativo; no usar como generador automático de frases."
+  },
+  "entries": [
+    { "term": "kawsay", "gloss": "vida; cultura", "document": "Diccionario Kichwa a Español", "pdfPage": 37 },
+    { "term": "pukllay", "gloss": "juego", "document": "Diccionario Español a Kichwa", "pdfPage": 25 },
+    { "term": "tatki", "gloss": "paso al caminar; metro. No se acredita el sentido de instrucciones de un trámite.", "document": "Diccionario Kichwa a Español", "pdfPage": 93 },
+    { "term": "achik", "gloss": "luz, claridad, claro", "document": "Diccionario Kichwa a Español", "pdfPage": 1 },
+    { "term": "amsa", "gloss": "oscuro, tiniebla, crepúsculo; entrada con marcas regionales", "document": "Diccionario Kichwa a Español", "pdfPage": 4 },
+    { "term": "tapuna", "gloss": "preguntar, averiguar, interrogar", "document": "Diccionario Kichwa a Español", "pdfPage": 92 },
+    { "term": "mushuk", "gloss": "nuevo, aplicado a objetos y tiempo", "document": "Diccionario Kichwa a Español", "pdfPage": 60 },
+    { "term": "rimanakuna", "gloss": "dialogar", "document": "Diccionario Kichwa a Español", "pdfPage": 78 },
+    { "term": "rimanakuy", "gloss": "dialogar, conversar", "document": "Diccionario Español a Kichwa", "pdfPage": 62 },
+    { "term": "llakta", "gloss": "pueblo, ciudad, comarca; no acredita por sí solo cualquier ubicación del campus", "document": "Diccionario Kichwa a Español", "pdfPage": 48 },
+    { "term": "rikuna", "gloss": "ver, mirar, observar", "document": "Diccionario Kichwa a Español", "pdfPage": 78 },
+    { "term": "munana", "gloss": "querer, desear, antojar", "document": "Diccionario Kichwa a Español", "pdfPage": 60 },
+    { "term": "yuyay", "gloss": "pensamiento, idea, memoria", "document": "Diccionario Kichwa a Español", "pdfPage": 118 }
+  ]
+}

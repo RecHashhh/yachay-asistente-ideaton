@@ -1,0 +1,11 @@
+{
+  "date": "2026-10-22",
+  "compiledLocalEntries": 1973,
+  "sourceSha256": "a3cc27148e662f4b27deb80c556dd41a18a6bbbf75195b1b58b0ca7517f2a033",
+  "sourcePdfPages": 120,
+  "bundledEntries": 13,
+  "humanReviewedConversationalPairs": 0,
+  "paidModelCallsDuringValidation": 0,
+  "validation": "21 backend tests, 4 approval tests, 2 preview tests, 6 browser scenarios; frontend build passed",
+  "localIndexPublished": false
+}

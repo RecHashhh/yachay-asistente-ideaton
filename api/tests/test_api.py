@@ -1,10 +1,19 @@
-import json
+"""Contrato del /chat integrado (grafo de Yachi + agente de búsqueda guiada), sin claves, sin modelo y sin base.
 
+Cubre lo mismo que las pruebas originales del agente: SSE que entiende el frontend, el historial con fuentes llega al
+backend, un saludo no dispara búsqueda; y además el camino del agente sobre el índice de Yachi.
+"""
+
+import json
+from types import SimpleNamespace
+
+import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 import app.main as main_module
-from app.db import get_session
-
+from app import graph, rules
+from app.yachi_retriever import YachiRetriever
 
 SOURCE = {
     "docId": "reglamento-1",
@@ -15,97 +24,119 @@ SOURCE = {
 }
 
 
-class FakeAgent:
-    def __init__(self, _settings):
-        pass
-
-    async def stream(self, _request, _session):
-        retrieved = [{
-            "doc_id": "reglamento-1",
-            "title": "Reglamento académico",
-            "validity_period": "2026",
-            "section": "Matrícula",
-            "content": "La matrícula se realiza en línea.",
-        }]
-        yield "custom", {"type": "status", "label": "Buscando en los documentos…"}
-        yield "values", {"unknown": False, "retrieved": retrieved, "reused_sources": []}
-        yield "custom", {"type": "token", "text": "La respuesta está respaldada."}
-        yield "values", {"unknown": False, "retrieved": retrieved, "reused_sources": []}
-
-
-class DirectAgent:
-    def __init__(self, _settings):
-        pass
-
-    async def stream(self, _request, _session):
-        yield "values", {"unknown": False, "retrieved": [], "reused_sources": []}
-        yield "custom", {"type": "token", "text": "¡Hola! ¿En qué te ayudo?"}
-        yield "values", {"unknown": False, "retrieved": [], "reused_sources": []}
-
-
-class HistoryAgent:
-    def __init__(self, _settings):
-        pass
-
-    async def stream(self, request, _session):
-        self.__class__.received_history = request.history
-        yield "values", {"unknown": False, "retrieved": [], "reused_sources": [SOURCE]}
-        yield "custom", {"type": "token", "text": "Se realiza en línea. [S1]"}
-        yield "values", {"unknown": False, "retrieved": [], "reused_sources": [SOURCE]}
-
-
-async def fake_session():
-    yield object()
-
-
-def post_chat(monkeypatch, agent, history=None, message="¿Cómo es la matrícula?"):
-    monkeypatch.setattr(main_module, "RagAgent", agent)
-    main_module.app.dependency_overrides[get_session] = fake_session
-    try:
-        with TestClient(main_module.app) as client:
-            return client.post(
-                "/chat",
-                json={"sessionId": "s1", "message": message, "lang": "es", "history": history or []},
-            )
-    finally:
-        main_module.app.dependency_overrides.clear()
-
-
 def parse_events(response):
     return [json.loads(block.removeprefix("data: ")) for block in response.text.strip().split("\n\n")]
 
 
-def test_chat_stream_matches_frontend_sse_contract_without_initial_search_status(monkeypatch) -> None:
-    response = post_chat(monkeypatch, FakeAgent)
+def post_chat(monkeypatch, events, history=None, message="¿Cómo es la matrícula?"):
+    received = {}
+
+    async def fake_run(question, lang, hist, session_id):
+        received.update(question=question, lang=lang, history=hist, session_id=session_id)
+        for event in events:
+            yield event
+
+    monkeypatch.setattr(main_module.graph, "run", fake_run)
+    client = TestClient(main_module.app)  # sin contexto: no abre la base ni carga modelos
+    response = client.post("/chat", json={"sessionId": "s1", "message": message, "lang": "es", "history": history or []})
+    return response, received
+
+
+def test_chat_stream_matches_frontend_sse_contract(monkeypatch) -> None:
+    events = [
+        {"type": "status", "label": "Buscando en los documentos oficiales"},
+        {"type": "step", "id": "search", "label": "Busqué en 75 documentos oficiales", "state": "done"},
+        {"type": "token", "text": "La respuesta está respaldada."},
+        {"type": "sources", "items": [SOURCE]},
+        {"type": "done", "messageId": "m1", "latencyMs": 40},
+    ]
+    response, _ = post_chat(monkeypatch, events)
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
-    events = parse_events(response)
-    assert [event["type"] for event in events] == ["status", "status", "token", "sources", "suggestions", "done"]
-    assert events[0]["label"].startswith("Buscando")
-    assert events[1]["label"].startswith("Preparando")
-    assert events[2] == {"type": "token", "text": "La respuesta está respaldada."}
-    assert events[3]["items"][0]["locator"] == "Matrícula"
-    assert events[-1]["messageId"]
+    out = parse_events(response)
+    assert [e["type"] for e in out] == ["status", "step", "token", "sources", "done"]
+    assert out[3]["items"][0]["locator"] == "Matrícula"
+    assert out[-1]["messageId"]
 
 
-def test_direct_greeting_does_not_emit_search_status(monkeypatch) -> None:
-    response = post_chat(monkeypatch, DirectAgent, message="Hola")
+def test_chat_request_accepts_and_forwards_history_sources(monkeypatch) -> None:
+    history = [{"role": "assistant", "content": "La matrícula se realiza en línea.", "sources": [SOURCE]}]
+    _, received = post_chat(monkeypatch, [{"type": "done", "messageId": "m1"}], history=history, message="¿Y eso dónde se hace?")
 
-    events = parse_events(response)
-    assert [event["type"] for event in events] == ["token", "suggestions", "done"]
-    assert events[0]["text"] == "¡Hola! ¿En qué te ayudo?"
+    assert received["history"][0]["sources"][0]["docId"] == "reglamento-1"
 
 
-def test_chat_request_accepts_and_reemits_history_sources(monkeypatch) -> None:
-    response = post_chat(
-        monkeypatch,
-        HistoryAgent,
-        history=[{"role": "assistant", "content": "La matrícula se realiza en línea. [S1]", "sources": [SOURCE]}],
-        message="¿Y eso dónde se hace?",
-    )
+def test_greeting_does_not_reach_search() -> None:
+    assert rules.triage("Hola", "es").route == "smalltalk"
+    assert rules.triage("hola yachi", "es").route == "smalltalk"
 
-    events = parse_events(response)
-    assert HistoryAgent.received_history[0].sources[0].docId == "reglamento-1"
-    assert [event["type"] for event in events] == ["status", "token", "sources", "suggestions", "done"]
-    assert events[2]["items"] == [SOURCE]
+
+class FakeAgent:
+    def __init__(self, retrieved=None, reused=None):
+        self.retrieved = retrieved or []
+        self.reused = reused or []
+        self.calls = []
+
+    async def gather(self, state, session, notify=None):
+        self.calls.append(state)
+        if notify:
+            notify("catalog", {"n": 75})
+            notify("search", {"query": state["message"], "scope": "focused", "found": len(self.retrieved),
+                              "documents": [{"docId": "d1", "title": "Guía de matrícula"}]})
+        return {"retrieved": self.retrieved, "reused_sources": self.reused, "searched": True, "unknown": not (self.retrieved or self.reused)}
+
+
+def fake_hit(chunk_id="d1#1", doc_id="d1"):
+    return SimpleNamespace(chunk_id=chunk_id, doc_id=doc_id, title="Guía de matrícula", seccion="Inscripción", texto="Documento: Guía\n\nTexto.",
+                           version="2026", periodo=None, fecha_consulta=None, url=None, acceso="publico", kind="pdf", audiencia="estudiantes",
+                           topic_id="tramites", score=1.0, cos=0.8, fts=1.0)
+
+
+@pytest.mark.asyncio
+async def test_agent_results_become_yachi_hits_with_real_steps(monkeypatch) -> None:
+    events = []
+    agent = FakeAgent(retrieved=[{"chunk_id": "d1#1", "similarity": 0.8}])
+    seen_ids = []
+    monkeypatch.setattr(graph, "_agent", lambda: agent)
+    monkeypatch.setattr(graph, "hits_by_ids", lambda ids, scores=None: seen_ids.extend(ids) or [fake_hit()])
+    monkeypatch.setattr(graph, "get_stream_writer", lambda: events.append)
+    monkeypatch.setattr(graph.settings, "anthropic_api_key", SecretStr("fake-key"))
+    monkeypatch.setattr(graph, "_n_docs", lambda: 75)
+
+    result = await graph.retrieve({"question": "¿Cómo me matriculo?", "lang": "es", "history": []})
+
+    assert seen_ids == ["d1#1"]
+    assert result["hits"][0].doc_id == "d1"
+    steps = {e["id"]: e for e in events if e["type"] == "step"}
+    assert steps["catalog"]["label"].startswith("Revisé el catálogo")
+    assert steps["search1"]["docs"][0]["title"] == "Guía de matrícula"
+    assert steps["search"]["state"] == "done" and "guiado por el catálogo" in steps["search"]["label"]
+    assert agent.calls[0]["message"] == "¿Cómo me matriculo?"
+
+
+@pytest.mark.asyncio
+async def test_agent_without_evidence_answers_unknown(monkeypatch) -> None:
+    events = []
+    monkeypatch.setattr(graph, "_agent", lambda: FakeAgent())
+    monkeypatch.setattr(graph, "hits_by_ids", lambda ids, scores=None: [])
+    monkeypatch.setattr(graph, "get_stream_writer", lambda: events.append)
+    monkeypatch.setattr(graph.settings, "anthropic_api_key", SecretStr("fake-key"))
+    monkeypatch.setattr(graph, "_n_docs", lambda: 75)
+    monkeypatch.setattr(graph, "_contact", lambda *a, **k: {"office": "Secretaría General"})
+
+    result = await graph.retrieve({"question": "¿Cuánto cuesta la piscina?", "lang": "es", "history": []})
+
+    assert result["kind"] == "sin_fuente"
+    assert any(e["type"] == "unknown" for e in events)
+
+
+def test_without_key_the_agent_is_not_used(monkeypatch) -> None:
+    monkeypatch.setattr(graph.settings, "anthropic_api_key", SecretStr(""))
+    assert graph.settings.agent_enabled is False
+
+
+@pytest.mark.asyncio
+async def test_yachi_retriever_caps_selected_documents() -> None:
+    with pytest.raises(ValueError):
+        await YachiRetriever().search(None, "matrícula", [f"d{i}" for i in range(6)])

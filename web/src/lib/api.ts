@@ -2,12 +2,14 @@ import * as inbox from './inbox';
 import * as mock from './mock';
 import type { ChatRequest, DocMeta, PublicDoc, StreamEvent, Topic, Trend, UploadInput } from './types';
 
-const API = ((import.meta.env.VITE_API_URL as string | undefined) ?? '').replace(/\/$/, '');
-/** El agente usa el backend si se configura VITE_API_URL; las demás funciones todavía son de ejemplo. */
-export const CHAT_MOCK = !API;
-export const SAMPLE_DATA = true;
-/** Los endpoints de administración, guías y demás aún no existen en este backend: usan datos locales. */
-export const MOCK = true;
+const configuredApi = ((import.meta.env.VITE_API_URL as string | undefined) ?? '').replace(/\/$/, '');
+// En desarrollo Vite reenvía las llamadas: evita bloqueos CORS entre puertos locales.
+const API = import.meta.env.DEV && /^https?:\/\//.test(configuredApi) ? '/__yachi_api' : configuredApi;
+/** Sin VITE_API_URL el frontend funciona con el simulador (mock.ts). */
+export const MOCK = !API;
+/** Nombres que usa la vista del chat y del Portal: con backend todo es real; sin él, todo es de ejemplo. */
+export const CHAT_MOCK = MOCK;
+export const SAMPLE_DATA = MOCK;
 
 const ADMIN_TOKEN_KEY = 'yt-admin-token';
 const adminToken = () => { try { return sessionStorage.getItem(ADMIN_TOKEN_KEY) ?? ''; } catch { return ''; } };
@@ -28,6 +30,7 @@ const connectionError = (lang: ChatRequest['lang']) => lang === 'en'
   ? 'Could not connect to the assistant. Check that the backend is running and try again.'
   : 'No se pudo conectar con el asistente. Comprueba que el backend esté activo e inténtalo de nuevo.';
 
+/** Mensaje legible para un error del backend (FastAPI responde {"detail": ...}); traduce los códigos conocidos. */
 async function responseError(response: Response, lang: ChatRequest['lang']): Promise<Error> {
   const body = await response.text().catch(() => '');
   let detail = body;
@@ -35,19 +38,19 @@ async function responseError(response: Response, lang: ChatRequest['lang']): Pro
     const parsed = JSON.parse(body) as { detail?: unknown };
     if (typeof parsed.detail === 'string') detail = parsed.detail;
   } catch { /* puede ser texto plano */ }
-
   const known: Record<string, [string, string]> = {
     database_unavailable: ['La base de datos no está disponible. Inténtalo de nuevo en unos minutos.', 'The database is unavailable. Please try again shortly.'],
     rag_index_empty: ['La base de documentos todavía no está indexada.', 'The document index is not ready yet.'],
   };
   const translated = known[detail];
   if (translated) return new Error(lang === 'en' ? translated[1] : translated[0]);
+  if (response.status === 429 && !detail) detail = lang === 'en' ? 'You are sending too many messages. Please wait a minute.' : 'Estás enviando muchos mensajes seguidos. Espera un minuto y vuelve a intentarlo.';
   return new Error(detail || connectionError(lang));
 }
 
 /** Chat por SSE: POST /chat con ChatRequest y respuesta text/event-stream, un StreamEvent por bloque `data:`. */
 export async function* streamChat(req: ChatRequest, signal?: AbortSignal): AsyncGenerator<StreamEvent> {
-  if (CHAT_MOCK) { yield* mock.mockChat(req, signal); return; }
+  if (MOCK) { yield* mock.mockChat(req, signal); return; }
   let r: Response;
   try {
     r = await fetch(`${API}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify(req), signal });
@@ -75,9 +78,9 @@ export async function* streamChat(req: ChatRequest, signal?: AbortSignal): Async
   }
 }
 
-/** Tendencias de ejemplo en el idioma pedido; el backend aún no ofrece este endpoint. */
+/** Tendencias en el idioma pedido. El backend las agrupa por similitud semántica y las traduce una vez al día. */
 export const getTrends = (lang: 'es' | 'en' | 'qu' = 'es'): Promise<Trend[]> =>
-  Promise.resolve(mock.trends.map((t) => ({ ...t, query: lang === 'en' ? mock.trendsEn[t.query] ?? t.query : t.query })));
+  MOCK ? Promise.resolve(mock.trends.map((t) => ({ ...t, query: lang === 'en' ? mock.trendsEn[t.query] ?? t.query : t.query }))) : json(`/trends?lang=${lang}`);
 
 /** Voto de utilidad de una respuesta; alimenta la revisión semanal de respuestas marcadas como no útiles. */
 export function sendFeedback(messageId: string, vote: 'up' | 'down', ctx?: { question: string; lang: 'es' | 'en' | 'qu'; reason?: inbox.FeedbackReason }): Promise<void> {
@@ -104,6 +107,10 @@ export interface RegisteredInquiry {
   transcript: string | null; status: 'nueva' | 'en_atencion' | 'resuelta'; created_at: string;
 }
 export const listInquiries = (): Promise<RegisteredInquiry[]> => MOCK ? Promise.resolve([]) : json('/admin/inquiries');
+
+/** Bitácora del Portal: quién cambió la base de conocimiento y cuándo (últimas 200 acciones). */
+export interface AuditEntry { at: string; email: string; action: string; target: string | null }
+export const listAudit = (): Promise<AuditEntry[]> => (MOCK ? Promise.resolve([]) : json('/admin/audit'));
 export const updateInquiry = (code: string, status: RegisteredInquiry['status']): Promise<void> =>
   json(`/admin/inquiries/${encodeURIComponent(code)}`, { method: 'PATCH', body: JSON.stringify({ status }) });
 export function updateInbox(id: string, patch: Partial<Pick<inbox.InboxItem, 'status' | 'controlId'>>): Promise<void> {
@@ -117,7 +124,7 @@ export const addControlCase = (c: Omit<import('./mock').ControlCase, 'id'>): Pro
 export type { ControlResult } from './mock';
 /** Corre el set de preguntas de control contra el asistente y devuelve cada resultado. */
 export const runControl = (onProgress?: (n: number) => void) =>
-  mock.runControl(onProgress);
+  MOCK ? mock.runControl(onProgress) : json<import('./mock').ControlResult[]>('/admin/validation/run', { method: 'POST' });
 export const controlSize = () => mock.controlSet.length;
 export const listControlCases = (): Promise<import('./mock').ControlCase[]> =>
   MOCK ? Promise.resolve([...mock.controlSet]) : json('/admin/validation/cases');
@@ -141,9 +148,14 @@ export const docHref = (url: string, page?: number) => (page ? `${url}#page=${pa
 export interface Admin { name: string; email: string }
 
 export async function adminLogin(email: string, password: string): Promise<Admin> {
-  if (!email.endsWith('@yachaytech.edu.ec') || password.length < 4) throw new Error('Usa tu correo institucional (@yachaytech.edu.ec) y tu contraseña');
-  sessionStorage.setItem(ADMIN_TOKEN_KEY, 'mock');
-  return { name: email.split('@')[0]!, email };
+  if (MOCK) {
+    if (!email.endsWith('@yachaytech.edu.ec') || password.length < 4) throw new Error('Usa tu correo institucional (@yachaytech.edu.ec) y tu contraseña');
+    sessionStorage.setItem(ADMIN_TOKEN_KEY, 'mock');
+    return { name: email.split('@')[0]!, email };
+  }
+  const r = await json<Admin & { token: string }>('/admin/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+  sessionStorage.setItem(ADMIN_TOKEN_KEY, r.token);
+  return { name: r.name, email: r.email };
 }
 export const adminLogout = () => {
   // La sesión se invalida también en el servidor (no basta con olvidar el token en el navegador).
@@ -166,12 +178,11 @@ export const saveFilter = (f: { category: FilterCategory; term: string; active: 
 export const checkFilter = (text: string): Promise<FilterCheck> => (MOCK ? needsBackend() : json('/admin/filters/check', { method: 'POST', body: JSON.stringify({ text }) }));
 export const testFilters = (): Promise<FilterTest> => (MOCK ? needsBackend() : json('/admin/filters/test', { method: 'POST' }));
 
-export const listDocs = (): Promise<DocMeta[]> => Promise.resolve(mock.docs.map((d) => ({ ...d })));
+export const listDocs = (): Promise<DocMeta[]> => (MOCK ? Promise.resolve(mock.docs.map((d) => ({ ...d }))) : json('/admin/docs'));
 
 export function deleteDoc(id: string): Promise<void> {
-  const i = mock.docs.findIndex((d) => d.id === id);
-  if (i >= 0) mock.docs.splice(i, 1);
-  return Promise.resolve();
+  if (MOCK) { const i = mock.docs.findIndex((d) => d.id === id); if (i >= 0) mock.docs.splice(i, 1); return Promise.resolve(); }
+  return json(`/admin/docs/${id}`, { method: 'DELETE' });
 }
 
 /** Lugares con coordenadas reales (se cachea: no cambian durante la sesión). */
@@ -189,12 +200,15 @@ export function reprocessDoc(id: string): Promise<void> {
 }
 
 export function createTopic(t: Omit<Topic, 'id'>): Promise<Topic> {
-  const n = { ...t, id: t.name.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-') };
-  mock.topics.push(n);
-  return Promise.resolve(n);
+  if (MOCK) {
+    const n = { ...t, id: t.name.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-') };
+    mock.topics.push(n);
+    return Promise.resolve(n);
+  }
+  return json('/admin/topics', { method: 'POST', body: JSON.stringify(t) });
 }
 
-/** La administración sigue en modo de ejemplo hasta que existan sus endpoints en el backend. */
+/** Sube el archivo con sus metadatos (multipart). El backend lo parte en fragmentos, genera embeddings y responde con status 'procesando'. */
 export function uploadDoc(input: UploadInput, onProgress: (p: number) => void): Promise<DocMeta> {
   if (MOCK) return mock.mockUpload(input, onProgress);
   return new Promise((resolve, reject) => {

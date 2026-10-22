@@ -30,11 +30,6 @@ class ChatRequest(BaseModel):
     attachments: list[dict] | None = None
 
 
-class EmailIngestRequest(BaseModel):
-    # Mensaje RFC 822 completo (.eml) en base64, tal como lo entrega el Email Trigger de n8n en formato RAW.
-    raw: str = Field(min_length=1, max_length=30_000_000)
-
-
 class HealthResponse(BaseModel):
     status: Literal["ok"]
     documents: int

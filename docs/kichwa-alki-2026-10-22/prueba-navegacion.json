@@ -1,0 +1,47 @@
+{
+  "tests": [
+    {
+      "width": 1280,
+      "lang": "es",
+      "welcomeVisible": true,
+      "horizontalOverflow": false,
+      "pageErrors": []
+    },
+    {
+      "width": 1280,
+      "lang": "en",
+      "welcomeVisible": true,
+      "horizontalOverflow": false,
+      "pageErrors": []
+    },
+    {
+      "width": 1280,
+      "lang": "qu",
+      "welcomeVisible": true,
+      "horizontalOverflow": false,
+      "pageErrors": []
+    },
+    {
+      "width": 390,
+      "lang": "es",
+      "welcomeVisible": true,
+      "horizontalOverflow": false,
+      "pageErrors": []
+    },
+    {
+      "width": 390,
+      "lang": "en",
+      "welcomeVisible": true,
+      "horizontalOverflow": false,
+      "pageErrors": []
+    },
+    {
+      "width": 390,
+      "lang": "qu",
+      "welcomeVisible": true,
+      "horizontalOverflow": false,
+      "pageErrors": []
+    }
+  ],
+  "limitation": "Solo navegación e interfaz; no mide calidad lingüística ni realiza llamadas reales al modelo."
+}

@@ -145,6 +145,8 @@ export type StreamEvent =
   | { type: 'suggestions'; items: string[] }
   /** Aviso sobre la respuesta, p. ej. cifras o enlaces que no aparecen textualmente en los documentos citados. */
   | { type: 'notice'; level: 'warn'; text: string }
+  /** Paso real del proceso (panel de actividad). Un mismo id se actualiza: 'running' → 'done' o 'warn'. */
+  | ({ type: 'step' } & ProcessStep)
   /** Botón de acción dentro de la respuesta, p. ej. abrir "Documentos disponibles". Solo rutas internas (#/...). */
   | { type: 'link'; label: string; href: string }
   | { type: 'done'; messageId: string; cached?: boolean; latencyMs?: number }
@@ -185,4 +187,15 @@ export interface UploadInput {
   url?: string;
   /** Si se indica, el archivo reemplaza a este documento como versión nueva. */
   replaces?: string;
+}
+
+/** Paso del proceso que se muestra en el panel de actividad del chat. */
+export interface ProcessStep {
+  id: string;
+  label: string;
+  state: 'running' | 'done' | 'warn';
+  detail?: string;
+  docs?: { docId: string; title: string }[];
+  /** Duración medida del paso (p. ej. la búsqueda), en milisegundos. */
+  ms?: number;
 }

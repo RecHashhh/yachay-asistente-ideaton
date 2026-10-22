@@ -1,0 +1,56 @@
+{
+  "fecha": "2026-10-22",
+  "fuente": "https://alki.ec/",
+  "modo": "Formulario publico mediante Playwright, secuencial y con cache",
+  "claves_interfaz": 110,
+  "interfaz_con_propuesta": 109,
+  "claves_vacias_sin_consulta": [
+    "originalQuote"
+  ],
+  "consultas_con_propuesta": 12,
+  "total_propuestas": 121,
+  "pendientes_de_consulta": [],
+  "alertas_tecnicas": [
+    {
+      "key": "send",
+      "flags": [
+        "igual_al_original"
+      ]
+    },
+    {
+      "key": "copy",
+      "flags": [
+        "respuesta_meta_en_espanol"
+      ]
+    },
+    {
+      "key": "demo",
+      "flags": [
+        "respuesta_meta_en_espanol"
+      ]
+    },
+    {
+      "key": "version",
+      "flags": [
+        "respuesta_meta_en_espanol"
+      ]
+    },
+    {
+      "key": "docOf",
+      "flags": [
+        "igual_al_original"
+      ]
+    },
+    {
+      "key": "inqSend",
+      "flags": [
+        "igual_al_original"
+      ]
+    }
+  ],
+  "variables_alteradas": [],
+  "con_variables": 13,
+  "aprobaciones_linguisticas_atribuidas": 0,
+  "activadas_en_yachi": 0,
+  "alcance": "Interfaz y ejemplos de preguntas; no traduccion de respuestas institucionales ni entrenamiento de un modelo"
+}

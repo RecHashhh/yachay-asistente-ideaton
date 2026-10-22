@@ -1,0 +1,86 @@
+{
+  "source": "https://alki.ec/",
+  "mode": "vista_previa_solicitada_por_usuario",
+  "approvedLinguistically": false,
+  "activeInterfaceKeys": 92,
+  "omitted": [
+    {
+      "key": "send",
+      "reason": "igual_al_original"
+    },
+    {
+      "key": "cancel",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "copy",
+      "reason": "respuesta_meta_en_espanol"
+    },
+    {
+      "key": "retry",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "steps",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "docs",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "helloSub",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "placeholder",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "trending",
+      "reason": "origen_modificado"
+    },
+    {
+      "key": "notice",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "themeLight",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "themeDark",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "disclaimer",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "demo",
+      "reason": "respuesta_meta_en_espanol"
+    },
+    {
+      "key": "attach",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "version",
+      "reason": "respuesta_meta_en_espanol"
+    },
+    {
+      "key": "docOf",
+      "reason": "igual_al_original"
+    },
+    {
+      "key": "inqSend",
+      "reason": "igual_al_original"
+    },
+    {
+      "key": "kichwaNote",
+      "reason": "origen_modificado"
+    }
+  ],
+  "exampleQuestionsStored": 12,
+  "institutionalAnswersTranslated": false
+}
