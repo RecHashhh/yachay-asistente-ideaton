@@ -1,4 +1,5 @@
 /** Record bounded PCM WAV locally, then send only to the configured Yachi API. */
+import { VoiceActivity } from './voiceActivity';
 const configured = ((import.meta.env.VITE_API_URL as string | undefined) ?? '').replace(/\/$/, '');
 const api = import.meta.env.DEV && /^https?:\/\//.test(configured) ? '/__yachi_api' : configured;
 export const speechApi = api;
@@ -22,6 +23,7 @@ export function listenKichwa(onStatus: (text: string) => void): { done: Promise<
     let timer: ReturnType<typeof setTimeout> | undefined;
     const parts: Float32Array[] = [];
     let count = 0;
+    const activity = new VoiceActivity();
     try {
       await context.resume();
       source = context.createMediaStreamSource(stream);
@@ -33,11 +35,11 @@ export function listenKichwa(onStatus: (text: string) => void): { done: Promise<
         processor!.onaudioprocess = (event) => {
           const data = event.inputBuffer.getChannelData(0).slice();
           parts.push(data); count += data.length;
-          if (count >= context.sampleRate * 15) resolve();
+          if (activity.update(data, context.sampleRate) || count >= context.sampleRate * 15) resolve();
         };
         source!.connect(processor!); processor!.connect(context.destination);
         timer = setTimeout(resolve, 15000);
-        onStatus('Grabando Kichwa… pulsa el micrófono para terminar (máximo 15 s).');
+        onStatus('Te escucho… terminaré cuando dejes de hablar.');
       });
     } finally {
       clearTimeout(timer);
@@ -46,7 +48,7 @@ export function listenKichwa(onStatus: (text: string) => void): { done: Promise<
       stream.getTracks().forEach((t) => t.stop());
       await context.close();
     }
-    if (cancelled) return '';
+    if (cancelled || !activity.hasSpeech) return '';
     const pcm = new Float32Array(count);
     let offset = 0;
     for (const part of parts) { pcm.set(part, offset); offset += part.length; }

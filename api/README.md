@@ -12,6 +12,13 @@ El micrófono en Kichwa captura hasta 15 segundos y llama a `/speech/transcribe`
 con WAV PCM16 mono a 16 kHz. Devuelve un borrador editable antes de enviar la consulta.
 El servidor no guarda audio ni entrena con él. ES/EN conservan el reconocimiento del navegador.
 La transcripción no traduce ni acredita la exactitud de la respuesta institucional.
+El dictado Kichwa cierra el turno tras aproximadamente 1,3 segundos de silencio después
+de detectar voz; si no detecta voz, termina sin enviar audio después de 5 segundos.
+El límite de seguridad de 15 segundos permanece. Es un detector de energía sencillo:
+conviene probarlo con el micrófono real y ruido ambiental del lugar de presentación.
+Las indicaciones están en el icono de información del modo voz. La velocidad,
+las voces disponibles y la escucha automática se encuentran en el engranaje,
+en español, inglés y Kichwa; ya no ocupan el pie de la pantalla.
 
 Créditos: Chihiro Taguchi, Jefferson Saransig, Dayana Velásquez y David Chiang,
 [Killkan-ASR](https://huggingface.co/ctaguchi/killkan_asr), CC BY 4.0,

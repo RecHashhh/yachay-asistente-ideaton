@@ -44,7 +44,7 @@ export function whenVoicesReady(): Promise<void> {
 export function speak(text: string, lang: Lang, prefs: VoicePrefs, onBoundary?: (i: number) => void): Promise<void> {
   if (!text.trim()) return Promise.resolve();
   stopSpeaking();
-  const voice = voicesFor(lang).find((v) => v.voiceURI === prefs.voiceURI) ?? voicesFor(lang)[0];
+  const voice = lang === 'qu' && prefs.voiceURI === 'mms-quw' ? undefined : voicesFor(lang).find((v) => v.voiceURI === prefs.voiceURI) ?? voicesFor(lang)[0];
   if (lang === 'qu' && !voice) return speakKichwa(text, prefs.rate, onBoundary);
   if (!ttsSupported()) return Promise.resolve();
   const parts = text.match(/[^.!?¿¡:\n]+[.!?:]?|\n/g)?.map((s) => s.trim()).filter(Boolean) ?? [text];

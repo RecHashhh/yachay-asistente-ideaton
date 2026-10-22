@@ -58,7 +58,7 @@ const assert = require('node:assert/strict');
     assert.deepEqual(spoken, { calls: 0, voices: 0 }, 'Spanish voices must not impersonate Kichwa');
     assert.equal(syntheses, 1, 'Without a native OS voice, play the server Kichwa waveform');
     await page.goto(url + '#/voz?lang=qu');
-    await page.getByText(/Voz Kichwa experimental/).waitFor();
+    await page.getByRole('button', { name: 'Configuración de voz', exact: true }).click();
     await page.getByRole('button', { name: 'Probar voz Kichwa', exact: true }).click();
     await page.waitForFunction(() => !document.querySelector('.voice-stage .chip')?.disabled);
     assert.equal(syntheses, 2);
