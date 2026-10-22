@@ -728,6 +728,9 @@ select option{background:var(--surface);color:var(--ink)}
 @media (max-width: 560px){ .adm-summary,.adm .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .adm-summary button:nth-child(2n),.adm .kpi:nth-child(2n){border-right:0} .adm-summary button,.adm .kpi{border-bottom:1px solid var(--line)} }
 /* Reporte opcional de traducción, integrado debajo de las acciones del mensaje. */
 .translation-report { margin-top: 8px; }
+.translation-report-footer{margin-top:8px;text-align:center;font-size:12px;line-height:1.5;color:var(--muted)}
+.translation-report-footer .translation-report-trigger{padding:0;font-size:inherit}
+.translation-report-footer .fb-panel{max-height:40dvh;max-width:560px;overflow-y:auto;text-align:left;margin:12px auto 0}
 .translation-report-trigger { color: var(--muted, #606a80); background: none; border: 0; padding: 4px 0; font: inherit; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .translation-report form { display: grid; gap: 8px; }
 .translation-report label { font-size: 13px; }
