@@ -1,8 +1,17 @@
 {
-  "source": "https://alki.ec/",
-  "mode": "vista_previa_solicitada_por_usuario",
+  "sources": [
+    "PDF aportados por el usuario",
+    "https://alki.ec/"
+  ],
+  "mode": "borrador_amplio_solicitado_por_usuario",
   "approvedLinguistically": false,
-  "activeInterfaceKeys": 92,
+  "documentedInterfaceKeys": 12,
+  "experimentalPhraseKeys": [
+    "hello",
+    "newChat"
+  ],
+  "activeInterfaceKeys": 111,
+  "omittedScope": "Propuestas originales de Alki omitidas; algunas claves cuentan con un reemplazo de diccionario activo.",
   "omitted": [
     {
       "key": "send",
@@ -14,7 +23,7 @@
     },
     {
       "key": "copy",
-      "reason": "respuesta_meta_en_espanol"
+      "reason": "respuesta_meta_no_traduccion"
     },
     {
       "key": "retry",
@@ -58,7 +67,7 @@
     },
     {
       "key": "demo",
-      "reason": "respuesta_meta_en_espanol"
+      "reason": "respuesta_meta_no_traduccion"
     },
     {
       "key": "attach",
@@ -66,7 +75,7 @@
     },
     {
       "key": "version",
-      "reason": "respuesta_meta_en_espanol"
+      "reason": "respuesta_meta_no_traduccion"
     },
     {
       "key": "docOf",
@@ -77,10 +86,23 @@
       "reason": "igual_al_original"
     },
     {
+      "key": "deleted",
+      "reason": "respuesta_meta_no_traduccion"
+    },
+    {
+      "key": "piiEdit",
+      "reason": "respuesta_meta_no_traduccion"
+    },
+    {
       "key": "kichwaNote",
       "reason": "origen_modificado"
     }
   ],
   "exampleQuestionsStored": 12,
-  "institutionalAnswersTranslated": false
+  "institutionalAnswersTranslated": false,
+  "totalNonemptyInterfaceKeys": 111,
+  "pendingInterfaceKeys": [],
+  "coverageIsNotLinguisticAccuracy": true,
+  "complementaryDraftCount": 21,
+  "complementaryDraftSource": "Propuestas de Codex para completar la interfaz, solicitadas por el usuario"
 }

@@ -7,5 +7,8 @@
   },
   "overrideEvidence": "evidencia-diccionarios.json: claro (PDF español-kichwa p. 9; kichwa-español p. 1), oscuro (p. 33 y p. 4). Etiquetas abreviadas con respaldo léxico, sin atribuir revisión de un hablante.",
   "ambiguousNotRejected": ["newChat"],
-  "humanApproved": false
+  "humanApproved": false,
+  "allowedProposals": ["hello", "newChat"],
+  "allowUnreviewedDrafts": true,
+  "draftAuthorization": "El usuario solicita ampliar el borrador de interfaz en kichwa, aunque no sea completamente correcto, para ir corrigiéndolo. Mantener las correcciones documentadas y excluir fallos conocidos."
 }

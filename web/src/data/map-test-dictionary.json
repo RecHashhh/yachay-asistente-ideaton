@@ -1,0 +1,149 @@
+{
+  "examples": [
+    "¿Dónde queda SENESCYT?",
+    "Sí",
+    "Estoy en el Bloque A",
+    "No, gracias",
+    "Mejor quiero ir a la biblioteca",
+    "Estoy en los bloques",
+    "Quiero ir del Bloque A a SENESCYT"
+  ],
+  "intents": [
+    {
+      "id": "find_senecyt",
+      "patterns": [
+        "donde queda senecyt",
+        "donde esta senecyt",
+        "muestrame senecyt",
+        "ubicacion de senecyt",
+        "quiero ver senecyt",
+        "donde queda senescyt",
+        "donde esta senescyt",
+        "muestrame senescyt",
+        "ubicacion de senescyt",
+        "quiero ver senescyt"
+      ],
+      "intent": "find_place",
+      "entities": {
+        "place": "senecyt"
+      }
+    },
+    {
+      "id": "find_bloque_a",
+      "patterns": [
+        "donde queda el bloque a",
+        "muestrame el bloque a",
+        "ubicacion del bloque a"
+      ],
+      "intent": "find_place",
+      "entities": {
+        "place": "bloque a"
+      }
+    },
+    {
+      "id": "affirmative",
+      "patterns": [
+        "si",
+        "claro",
+        "por supuesto",
+        "quiero ir",
+        "trazame la ruta",
+        "como llego",
+        "dale",
+        "vale",
+        "de acuerdo",
+        "ok",
+        "okay",
+        "si trazar ruta",
+        "si traza la ruta",
+        "si por favor",
+        "claro que si",
+        "trazar ruta"
+      ],
+      "intent": "affirmative"
+    },
+    {
+      "id": "negative",
+      "patterns": [
+        "no",
+        "no gracias",
+        "solo queria verlo",
+        "solo queria verla",
+        "ahora no",
+        "no quiero ruta",
+        "cancelar",
+        "cancela",
+        "olvidalo",
+        "dejalo",
+        "no solo queria verlo",
+        "no solo ver ubicacion",
+        "no por ahora",
+        "no trazar ruta"
+      ],
+      "intent": "negative"
+    },
+    {
+      "id": "route_between",
+      "patterns": [
+        "quiero ir de {origin} a {destination}",
+        "quiero ir del {origin} a {destination}",
+        "quiero ir del {origin} al {destination}",
+        "como llego de {origin} a {destination}",
+        "como llego del {origin} al {destination}",
+        "ruta de {origin} a {destination}",
+        "ruta del {origin} al {destination}",
+        "desde {origin} hasta {destination}",
+        "trazar ruta de {origin} a {destination}"
+      ],
+      "intent": "route"
+    },
+    {
+      "id": "route_destination",
+      "patterns": [
+        "como llego a {destination}",
+        "quiero la ruta a {destination}",
+        "trazame la ruta a {destination}"
+      ],
+      "intent": "route_destination"
+    },
+    {
+      "id": "origin_bloque_a",
+      "patterns": [
+        "estoy en el bloque a",
+        "desde el bloque a",
+        "me encuentro en el bloque a"
+      ],
+      "intent": "provide_origin",
+      "entities": {
+        "place": "bloque a"
+      }
+    },
+    {
+      "id": "provide_origin",
+      "patterns": [
+        "estoy en {place}",
+        "desde {place}",
+        "me encuentro en {place}",
+        "salgo de {place}",
+        "parto de {place}"
+      ],
+      "intent": "provide_origin"
+    },
+    {
+      "id": "find_place",
+      "patterns": [
+        "donde queda {place}",
+        "donde esta {place}",
+        "muestrame {place}",
+        "ubicacion de {place}",
+        "ubicacion del {place}",
+        "quiero ver {place}",
+        "quiero ir a {place}",
+        "llevame a {place}",
+        "busca {place}",
+        "buscar {place}"
+      ],
+      "intent": "find_place"
+    }
+  ]
+}

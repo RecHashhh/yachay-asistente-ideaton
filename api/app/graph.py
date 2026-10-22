@@ -14,6 +14,7 @@ y verificación posterior: cifras, correos y enlaces de la respuesta deben estar
 Filtros de entrada (crisis, denuncias, groserías, manipulación, datos personales): ver filters.py.
 """
 
+import json
 import re
 import time
 import uuid
@@ -27,6 +28,7 @@ from langgraph.graph import END, START, StateGraph
 from . import contacts, filters, procedures, rules
 from .config import settings
 from .db import conn
+from .kichwa import language_context
 from .search import Hit, expand, hits_by_ids, hybrid
 
 client = anthropic.AsyncAnthropic() if settings.has_anthropic_key else None
@@ -39,7 +41,7 @@ ECUADOR = timezone(timedelta(hours=-5))  # hora local para HOY (Ecuador no tiene
 SYSTEM = """Eres Yachi, el asistente institucional de la Universidad Yachay Tech (Urcuquí, Ecuador). Ayudas a estudiantes con trámites, normativa, servicios y ubicaciones.
 
 Reglas obligatorias:
-1. Responde SOLO con información que esté en los FRAGMENTOS del mensaje. No uses conocimiento propio ni supongas.
+1. Para datos institucionales, responde SOLO con información que esté en los FRAGMENTOS. Para ubicaciones, usa VERIFIED MAP RESULTS; no inventes lugares ni calcules coordenadas, distancias o rutas. No uses conocimiento propio ni supongas.
 2. Después de cada dato escribe la marca del fragmento de donde sale, por ejemplo [F2]. Si un dato no está en ningún fragmento, no lo escribas.
 3. Si los fragmentos no permiten responder la pregunta, responde exactamente SIN_INFORMACION y nada más.
 4. No inventes fechas, plazos, montos, correos, nombres de personas ni enlaces.
@@ -96,6 +98,8 @@ class State(TypedDict, total=False):
     proc: Any
     origin: Any
     hits: list[Hit]
+    map_results: list[dict]
+    map_found: bool
     kind: str
     doc_ids: list[str]
     tokens_in: int
@@ -194,6 +198,8 @@ async def route(state: State) -> State:
     base = {"question": q, "triage": t.kind, "sensitive": t.sensitive}
     if t.route == "crisis":
         return {**base, "route": "crisis"}
+    if state['lang'] == 'qu' and re.sub(r'[^\w\s]', '', q.casefold()).strip() in {'imanalla', 'alli puncha', 'alli chishi', 'alli tuta'}:
+        return {**base, 'triage': 'saludo', 'route': 'smalltalk'}
     if t.route == "smalltalk":
         return {**base, "route": "smalltalk"}
     if t.route == "ood":
@@ -260,6 +266,17 @@ async def out_of_domain(state: State) -> State:
 
 
 async def smalltalk(state: State) -> State:
+    if state['lang'] == 'qu' and client is not None and state.get('triage') in {'saludo', 'cierre'}:
+        response = await client.messages.create(
+            model=settings.anthropic_model, max_tokens=250,
+            system='You are Yachi. Respond briefly to this greeting or farewell only. Do not add institutional facts. '
+                   + language_context(state['question'], 'qu'),
+            messages=[{'role': 'user', 'content': state['question']}],
+        )
+        text = ''.join(getattr(part, 'text', '') for part in response.content).strip()
+        if text:
+            _say(text)
+            return {'kind': 'saludo', 'doc_ids': [], 'tokens_in': response.usage.input_tokens, 'tokens_out': response.usage.output_tokens}
     s = rules.smalltalk(state["question"], state["lang"], state.get("triage"))
     get_stream_writer()({"type": "clarify", "question": s["question"], "options": s["options"]})
     return {"kind": s["kind"], "doc_ids": []}
@@ -343,6 +360,8 @@ async def _agent_retrieve(state: State, q: str, lang: str, where_es: str, where_
             _step("reuse", _t(lang, "Revalidé las fuentes de una respuesta anterior", "Re-validated the sources of a previous answer"))
 
     result = await _agent().gather({"message": q, "lang": lang, "history": state.get("history") or []}, None, notify)
+    map_results = result.get("map_results") or []
+    map_found = bool(result.get("map_found"))
     retrieved = result.get("retrieved") or []
     ids = [r["chunk_id"] for r in retrieved][: settings.rag_context_chunks]
     if not ids:
@@ -351,6 +370,8 @@ async def _agent_retrieve(state: State, q: str, lang: str, where_es: str, where_
     _step("search", _t(lang, f"Busqué en {where_es}, guiado por el catálogo", f"Searched {where_en}, guided by the catalog"),
           ms=int((time.time() - t0) * 1000))
     if not hits:
+        if map_results:
+            return {"hits": [], "map_results": map_results, "map_found": map_found}
         topic = "bienestar" if state.get("triage") == "denuncia" else None
         _step("found", _t(lang, "No encontré un fragmento con relevancia suficiente", "Found no sufficiently relevant excerpt"), "warn",
               detail=_t(lang, "Prefiero no responder antes que adivinar.", "I'd rather not answer than guess."))
@@ -360,7 +381,7 @@ async def _agent_retrieve(state: State, q: str, lang: str, where_es: str, where_
     _step("found", _t(lang, f"Reuní {len(hits)} fragmentos de {len(docs)} {'documento' if len(docs) == 1 else 'documentos'}",
                       f"Gathered {len(hits)} excerpts from {len(docs)} {'document' if len(docs) == 1 else 'documents'}"), docs=docs)
     w({"type": "status", "label": f"{_t(lang, 'Consultando', 'Consulting')} {hits[0].title}"})
-    return {"hits": hits}
+    return {"hits": hits, "map_results": map_results, "map_found": map_found}
 
 
 async def retrieve(state: State) -> State:
@@ -430,6 +451,11 @@ async def generate(state: State) -> State:
         f"[F{i + 1}] {h.title} | {h.seccion or 'sin sección'} | versión {h.version}{f' | período {h.periodo}' if h.periodo else ''}\n{h.texto.split(chr(10) + chr(10), 1)[-1][:3000]}"
         for i, h in enumerate(hits)
     )
+    map_results = state.get("map_results") or []
+    map_context = "\n".join(json.dumps(item, ensure_ascii=False, separators=(",", ":")) for item in map_results)
+    evidence = frags
+    if map_context:
+        evidence += "\n\nVERIFIED MAP RESULTS (from PostGIS):\n" + map_context
     msgs: list[dict] = []
     for turn in (state.get("history") or [])[-6:]:
         if turn.get("content") and turn.get("role") in ("user", "assistant"):
@@ -440,8 +466,9 @@ async def generate(state: State) -> State:
         msgs.pop(0)
     if msgs and msgs[-1]["role"] == "user":
         msgs.pop()
+    language = {'en': 'inglés', 'qu': 'kichwa ecuatoriano'}.get(lang, 'español')
     today = f"{datetime.now(ECUADOR):%d/%m/%Y}"
-    msgs.append({"role": "user", "content": f"IDIOMA: {'inglés' if lang == 'en' else 'español'}\nHOY: {today}\n\nFRAGMENTOS:\n<fragmentos>\n{frags}\n</fragmentos>\n\n"
+    msgs.append({"role": "user", "content": f"IDIOMA: {language}\nHOY: {today}\n\nEVIDENCIA VERIFICADA:\n<evidencia>\n{evidence}\n</evidencia>\n\n"
                                             f"PREGUNTA (texto del usuario):\n<pregunta>{_quote(state['question'])}</pregunta>"})
 
     buf, sent, cited = "", 0, set()
@@ -449,7 +476,8 @@ async def generate(state: State) -> State:
     w({"type": "status", "label": _t(lang, "Redactando respuesta", "Writing response")})
     _step("write", _t(lang, "Redactando solo con esos fragmentos", "Writing only from those excerpts"), "running")
     async with client.messages.stream(
-        model=settings.anthropic_model, max_tokens=900, system=SYSTEM, messages=msgs,
+        model=settings.anthropic_model, max_tokens=1400 if lang == 'qu' else 900,
+        system=SYSTEM + language_context(state['question'], lang), messages=msgs,
         thinking={"type": "disabled"}, cache_control={"type": "ephemeral"},
     ) as stream:
         async for text in stream.text_stream:
@@ -489,7 +517,7 @@ async def generate(state: State) -> State:
     w({"type": "sources", "items": _with_wellbeing(sources, state)})
     # Verificación: cifras, correos y enlaces que no están en los fragmentos se avisan y van a la bandeja para revisión.
     # HOY también es un dato dado al modelo (no de los documentos): decir "hoy es 22/10" no es un dato inventado.
-    bad = filters.unsupported_facts(clean, frags + f"\n{today}" + (SUPPORT["es"] if state.get("triage") == "denuncia" else ""))
+    bad = filters.unsupported_facts(clean, evidence + f"\n{today}" + (SUPPORT["es"] if state.get("triage") == "denuncia" else ""))
     _step("write", _t(lang, f"Redacté la respuesta citando {len(sources)} {'fuente' if len(sources) == 1 else 'fuentes'}",
                       f"Wrote the answer citing {len(sources)} {'source' if len(sources) == 1 else 'sources'}"))
     if bad:
@@ -569,7 +597,7 @@ def build():
     g.add_node("finish", finish)
     g.add_edge(START, "route")
     g.add_conditional_edges("route", _next, {"ood": "ood", "smalltalk": "smalltalk", "crisis": "crisis", "clarify": "clarify", "place": "place", "procedure": "procedure", "retrieve": "retrieve"})
-    g.add_conditional_edges("retrieve", lambda s: "generate" if s.get("hits") else "finish", {"generate": "generate", "finish": "finish"})
+    g.add_conditional_edges("retrieve", lambda s: "generate" if s.get("hits") or s.get("map_results") else "finish", {"generate": "generate", "finish": "finish"})
     for n in ("ood", "smalltalk", "crisis", "clarify", "place", "procedure", "generate"):
         g.add_edge(n, "finish")
     g.add_edge("finish", END)

@@ -1,0 +1,29 @@
+{
+  "source": "Propuestas de Codex para completar la interfaz, solicitadas por el usuario",
+  "scope": "Borradores aproximados, con paráfrasis y términos técnicos conservados. Las frases completas no provienen literalmente de los PDF ni de Alki.",
+  "approved": false,
+  "humanReviewed": false,
+  "entries": [
+    { "key": "undo", "es": "Deshacer", "qu": "Kutichina", "note": "Propuesta contextual de restaurar la conversación. Kutichina documenta devolver (PDF kichwa-español p. 44); no es una equivalencia digital revisada." },
+    { "key": "fbSkip", "es": "Omitir", "qu": "Sakina", "note": "Propuesta de dejar sin responder; reutiliza la raíz documentada de dejar, sin revisión del uso en interfaz." },
+    { "key": "helloSub", "es": "¿Qué trámite o lugar de {uni} necesitas?", "qu": "¿{uni}pi ima ruranata, ima kuskatatak maskanki?", "note": "Paráfrasis aproximada de qué actividad o lugar buscas; revisar con hablante." },
+    { "key": "placeholder", "es": "Pregúntale a {name}…", "qu": "{name}ta tapuy…" },
+    { "key": "trending", "es": "Preguntas de ejemplo", "qu": "Tapuykuna", "note": "Etiqueta abreviada Preguntas." },
+    { "key": "notice", "es": "Aviso de uso de datos", "qu": "Willaykunata llamkachinamanta" },
+    { "key": "disclaimer", "es": "{name} responde solo con documentos oficiales. Revisa la fuente de cada respuesta.", "qu": "{name}ka yachaywasipa killkashkakunallawan kutichin. Sapa kutichipi rikuchishka killkata rikuy.", "note": "Paráfrasis de documentos universitarios y consulta de la referencia. No es una traducción certificada." },
+    { "key": "demo", "es": "Datos de ejemplo", "qu": "Rikuchina willaykuna" },
+    { "key": "demoTitle", "es": "Sin backend: respuestas del asistente simuladas con datos de ejemplo", "qu": "Mana backend tiyanchu: kay kutichikuna rikuchinallami kan." },
+    { "key": "chatTextOnly", "es": "El agente conectado solo admite preguntas de texto. Quita los adjuntos e inténtalo de nuevo.", "qu": "Kay agente killkashka tapuykunallata chaskin. Yapashka archivokunata anchuchishpa kutin kachay." },
+    { "key": "attach", "es": "Adjuntar imagen o PDF", "qu": "Rikchakta PDFtapash yapana" },
+    { "key": "copy", "es": "Copiar respuesta", "qu": "Kutichita kikinchana", "note": "Término técnico propuesto; no se ha confirmado esta equivalencia en los PDF." },
+    { "key": "retry", "es": "Volver a generar", "qu": "Kutin kutichina", "note": "Paráfrasis de responder de nuevo." },
+    { "key": "version", "es": "Versión", "qu": "Mushukyachishka killka", "note": "Paráfrasis de documento actualizado; revisar el concepto de versión." },
+    { "key": "docOf", "es": "documento del", "qu": "killkashka puncha", "note": "Se usa antes de una fecha en el detalle de la fuente." },
+    { "key": "steps", "es": "Pasos", "qu": "Ruray ñan", "note": "Paráfrasis de camino de acciones, no pasos físicos." },
+    { "key": "docs", "es": "Qué necesitas", "qu": "Rurankapak charina", "note": "Paráfrasis de lo que se debe tener para realizar la actividad." },
+    { "key": "cancel", "es": "Cancelar", "qu": "Sakina", "note": "Sakina documenta dejar o abandonar (PDF kichwa-español p. 80). El uso digital es una propuesta." },
+    { "key": "deleted", "es": "Conversación eliminada", "qu": "Rimanakuy pichashka" },
+    { "key": "piiEdit", "es": "Editar mensaje", "qu": "Killkashkata allichina" },
+    { "key": "kichwaNote", "es": "Kichwa experimental: puede contener errores de traducción. Compara la versión en español y usa «Reportar traducción» para sugerir una corrección.", "qu": "Kay kichwa rimaypika pantaykuna tiyayta ushankuna. Españolpi killkashkawan chimpapuray. «Reportar traducción» ñitishpa allichinata willay. (Experimental: puede contener errores.)", "note": "Se conserva una advertencia breve también en español para que la limitación sea comprensible." }
+  ]
+}

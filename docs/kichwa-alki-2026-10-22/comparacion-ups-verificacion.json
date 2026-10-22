@@ -1,0 +1,33 @@
+{
+  "source": "https://tikrachina.ups.edu.ec/traductor/",
+  "direction": "es-qu",
+  "limitation": "Comparación exploratoria; ninguno de los proveedores certifica estas frases. No activa cambios de interfaz.",
+  "items": [
+    {
+      "key": "cancel",
+      "es": "Cancelar",
+      "observedAt": "2026-10-22T17:56:53.081Z",
+      "httpStatus": 200,
+      "approved": false,
+      "echoedSpanish": "Cancelar",
+      "upsQu": "chunka",
+      "alkiQu": "Kawsay.",
+      "alkiExactInput": true,
+      "flags": [],
+      "status": "pendiente_revision_linguistica"
+    },
+    {
+      "key": "helloSub",
+      "es": "¿Qué trámite o lugar de Yachay Tech necesitas?",
+      "observedAt": "2026-10-22T17:56:56.227Z",
+      "httpStatus": 200,
+      "approved": false,
+      "echoedSpanish": "¿Qué trámite o lugar de Yachay Tech necesitas?",
+      "upsQu": "mishki",
+      "alkiQu": "¿Ima rikhuyka o llakta Yachay Techmanta kikinka?",
+      "alkiExactInput": true,
+      "flags": [],
+      "status": "pendiente_revision_linguistica"
+    }
+  ]
+}

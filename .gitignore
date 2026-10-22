@@ -41,3 +41,18 @@ api/app/data/*.local.json
 
 # Correos de muestra (pueden tener datos personales)
 *.eml
+
+# Respaldos y reportes generados localmente; se conservan en el equipo, no en Git.
+/Mapa/backups/
+/Mapas/backups/
+/Mapa/reporte_final.md
+/Mapas/.dockerignore
+/Mapas/.env.example
+/Mapas/Dockerfile
+/Mapas/docker-compose.yml
+/Mapas/README.md
+/Mapas/API_CONTRACT.md
+/docs/MAP_TEST_MODE.md
+/docs/POSTGRES_UNIFICATION.md
+/docs/SATELLITE_BASEMAP.md
+api/models/

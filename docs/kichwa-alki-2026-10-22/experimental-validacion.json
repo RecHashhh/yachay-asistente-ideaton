@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-22",
+  "mode": "experimental_qu_with_spanish_comparison",
+  "backendTests": 42,
+  "approvalTests": 4,
+  "previewTests": 2,
+  "browserReportCases": 4,
+  "migration": "api/sql/07_translation_reports.sql; tabla preparada en PostgreSQL local con DATABASE_URL del nucleo de Yachi",
+  "realModelTest": "No ejecutado: ANTHROPIC_API_KEY vacia en los archivos locales revisados",
+  "realModelCalls": 0,
+  "linguisticallyValidated": false,
+  "autoLearning": false,
+  "realPostgresReportTest": "Endpoint 201, lectura de pending_review y eliminacion del registro sintetico"
+}

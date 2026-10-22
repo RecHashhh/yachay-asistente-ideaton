@@ -17,6 +17,9 @@ COPY --chown=app:app api/alembic.ini /app/alembic.ini
 COPY --chown=app:app api/migrations /app/migrations
 # Caché del modelo de embeddings (fastembed) y archivos subidos desde el Portal: el usuario de la app debe poder escribir.
 RUN mkdir -p /app/.cache /app/uploads && chown app:app /app/.cache /app/uploads
+COPY --chown=app:app Mapas/app /app/Mapas/app
+COPY --chown=app:app Mapas/migrations /app/Mapas/migrations
+COPY --chown=app:app Mapas/alembic.ini /app/Mapas/alembic.ini
 
 USER app
 EXPOSE 8000

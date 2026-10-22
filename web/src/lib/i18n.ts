@@ -4,11 +4,11 @@ import previewKichwa from './kichwa.preview.json';
 
 export type Lang = 'es' | 'en' | 'qu';
 
-/** Kichwa: solo el saludo y la etiqueta; el resto de la interfaz cae a español. POR VALIDAR con un hablante nativo. */
+/** Kichwa experimental: borradores de interfaz pendientes de revisión por un hablante. */
 export const LANGS: { id: Lang; label: string; short: string; speech: string }[] = [
   { id: 'es', label: 'Español', short: 'ES', speech: 'es-EC' },
   { id: 'en', label: 'English', short: 'EN', speech: 'en-US' },
-  { id: 'qu', label: 'Kichwa (Ecuador) · beta', short: 'KI', speech: 'es-EC' },
+  { id: 'qu', label: 'Kichwa (Ecuador) · beta', short: 'KI', speech: 'qu-EC' },
 ];
 
 const es = {
@@ -39,6 +39,7 @@ const es = {
   version: 'Versión', docOf: 'documento del', consultedOn: 'consultado el', institutional: 'Requiere iniciar sesión con tu cuenta de la universidad.', openMaps: 'Abrir en Google Maps', hours: 'Horario',
   steps: 'Pasos', docs: 'Qué necesitas', where: 'Dónde', time: 'Tiempo estimado', office: 'Responsable',
   showMap: 'Ver en el mapa', done: 'Hecho',
+  mapLayers: 'Capas del mapa', satellite: 'Satélite', streets: 'Calles', satelliteUnavailable: 'No se pudo cargar la imagen satelital. Se muestran las calles.',
   unknownTitle: 'Sin información oficial sobre este tema',
   unknownBody: 'No encontramos este tema en los documentos oficiales disponibles. Para no darte un dato inexacto, te sugerimos consultar con:',
   outOfDomain: 'Consulta fuera del ámbito institucional',
@@ -67,7 +68,7 @@ const es = {
   langAuto: 'Detecté que escribes en {lang}. ¿Cambiar el idioma?',
   change: 'Cambiar',
   open: 'Abrir asistente', close: 'Cerrar',
-  kichwaNote: 'Kichwa en revisión: la interfaz combina propuestas de Alki y términos de diccionario. Los textos con discrepancias y las respuestas institucionales se muestran en español mientras se revisan.',
+  kichwaNote: 'Kichwa experimental: puede contener errores de traducción. Compara la versión en español y usa «Reportar traducción» para sugerir una corrección.',
   docsNav: 'Documentos disponibles',
   docsTitle: 'Documentos disponibles',
   docsSub: 'Todo lo que {name} usa para responder. Solo se usa la versión vigente de cada documento.',
@@ -115,6 +116,7 @@ const en: Dict = {
   version: 'Version', docOf: 'document dated', consultedOn: 'retrieved on', institutional: 'Requires signing in with your university account.', openMaps: 'Open in Google Maps', hours: 'Hours',
   steps: 'Steps', docs: 'What you need', where: 'Where', time: 'Estimated time', office: 'Office in charge',
   showMap: 'Show on map', done: 'Done',
+  mapLayers: 'Map layers', satellite: 'Satellite', streets: 'Streets', satelliteUnavailable: 'Satellite imagery could not load. Showing streets.',
   unknownTitle: 'No official information on this topic',
   unknownBody: 'We could not find this topic in the available official documents. To avoid giving you inaccurate information, please contact:',
   outOfDomain: 'Outside the institutional scope',
@@ -143,7 +145,7 @@ const en: Dict = {
   langAuto: 'Looks like you are writing in {lang}. Switch language?',
   change: 'Switch',
   open: 'Open assistant', close: 'Close',
-  kichwaNote: 'Kichwa under review: the interface combines Alki proposals and dictionary terms. Labels with discrepancies and institutional answers remain in Spanish pending review.',
+  kichwaNote: 'Experimental Kichwa: translations may contain errors. Compare the Spanish version and use “Report translation” to suggest a correction.',
   docsNav: 'Available documents',
   docsTitle: 'Available documents',
   docsSub: 'Everything {name} uses to answer. Only the current version of each document is used.',

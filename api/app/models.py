@@ -12,6 +12,7 @@ class Base(DeclarativeBase):
 
 class Document(Base):
     __tablename__ = "documents"
+    __table_args__ = {"schema": "rag"}
 
     doc_id: Mapped[str] = mapped_column(Text, primary_key=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
@@ -30,9 +31,10 @@ class Document(Base):
 
 class RagChunk(Base):
     __tablename__ = "rag_chunks"
+    __table_args__ = {"schema": "rag"}
 
     chunk_id: Mapped[str] = mapped_column(Text, primary_key=True)
-    doc_id: Mapped[str] = mapped_column(ForeignKey("documents.doc_id", ondelete="CASCADE"), nullable=False)
+    doc_id: Mapped[str] = mapped_column(ForeignKey("rag.documents.doc_id", ondelete="CASCADE"), nullable=False)
     section: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
     content: Mapped[str] = mapped_column(Text, nullable=False)
     tokens_approx: Mapped[int] = mapped_column(Integer, nullable=False)
