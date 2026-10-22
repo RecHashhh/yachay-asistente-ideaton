@@ -27,9 +27,11 @@ En otra terminal:
 
 ```bash
 cd web
-npm install
+npm ci               # instala las dependencias fijadas, incluida maplibre-gl
 npm run dev          # http://localhost:5180
 ```
+
+No hace falta configurar variables satelitales para arrancar: el frontend intenta usar Esri World Imagery por defecto. Que las imágenes carguen depende de la disponibilidad y condiciones del proveedor y del acceso a Internet desde el navegador; si no se puede acceder a las teselas, el mapa cambia a Calles. `VITE_SATELLITE_TILE_URL` y `VITE_SATELLITE_ATTRIBUTION` permiten sustituir el proveedor. Las variables `VITE_*` son públicas en el navegador: no pongas secretos en ellas. Antes de desplegar, revisa y cumple las condiciones vigentes del proveedor de imágenes.
 
 - Chat público: `http://localhost:5180/`
 - **Modo voz directo** (para compartir con personas ciegas o con baja visión): `http://localhost:5180/#/voz`
