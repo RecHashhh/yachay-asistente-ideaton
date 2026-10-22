@@ -1,14 +1,29 @@
 # Asistente institucional Yachay Tech
 
-Chatbot público de la universidad. Responde con los documentos que cargan los administradores (PDF, XLSX, CSV), cita la fuente con su versión y su fecha, y puede marcar lugares en el mapa del campus.
+Prototipo del chatbot público de la universidad. Responde con documentos fuente, cita su período de vigencia y sección, y puede marcar lugares en el mapa del campus.
 
 ```
 IDEATHON/
-  web/   Frontend React + Vite + motion
-  api/   Backend FastAPI + LangGraph + PostgreSQL/pgvector
+  web/   Frontend React + Vite + motion (este paso)
+  api/   Backend FastAPI + LangChain/LangGraph
+  rag/   Corpus Markdown y fragmentos para el índice RAG
 ```
 
 ## Correr el frontend
+
+Para preguntar al agente RAG, configura el frontend y levanta el backend en terminales separadas:
+
+```bash
+cp web/.env.example web/.env.local
+cp .env.example .env
+# Edita .env: ADMIN_EMAILS/ADMIN_PASSWORD (≥ 12) y, para el agente, ANTHROPIC_API_KEY.
+# Copia el corpus autorizado (confidencial, no está en el repo) a ./rag
+docker compose up --build
+```
+
+Sin Docker: ver `api/README.md` (PostgreSQL 18 + pgvector local, `python -m app.migrate`, `python -m app.ingest`, `uvicorn app.main:app`).
+
+En otra terminal:
 
 ```bash
 cd web
@@ -19,9 +34,22 @@ npm run dev          # http://localhost:5180
 - Chat público: `http://localhost:5180/`
 - **Modo voz directo** (para compartir con personas ciegas o con baja visión): `http://localhost:5180/#/voz`
 - Widget incrustado en otra página (estilo Messenger): `http://localhost:5180/demo-sitio.html`
-- Portal de administración: `http://localhost:5180/#/admin`. En modo de ejemplo entra cualquier correo `@yachaytech.edu.ec` con una contraseña de 4 caracteres o más.
+- Portal de administración: `http://localhost:5180/#/admin`. Con backend: los correos de `ADMIN_EMAILS` y `ADMIN_PASSWORD`. En el simulador entra cualquier correo `@yachaytech.edu.ec` con una contraseña de 4 caracteres o más.
 
-Si `VITE_API_URL` está vacío (ver `.env.example`), todo funciona con el simulador `web/src/lib/mock.ts`. Los datos de ejemplo **no son información oficial**.
+`web/.env.local` conecta el frontend a `http://localhost:8000`: chat, tendencias, temas, guías, lugares, bandeja, filtros, validación y Portal usan el backend real. Sin `VITE_API_URL` todo funciona con el simulador (datos de ejemplo, **no son información oficial**).
+
+## Arquitectura (integración del 22/10/2026)
+
+Cada pregunta pasa por el grafo de Yachi (`api/app/graph.py`) y, solo si hace falta buscar, por el agente:
+
+1. **Triage sin modelo** (`rules.py`, `filters.py`): datos personales ocultos, crisis (ECU 911 y Bienestar), acoso o violencia, insultos, manipulación, saludos, fuera del ámbito, Confesionario.
+2. **Respuestas deterministas, sin modelo**: guías de trámite con citas verificadas (`procedures.py`), aulas y lugares con coordenadas oficiales y mapa real, aclaraciones.
+3. **Búsqueda**:
+   - *Con `ANTHROPIC_API_KEY`* (y `YACHI_AGENT=auto`): el **agente** (`agent.py`) lee el catálogo de documentos con sus descripciones (`rag/descripciones.csv`), elige en cuáles buscar, reformula con los términos del documento y puede buscar varias veces; consulta el índice de Yachi a través de `yachi_retriever.py`.
+   - *Sin clave*: búsqueda híbrida directa (`search.py`): texto en español, cobertura de conceptos poco frecuentes, siglas exactas, glosario para preguntas en inglés y vectores multilingües, fusionados con RRF.
+4. **Redacción con salvaguardas** (`generate`): solo con los fragmentos, citas armadas por el servidor, `SIN_INFORMACION` → "sin información oficial" con la oficina que corresponde, y verificación posterior de cifras, correos y enlaces. Sin clave se muestra el fragmento literal.
+
+El panel de actividad del chat muestra los pasos reales (catálogo, búsquedas, documentos, verificación). La capa original del agente con Ollama/`bge-m3` y Alembic (`retrieval.py`, `models.py`, `seed.py`, `migrations/`) se conserva como perfil opcional `ollama` de `docker-compose`, en su propia base.
 
 ## Estado de entrega — 20 de octubre de 2026
 
@@ -110,58 +138,44 @@ Detalle por criterio, evidencia y guion del pitch: [docs/INFORME-RUBRICA.md](doc
 
 ## Contrato con el backend
 
+El backend implementa `POST /chat` y `GET /health`. El chat envía el texto, idioma e historial reciente al agente y consume la respuesta SSE. El resto de las funciones listadas abajo permanece en el simulador del frontend.
+
 | Método | Ruta | Uso |
 |---|---|---|
-| POST | `/chat` | `ChatRequest` → `text/event-stream` con `StreamEvent` (`status`, `token`, `tool`, `procedure`, `unknown`, `sources`, `suggestions`, `link`, `done`, `error`) |
-| GET | `/trends` | Consultas más frecuentes de los últimos 7 días |
-| GET | `/topics` | Temas consultables |
-| POST | `/admin/login` | Devuelve un token. Sugerido: Microsoft Entra ID con el tenant de la universidad |
-| GET/POST/DELETE | `/admin/docs` | Listar, subir (multipart con metadatos) y quitar documentos |
-| POST | `/admin/topics` | Crear un tema |
-| POST | `/inquiries` | Consulta enviada a la dependencia desde una respuesta sin información (`office`, `email`, `question`, `lang`) → código de seguimiento |
-| POST | `/feedback` | Voto 👍/👎 de una respuesta; los 👎 entran a la bandeja |
-| GET/PATCH | `/admin/unanswered` | Bandeja "Sin respuesta": preguntas sin fuente, fuera del ámbito o con 👎, agrupadas y con conteo; estado nuevo, convertida o descartada |
-| POST | `/admin/validation/cases` | Agregar una pregunta de control (desde la bandeja o el CSV) |
+| POST | `/chat` | `ChatRequest` → `text/event-stream` (`status`, `token`, `unknown`, `sources`, `suggestions`, `done`, `error`) |
+| GET | `/health` | Estado de PostgreSQL y conteo de documentos y fragmentos indexados |
 
-## Backend propuesto (LangChain + LangGraph)
+## Backend RAG con Docker Compose
 
-**Ingesta.** Cuando el administrador sube un archivo:
-1. Se lee según el tipo: PDF con `PyPDFLoader` (una página por documento); XLSX y CSV fila por fila, convirtiendo cada fila en texto `columna: valor` con su hoja y número de fila.
-2. Se parte en fragmentos de unos 800 tokens con 100 de traslape. Las tablas se parten por grupos de filas, nunca a mitad de fila.
-3. Cada fragmento lleva los metadatos `doc_id`, `topic_id`, `version`, `doc_date`, `origin`, `url`, `locator` (página, hoja o fila) y `is_current`.
-4. Al subir una versión nueva se marca `is_current=false` en la anterior. No se borra, para poder auditar.
+El Compose levanta PostgreSQL 17 con pgvector, el servicio de carga inicial y la API. El frontend no está dentro de Compose.
 
-**Consulta (grafo LangGraph):**
+1. Copia el archivo de entorno y configura las claves:
+
+```bash
+cp .env.example .env
+# Edita .env: ANTHROPIC_API_KEY
 ```
-entrada → caché semántica ──(acierto)──────────────────────────→ respuesta
-             └─(fallo)→ router de tema (modelo pequeño) → recuperación híbrida filtrada
-                         → reordenar (top 4) → modelo de respuesta con herramienta
-                           mostrar_en_mapa → stream SSE
+
+2. Construye y arranca los servicios:
+
+```bash
+docker compose up --build
 ```
-- La recuperación filtra por `is_current=true` y por el tema que detecta el router, y combina BM25 con vectores.
-- La herramienta `mostrar_en_mapa(destino, origen?, resaltar?)` solo acepta los `id` de `campus.ts`. El modelo nunca ve coordenadas.
-- Si ningún fragmento pasa el umbral de relevancia, el asistente dice que no lo sabe en vez de inventar.
 
-## Búsqueda híbrida (especificación para el backend)
+Compose levanta Ollama y descarga el modelo de embeddings al volumen persistente `ollama_data`. Después, el servicio `seed` aplica las migraciones y sincroniza `rag/chunks.jsonl`, `rag/fuentes.csv` y `rag/descripciones.csv`. Guarda un resumen por documento en `documents.description` y genera embeddings locales para fragmentos nuevos o modificados; una segunda ejecución sin cambios no vuelve a generarlos. La base de datos conserva sus datos en el volumen `postgres_data`.
 
-Los reglamentos tienen numeración ("art. 42", "literal b") y siglas ("F-SG-03") que la búsqueda por vectores encuentra mal; la búsqueda por palabras clave las encuentra exacto, pero falla con sinónimos ("cambiarme de carrera" frente a "cambio de carrera"). Se combinan las dos:
+Ollama reserva una GPU NVIDIA para calcular embeddings. El host debe tener un driver NVIDIA activo y NVIDIA Container Toolkit configurado para Docker; Compose pasa una GPU al contenedor de Ollama.
 
-1. **Fragmentación por estructura.** Los PDF se parten por artículo o sección (no por número fijo de caracteres); cada fragmento guarda su encabezado ("Art. 42 – Cambio de carrera"). Los XLSX/CSV, por grupos de filas con los nombres de columna.
-2. **Dos índices en la misma base.** PostgreSQL con `pgvector` (embeddings multilingües, coseno) y búsqueda de texto completo (`tsvector` en español e inglés, o BM25 con `pg_search`). Ambos filtran por `is_current = true` y por el tema que detecta el router.
-3. **Fusión por rango recíproco (RRF).** Se toman los 20 mejores de cada índice y se combinan con `score = Σ 1 / (60 + rango)`. No requiere calibrar pesos entre índices.
-4. **Reordenamiento.** Un reordenador (cross-encoder multilingüe o el mismo Haiku con una instrucción corta) deja los 4 fragmentos que van al modelo.
-5. **Umbral de "sin información".** Si el mejor fragmento reordenado no supera el umbral, no se llama al modelo de respuesta: se devuelve el evento `unknown` (más barato y sin riesgo de inventar).
-6. **Citas armadas por el servidor.** El modelo solo devuelve el `id` del fragmento que usa; el backend completa documento, versión, fecha, página y enlace. Una cita inventada es imposible por construcción.
+```bash
+docker compose run --rm seed  # volver a sincronizar el corpus
+docker compose down           # detener servicios, conservar datos
+docker compose down -v        # eliminar también la base local
+```
 
-Para el paper: correr el set de control con tres modos (solo vectores, solo palabras clave, híbrido) y reportar exactitud y citación correcta de cada uno en la pestaña Validación.
+API: `http://localhost:8000`; salud: `http://localhost:8000/health`. PostgreSQL se publica solo en `localhost:5432`. La búsqueda combina distancia coseno en pgvector y búsqueda textual PostgreSQL; LangGraph responde con hasta cuatro fragmentos. Sin fragmentos sobre el umbral de relevancia, emite `unknown`.
 
-## Estrategias para gastar menos tokens
+La configuración de los modelos está en `.env.example`: Ollama usa `bge-m3` para embeddings de 1024 dimensiones y Anthropic usa Claude Haiku 5.5 (`claude-haiku-5-5`) para redactar respuestas. `OLLAMA_EMBEDDING_MODEL` se puede cambiar por otro modelo compatible de 1024 dimensiones; si se cambia, la carga vuelve a calcular los vectores. Las claves de Anthropic no deben guardarse en Git.
 
-1. **Caché semántica.** Si una pregunta nueva es casi igual a una ya respondida (similitud mayor a 0.95, con el mismo tema y la misma versión de los documentos), se devuelve la respuesta guardada sin llamar al modelo. Las preguntas de las tendencias son las que más se repiten.
-2. **Caché de prompt.** El prompt de sistema, la lista de lugares y la definición de la herramienta van primero y no cambian, así se cachean y cuestan una fracción del precio en cada llamada.
-3. **Router barato.** Un modelo pequeño (Haiku) clasifica el tema y descarta saludos y preguntas fuera de alcance. El modelo grande solo responde cuando hay contexto útil.
-4. **Pocos fragmentos y buenos.** Se recuperan unos 20 y el reordenador se queda con 4, en vez de mandar 10 o más al modelo.
-5. **Historial corto.** El frontend envía solo los últimos 6 turnos (`HISTORY_TURNS` en `Chat.tsx`). El backend resume lo anterior en 2 o 3 líneas.
-6. **Tablas precalculadas.** Las preguntas de valores exactos (aranceles, horarios) se responden con una búsqueda estructurada sobre el CSV o XLSX, no metiendo la tabla completa en el prompt.
-7. **Límite de salida.** `max_tokens` de unos 600 y la instrucción de responder breve y con listas.
-8. **Sugerencias sin modelo.** Las preguntas de seguimiento salen de las tendencias del mismo tema, no de otra llamada al modelo.
+El frontend ya conecta el chat con `/chat` mediante `VITE_API_URL=http://localhost:8000` en `web/.env.local`. El CORS del backend permite los orígenes locales de Vite. `/health` se puede consultar para verificar que la base y el índice estén disponibles. Las preguntas y respuestas usan el agente real; las tarjetas de sugerencias, tendencias, temas y el portal de administración siguen siendo de ejemplo.
+
+`fecha_consulta` se conserva como metadato de la fuente y no se presenta como fecha de publicación. El historial se procesa en la petición, sin almacenarse en PostgreSQL. Esta etapa no incluye adjuntos, autenticación, administración de documentos, tendencias, temas ni feedback.

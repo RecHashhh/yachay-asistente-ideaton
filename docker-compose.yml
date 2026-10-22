@@ -1,0 +1,149 @@
+# Yachi completo: PostgreSQL + pgvector, migraciones e ingesta del corpus, y la API (grafo + agente con clave de Anthropic).
+#   cp .env.example .env   # completar ADMIN_PASSWORD (≥ 12) y, si se quiere el agente, ANTHROPIC_API_KEY
+#   copiar el corpus del equipo (confidencial, fuera del repo) a ./rag  → chunks.jsonl, fuentes.csv, corpus/, datos/, tramites.json
+#   docker compose up --build
+# Perfil opcional "ollama": la capa original de indexación con Ollama/bge-m3 y Alembic, en su propia base (yachay_rag).
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-yachi}
+      POSTGRES_USER: ${POSTGRES_USER:-yachay}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-only-change-me}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./api/sql/docker:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+    logging: &default-logging
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  # Esquema (sql/*.sql), filtros, descripciones del catálogo y carga del corpus con embeddings (fastembed, sin GPU).
+  seed:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    command: ["sh", "-c", "python -m app.migrate && python -m app.ingest"]
+    environment: &api-environment
+      DATABASE_URL: postgresql://${POSTGRES_USER:-yachay}:${POSTGRES_PASSWORD:-local-dev-only-change-me}@db:5432/${POSTGRES_DB:-yachi}
+      RAG_DIR: /app/rag
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-haiku-5-5}
+      YACHI_AGENT: ${YACHI_AGENT:-auto}
+      RAG_MIN_SIMILARITY: ${RAG_MIN_SIMILARITY:-0.30}
+      RAG_CONTEXT_CHUNKS: ${RAG_CONTEXT_CHUNKS:-8}
+      RAG_MAX_TOOL_CALLS: ${RAG_MAX_TOOL_CALLS:-6}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5180}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5180,http://127.0.0.1:5180}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      RETENTION_DAYS: ${RETENTION_DAYS:-365}
+      # Capa original (perfil "ollama"): base aparte.
+      POSTGRES_DB: yachay_rag
+      POSTGRES_USER: ${POSTGRES_USER:-yachay}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-only-change-me}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-bge-m3}
+    volumes:
+      - ./rag:/app/rag:ro
+      - model_cache:/app/.cache
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    logging: *default-logging
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    environment: *api-environment
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    volumes:
+      - ./rag:/app/rag:ro
+      - model_cache:/app/.cache
+      - uploads:/app/uploads
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ---------------------------------------------------------------- perfil opcional: capa original con Ollama
+  ollama:
+    profiles: ["ollama"]
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+    logging: *default-logging
+
+  ollama-model:
+    profiles: ["ollama"]
+    image: ollama/ollama:latest
+    entrypoint: ["/bin/ollama"]
+    command: ["pull", "${OLLAMA_EMBEDDING_MODEL:-bge-m3}"]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+    logging: *default-logging
+
+  seed-ollama:
+    profiles: ["ollama"]
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    command: ["sh", "-c", "alembic upgrade head && python -m app.seed"]
+    environment: *api-environment
+    volumes:
+      - ./rag:/app/rag:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama-model:
+        condition: service_completed_successfully
+    restart: "no"
+    logging: *default-logging
+
+volumes:
+  postgres_data:
+  ollama_data:
+  model_cache:
+  uploads:
