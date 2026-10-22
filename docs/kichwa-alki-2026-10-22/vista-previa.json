@@ -2,23 +2,67 @@
   "source": "https://alki.ec/",
   "mode": "vista_previa_solicitada_por_usuario",
   "approvedLinguistically": false,
-  "activeInterfaceKeys": 101,
+  "activeInterfaceKeys": 92,
   "omitted": [
     {
       "key": "send",
       "reason": "igual_al_original"
     },
     {
+      "key": "cancel",
+      "reason": "discrepancia_en_revision"
+    },
+    {
       "key": "copy",
       "reason": "respuesta_meta_en_espanol"
+    },
+    {
+      "key": "retry",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "steps",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "docs",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "helloSub",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "placeholder",
+      "reason": "discrepancia_en_revision"
     },
     {
       "key": "trending",
       "reason": "origen_modificado"
     },
     {
+      "key": "notice",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "themeLight",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "themeDark",
+      "reason": "discrepancia_en_revision"
+    },
+    {
+      "key": "disclaimer",
+      "reason": "discrepancia_en_revision"
+    },
+    {
       "key": "demo",
       "reason": "respuesta_meta_en_espanol"
+    },
+    {
+      "key": "attach",
+      "reason": "discrepancia_en_revision"
     },
     {
       "key": "version",

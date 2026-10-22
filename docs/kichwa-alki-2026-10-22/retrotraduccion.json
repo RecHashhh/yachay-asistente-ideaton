@@ -1,0 +1,127 @@
+{
+  "source": "https://alki.ec/",
+  "method": "Formulario público con dirección Kichwa a Español",
+  "limitation": "El mismo traductor puede reproducir sus errores. No es validación humana ni puntuación de calidad.",
+  "items": [
+    {
+      "key": "cancel",
+      "es": "Cancelar",
+      "qu": "Kawsay.",
+      "backEs": "Vida.",
+      "direction": "qu-es",
+      "observedAt": "2026-10-22T15:48:37.366Z",
+      "status": "pendiente_comparacion",
+      "approved": false
+    },
+    {
+      "key": "retry",
+      "es": "Volver a generar",
+      "qu": "Ñukaka rishunchik.",
+      "backEs": "Yo veo.",
+      "direction": "qu-es",
+      "observedAt": "2026-10-22T15:48:41.864Z",
+      "status": "pendiente_comparacion",
+      "approved": false
+    },
+    {
+      "key": "steps",
+      "es": "Pasos",
+      "qu": "Pukllay",
+      "backEs": "Juego",
+      "direction": "qu-es",
+      "observedAt": "2026-10-22T15:48:45.986Z",
+      "status": "pendiente_comparacion",
+      "approved": false
+    },
+    {
+      "key": "docs",
+      "es": "Qué necesitas",
+      "qu": "¿Ima rikhuyki?",
+      "backEs": "¿Qué ves?",
+      "direction": "qu-es",
+      "observedAt": "2026-10-22T15:48:50.128Z",
+      "status": "pendiente_comparacion",
+      "approved": false
+    },
+    {
+      "key": "newChat",
+      "es": "Nueva conversación",
+      "qu": "Mushuk rimanakuy",
+      "backEs": "Nuevo lenguaje.",
+      "direction": "qu-es",
+      "observedAt": "2026-10-22T15:48:54.341Z",
+      "status": "pendiente_comparacion",
+      "approved": false
+    },
+    {
+      "key": "helloSub",
+      "es": "¿Qué trámite o lugar de {uni} necesitas?",
+      "qu": "¿Ima rikhuyka o llakta {uni}manta kikinka?",
+      "backEs": "¿Qué ves de la ciudad {uni}manta?",
+      "direction": "qu-es",
+      "observedAt": "2026-10-22T15:48:58.588Z",
+      "status": "pendiente_comparacion",
+      "approved": false
+    },
+    {
+      "key": "placeholder",
+      "es": "Pregúntale a {name}…",
+      "qu": "Ñukaka {name}ta yachakichu...",
+      "backEs": "Yo conozco a {name}...",
+      "direction": "qu-es",
+      "observedAt": "2026-10-22T15:49:02.770Z",
+      "status": "pendiente_comparacion",
+      "approved": false
+    },
+    {
+      "key": "notice",
+      "es": "Aviso de uso de datos",
+      "qu": "Ñukaka riksichik datos chaylla.",
+      "backEs": "Yo veo esos datos.",
+      "direction": "qu-es",
+      "observedAt": "2026-10-22T15:49:06.824Z",
+      "status": "pendiente_comparacion",
+      "approved": false
+    },
+    {
+      "key": "themeLight",
+      "es": "Tema claro",
+      "qu": "Tukuy yuyay",
+      "backEs": "Recuerda todo.",
+      "direction": "qu-es",
+      "observedAt": "2026-10-22T15:49:11.003Z",
+      "status": "pendiente_comparacion",
+      "approved": false
+    },
+    {
+      "key": "themeDark",
+      "es": "Tema oscuro",
+      "qu": "Sumaq ch'ulla",
+      "backEs": "Hermoso y único",
+      "direction": "qu-es",
+      "observedAt": "2026-10-22T15:49:15.216Z",
+      "status": "pendiente_comparacion",
+      "approved": false
+    },
+    {
+      "key": "attach",
+      "es": "Adjuntar imagen o PDF",
+      "qu": "Ñukaka imashina rikhuyki, mana yuyaychik.",
+      "backEs": "Yo te veo, no te recuerdo.",
+      "direction": "qu-es",
+      "observedAt": "2026-10-22T15:49:19.403Z",
+      "status": "pendiente_comparacion",
+      "approved": false
+    },
+    {
+      "key": "disclaimer",
+      "es": "{name} responde solo con documentos oficiales. Revisa la fuente de cada respuesta.",
+      "qu": "{name} rishunchik oficial wasi kawsay. Rikhuy rimaqkuna llakta.",
+      "backEs": "{name} es el representante oficial de la vida. Miren las voces de la comunidad.",
+      "direction": "qu-es",
+      "observedAt": "2026-10-22T15:49:24.023Z",
+      "status": "pendiente_comparacion",
+      "approved": false
+    }
+  ]
+}
