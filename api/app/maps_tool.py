@@ -8,6 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from Mapas.app.db import SessionLocal
+from Mapas.app.matching import resolve_place_candidates
 from Mapas.app.routing import route_places
 from Mapas.app.search import get_place, nearby_places, search_places
 from Mapas.app.osm import normalize_text
@@ -18,21 +19,21 @@ REFERENCE_PREFERENCES = {"las manuelas": "Plaza Las Manuelas"}
 
 class MapActionInput(BaseModel):
     intent: Literal["search", "nearby", "route"] = Field(
-        description="Operación determinista: buscar lugar, buscar cerca de una referencia o calcular ruta."
+        description="Elige search para ubicar/listar lugares, nearby para buscar desde una referencia, o route para trazar origen y destino."
     )
-    query: str | None = Field(default=None, description="Nombre, categoría o descripción que buscar.")
-    category: str | None = Field(default=None, description="Categoría de lugar, por ejemplo restaurant, karaoke o entertainment.")
-    reference: str | None = Field(default=None, description="Lugar de referencia para la búsqueda de proximidad.")
-    radius_m: int = Field(default=800, ge=1, le=10000, description="Radio máximo de proximidad en metros; lo aplica PostGIS.")
-    origin: str | None = Field(default=None, description="Nombre del origen para calcular una ruta.")
-    destination: str | None = Field(default=None, description="Nombre del destino para calcular una ruta.")
-    mode: Literal["walking", "driving"] = "walking"
+    query: str | None = Field(default=None, description="Búsqueda de nombre, categoría o descripción. Pasa las palabras del usuario sin corregir typos; la base resuelve variantes.")
+    category: str | None = Field(default=None, description="Categoría para listar lugares o filtrar nearby; admite español/inglés y typos conocidos.")
+    reference: str | None = Field(default=None, description="Lugar desde el cual buscar en nearby; conserva el texto original del usuario.")
+    radius_m: int = Field(default=800, ge=1, le=10000, description="Radio máximo de nearby en metros.")
+    origin: str | None = Field(default=None, description="Origen de route; conserva el texto original del usuario.")
+    destination: str | None = Field(default=None, description="Destino de route; conserva el texto original del usuario.")
+    mode: Literal["walking", "driving"] = Field(default="walking", description="Modo de ruta.")
 
 
 def _compact_place(place: dict[str, Any]) -> dict[str, Any]:
     return {
         key: place[key]
-        for key in ("id", "name", "display_name", "category", "subcategory", "score", "distance_m", "match")
+        for key in ("id", "name", "display_name", "category", "subcategory", "distance_m")
         if place.get(key) is not None
     }
 
@@ -41,19 +42,14 @@ def _resolve(session: Any, query: str) -> tuple[dict[str, Any] | None, list[dict
     candidates = search_places(session, query, limit=5)
     if not candidates:
         return None, []
+    if all(item.get("match") == "category" for item in candidates):
+        return None, candidates
     preferred_name = REFERENCE_PREFERENCES.get(normalize_text(query))
     if preferred_name:
         preferred = [item for item in candidates if normalize_text(item["display_name"]) == normalize_text(preferred_name)]
         if len(preferred) == 1:
             return preferred[0], []
-    exact = [item for item in candidates if item.get("match") in {"exact_name", "exact_alias"}]
-    if len(exact) == 1:
-        return exact[0], []
-    if len(exact) > 1:
-        return None, exact
-    if len(candidates) == 1:
-        return candidates[0], []
-    return None, candidates
+    return resolve_place_candidates(candidates)
 
 
 def _place_feature(session: Any, place_id: str, role: str = "candidate") -> dict[str, Any] | None:
@@ -86,12 +82,13 @@ def execute_map_action(**args: Any) -> tuple[dict[str, Any], dict[str, Any] | No
             if args.get("category"):
                 # An explicit category asks for a list; a name/description query
                 # must resolve to one place or return choices for clarification.
-                candidates = search_places(session, query, category=args["category"], limit=5)
+                candidates = search_places(session, "", category=args["category"], limit=5)
                 status = "ok" if candidates else "not_found"
             else:
                 selected, ambiguous = _resolve(session, query)
                 candidates = [selected] if selected else ambiguous
-                status = "ok" if selected else "ambiguous" if ambiguous else "not_found"
+                category_results = bool(ambiguous) and all(item.get("match") == "category" for item in ambiguous)
+                status = "ok" if selected or category_results else "ambiguous" if ambiguous else "not_found"
             features = [_place_feature(session, item["id"]) for item in candidates[:5]]
             return (
                 {"status": status, "query": query, "results": [_compact_place(item) for item in candidates]},

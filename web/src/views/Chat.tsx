@@ -415,9 +415,9 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
               <Mascot size={embed ? 48 : 64} mood={input ? 'thinking' : 'idle'} />
               <h1><span lang={lang === 'qu' ? 'qu-EC' : undefined} className="hello-main">{t('hello', { name: BRAND.mascotName })}</span><span>{t('helloSub', { uni: BRAND.university })}</span></h1>
             </div>
-            {lang === 'qu' && <p className="kichwa-note" role="note">{t('kichwaNote')}</p>}
             {piiBanner}
             {composer}
+            {lang === 'qu' && <KichwaTranslationFooter msgs={msgs} />}
             {langBanner}
             {forYou.length > 0 && !embed && (
               <div className="suggest">
@@ -474,7 +474,6 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
               </motion.div>
             </div>
             <div className="composer-wrap">
-              {lang === 'qu' && <p className="kichwa-note" role="note">{t('kichwaNote')}</p>}
               {awayFromEnd && <button className="jump-to-latest" onClick={() => {
                 followEnd.current = true; setAwayFromEnd(false);
                 scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: reducedMotion ? 'instant' : 'smooth' });
@@ -482,7 +481,7 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
               {langBanner}
               {piiBanner}
               {composer}
-              <p className="disclaimer">{t('disclaimer', { name: BRAND.mascotName })} · <button onClick={() => setDialog('notice')}>{t('notice')}</button></p>
+              {lang === 'qu' ? <KichwaTranslationFooter msgs={msgs} /> : <p className="disclaimer">{t('disclaimer', { name: BRAND.mascotName })} · <button onClick={() => setDialog('notice')}>{t('notice')}</button></p>}
             </div>
           </>
         )}
@@ -502,6 +501,15 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
       </AnimatePresence>
     </>
   );
+}
+
+function KichwaTranslationFooter({ msgs }: { msgs: Msg[] }) {
+  const { t } = useT();
+  const index = msgs.reduce((last, message, i) => message.role === 'assistant' && message.text && !message.streaming ? i : last, -1);
+  const message = msgs[index];
+  const question = msgs.slice(0, index < 0 ? 0 : index).reverse().find((item) => item.role === 'user')?.text ?? '';
+  const answer = message?.text || `${t('hello', { name: BRAND.mascotName })}\n${t('helloSub', { uni: BRAND.university })}`;
+  return <TranslationReport key={message?.id ?? 'interface'} footer messageId={message?.serverId ?? message?.id ?? 'interface-kichwa'} question={question} answer={answer} />;
 }
 
 function AssistantMsg({ m, question, transcript, theme, mapConfig, onVote, onReason, onRetry, onAsk, onShowMap }: { m: Msg; question?: string; transcript: string; theme: 'light' | 'dark'; mapConfig: MapConfig | null; onVote: (v: 'up' | 'down') => void; onReason: (r: FeedbackReason | null) => Promise<void>; onRetry: () => void; onAsk: (q: string) => void; onShowMap: (placeId: string) => void }) {
@@ -602,7 +610,6 @@ function AssistantMsg({ m, question, transcript, theme, mapConfig, onVote, onRea
           <FeedbackPanel office={m.procedure?.office ?? (lang === 'en' ? "Registrar's Office" : 'Secretaría General')} question={question ?? ''} transcript={transcript} onReason={onReason} />
         )}
 
-        {!m.streaming && m.lang === 'qu' && !!m.text && <TranslationReport messageId={m.serverId ?? m.id} question={question ?? ''} answer={m.text} />}
 
         {!m.streaming && m.suggestions && m.suggestions.length > 0 && (
           <div className="follow">

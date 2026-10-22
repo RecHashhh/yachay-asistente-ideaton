@@ -74,7 +74,8 @@ class AttendanceRelevance(unittest.IsolatedAsyncioTestCase):
     async def test_council_absence_is_not_a_class_absence_procedure(self):
         events = []
         hit = SimpleNamespace(doc_id='ejemplo', texto='Consejo: informar a secretaría la inasistencia justificada.', cos=0.9, fts=1, topic_id='academico', title='Ejemplo sintético')
-        with patch.object(graph, 'hybrid', return_value=[hit]), patch.object(graph, 'get_stream_writer', return_value=events.append):
+        with patch.object(graph, 'hybrid', return_value=[hit]), patch.object(graph, 'get_stream_writer', return_value=events.append), \
+                patch.object(graph.settings, 'agent_mode', 'off'):  # camino sin agente, aunque el .env tenga clave
             result = await graph.retrieve({'question': 'Cómo justifico una inasistencia', 'lang': 'es', 'history': []})
             self.assertEqual(result['kind'], 'sin_fuente')
             self.assertTrue(any(e['type'] == 'unknown' for e in events))
@@ -82,7 +83,8 @@ class AttendanceRelevance(unittest.IsolatedAsyncioTestCase):
     async def test_explicit_council_query_keeps_its_domain(self):
         events = []
         hit = SimpleNamespace(doc_id='ejemplo', texto='Consejo: informar a secretaría la inasistencia justificada.', cos=0.9, fts=1, topic_id='academico', title='Ejemplo sintético')
-        with patch.object(graph, 'hybrid', return_value=[hit]), patch.object(graph, 'get_stream_writer', return_value=events.append):
+        with patch.object(graph, 'hybrid', return_value=[hit]), patch.object(graph, 'get_stream_writer', return_value=events.append), \
+                patch.object(graph.settings, 'agent_mode', 'off'):  # camino sin agente, aunque el .env tenga clave
             result = await graph.retrieve({'question': 'Cómo justifico una inasistencia al CSU', 'lang': 'es', 'history': []})
             self.assertEqual(result['hits'], [hit])
 

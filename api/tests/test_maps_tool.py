@@ -7,6 +7,7 @@ def test_map_result_sent_to_llm_is_compact() -> None:
     compact = maps_tool._compact_place({
         "id": "123", "display_name": "Patomar", "category": "entertainment",
         "subcategory": "karaoke", "location": {"coordinates": [-78, 0.4]},
+        "score": 0.99, "match": "exact_alias",
         "geometry": {"type": "Polygon", "coordinates": [[...]]},
     })
 
@@ -25,6 +26,47 @@ def test_ambiguous_reference_is_not_silently_selected(monkeypatch) -> None:
 
     assert selected is None
     assert [item["id"] for item in candidates] == ["a", "b"]
+
+
+def test_confident_fuzzy_match_is_resolved_without_asking_the_user(monkeypatch) -> None:
+    monkeypatch.setattr(maps_tool, "search_places", lambda *_args, **_kwargs: [
+        {"id": "plaza", "display_name": "Plaza Las Manuelas", "match": "fuzzy", "score": 0.91},
+        {"id": "bathroom", "display_name": "Baño de Las Manuelas", "match": "fuzzy", "score": 0.62},
+    ])
+
+    selected, candidates = maps_tool._resolve(object(), "plasa manuelas")
+
+    assert selected["id"] == "plaza"
+    assert candidates == []
+
+
+def test_fuzzy_match_with_close_scores_remains_ambiguous(monkeypatch) -> None:
+    monkeypatch.setattr(maps_tool, "search_places", lambda *_args, **_kwargs: [
+        {"id": "a", "display_name": "Bloque A", "match": "fuzzy", "score": 0.76},
+        {"id": "b", "display_name": "Bloque B", "match": "fuzzy", "score": 0.73},
+    ])
+
+    selected, candidates = maps_tool._resolve(object(), "bloqe")
+
+    assert selected is None
+    assert [item["id"] for item in candidates] == ["a", "b"]
+
+
+def test_category_typo_returns_verified_place_results(monkeypatch) -> None:
+    class FakeSession:
+        def close(self):
+            pass
+
+    candidates = [{"id": "restaurant", "display_name": "Restaurante", "match": "category", "score": 0.6}]
+    monkeypatch.setattr(maps_tool, "SessionLocal", FakeSession)
+    monkeypatch.setattr(maps_tool, "_resolve", lambda *_args: (None, candidates))
+    monkeypatch.setattr(maps_tool, "_place_feature", lambda *_args: {"type": "Feature", "id": "restaurant"})
+
+    result, geometry = maps_tool.execute_map_action(intent="search", query="restuarante")
+
+    assert result["status"] == "ok"
+    assert result["results"] == [maps_tool._compact_place(candidates[0])]
+    assert geometry["features"] == [{"type": "Feature", "id": "restaurant"}]
 
 
 def test_canonical_las_manuelas_reference_resolves_plaza(monkeypatch) -> None:

@@ -87,7 +87,7 @@ def _decision_prompt(max_tool_calls: int) -> str:
     return f"""You gather evidence so the Yachay Tech assistant can answer. You may call tools repeatedly, reading each result before deciding the next step, up to {max_tool_calls} tool calls in total. Each history turn is labeled with its zero-based index. Source excerpts attached to an assistant turn are labeled with that history index.
 
 - Do not use tools for greetings, thanks, or ordinary small talk.
-- For a location request, call map_action with names, categories, or natural-language references. It searches, resolves ambiguity, calculates proximity, and routes deterministically in PostGIS; never estimate coordinates, distances, or paths. Use it without RAG for map-only requests and also use RAG only when the user asks for institutional facts.
+- For a location request, call map_action with the user's place/category wording unchanged, including suspected typos. The tool resolves only known category variants; PostGIS fuzzy-matches names and verifies candidates. Ask the user when results remain ambiguous; never invent places, coordinates, distances, or routes. Use maps without RAG unless the user also asks for institutional facts.
 - If a follow-up is already answered by a prior assistant turn with attached sources, and the user is not asking to verify/update it or for a missing detail, call reuse_history with that turn's index.
 - For a new institutional fact, a missing detail, or an explicit request to verify or update, call list_documents first (its result is cached; skip it only if you already called it), read the titles and descriptions, and then call search_rag with the document_ids of the relevant documents. The user's wording often differs from the documents' (for example "otra universidad" vs "cambio de IES"), so build the query with the terms found in the catalog. Search the full corpus with an empty document_ids list only when no catalog entry looks relevant.
 - After reading results, search again when the question has several parts and some are not yet covered, when a document refers to another procedure, document, or form that the answer needs, or when a needed detail (date, requirement, contact, step) is missing. Make each new query specific, using the exact names and terms found in the documents. Do not repeat a query that has already been made.
@@ -194,7 +194,7 @@ class RagAgent:
             destination: str | None = None,
             mode: str = "walking",
         ) -> str:
-            """Busca lugares, resuelve referencias, calcula proximidad y rutas con PostGIS."""
+            """Busca nombres/categorías (también con typos), lugares cercanos y rutas. Conserva las palabras originales: PostGIS verifica los resultados; no adivines ni corrijas lugares."""
             nonlocal map_found
             try:
                 result, geometry = await asyncio.to_thread(

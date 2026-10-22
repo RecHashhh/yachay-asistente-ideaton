@@ -36,6 +36,17 @@ const assert = require('node:assert/strict');
       if (lang === 'qu') await page.screenshot({ path: `docs/kichwa-alki-2026-10-22/voz-limpia-${width}.png` });
       await page.close();
     }
+    const page = await browser.newPage();
+    await page.addInitScript(() => localStorage.setItem('yt-consent-2026-10c', '1'));
+    await page.goto('http://127.0.0.1:5180/#/voz?lang=es');
+    await page.getByRole('button', { name: 'Información del modo voz', exact: true }).waitFor();
+    await page.evaluate(() => { location.hash = '/voz?lang=qu'; });
+    await page.getByRole('button', { name: 'Rimaymanta willay', exact: true }).click();
+    assert.match(await page.locator('#voice-options').innerText(), /Yachika rimayta/);
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'qu-EC');
+    assert.equal(await page.locator('.voice').getAttribute('translate'), 'no');
+    assert.equal(await page.evaluate(() => localStorage.getItem('yt-lang')), 'qu');
+    await page.close();
     console.log('Voice layout: ES/EN/QU desktop/mobile, settings persistence, dismissible info and no panel overflow: OK.');
   } finally { await browser.close(); }
 })().catch((error) => { console.error(error); process.exit(1); });
