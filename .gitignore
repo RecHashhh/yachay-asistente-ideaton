@@ -38,3 +38,6 @@ docs/auditoria-integral-2026-10-20/index.html
 __pycache__/
 *.pyc
 api/app/data/*.local.json
+
+# Correos de muestra (pueden tener datos personales)
+*.eml
