@@ -4,11 +4,11 @@ import previewKichwa from './kichwa.preview.json';
 
 export type Lang = 'es' | 'en' | 'qu';
 
-/** Kichwa: solo el saludo y la etiqueta; el resto de la interfaz cae a español. POR VALIDAR con un hablante nativo. */
+/** Kichwa experimental: borradores de interfaz pendientes de revisión por un hablante. */
 export const LANGS: { id: Lang; label: string; short: string; speech: string }[] = [
   { id: 'es', label: 'Español', short: 'ES', speech: 'es-EC' },
   { id: 'en', label: 'English', short: 'EN', speech: 'en-US' },
-  { id: 'qu', label: 'Kichwa (Ecuador) · beta', short: 'KI', speech: 'es-EC' },
+  { id: 'qu', label: 'Kichwa (Ecuador) · beta', short: 'KI', speech: 'qu-EC' },
 ];
 
 const es = {

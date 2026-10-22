@@ -1,14 +1,15 @@
 import { PLACES, placeById, placeName } from './campus';
 import type { Lang } from './i18n';
+import { kichwaRecordingSupported, listenKichwa } from './kichwaSpeech';
 import type { MapAction, Procedure, Source, Unknown } from './types';
 
 /**
  * Motor de voz del modo conversación: reconocimiento (Web Speech API), síntesis con la mejor voz disponible,
  * sonidos de estado y la conversión de una respuesta (texto, trámite, mapa, fuentes) a algo que se entiende sin ver la pantalla.
- * Todo corre en el navegador: costo cero. El reconocimiento lo hace el servicio del navegador (Google en Chrome, Microsoft en Edge).
+ * ES/EN usan el servicio del navegador. Kichwa usa Killkan en el servidor Yachi, sin guardar audio.
  */
 
-const SPEECH_LANG: Record<Lang, string> = { es: 'es-EC', en: 'en-US', qu: 'es-EC' };
+const SPEECH_LANG: Record<Lang, string> = { es: 'es-EC', en: 'en-US', qu: 'qu-EC' };
 const PREF_KEY = 'yt-voice';
 
 export interface VoicePrefs { rate: number; voiceURI?: string; autoListen: boolean }
@@ -24,12 +25,12 @@ export const ttsSupported = () => typeof window !== 'undefined' && 'speechSynthe
 /** Voces del idioma, las de mejor calidad primero (Natural/Neural de Edge, Google, luego locales del país). */
 export function voicesFor(lang: Lang): SpeechSynthesisVoice[] {
   if (!ttsSupported()) return [];
-  const base = lang === 'en' ? 'en' : 'es';
+  const base = lang === 'en' ? 'en' : lang === 'qu' ? 'qu' : 'es';
   const score = (v: SpeechSynthesisVoice) =>
     (/natural|neural|online/i.test(v.name) ? 40 : 0) + (/google/i.test(v.name) ? 20 : 0) +
     (v.lang.toLowerCase() === SPEECH_LANG[lang].toLowerCase() ? 10 : 0) +
     (base === 'es' && /es-(EC|CO|MX|US|419)/i.test(v.lang) ? 5 : 0) + (v.localService ? 0 : 2);
-  return speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith(base)).sort((a, b) => score(b) - score(a));
+  return speechSynthesis.getVoices().filter((v) => lang === 'qu' ? /^(qu-ec|qug|qvi)(-|$)/i.test(v.lang) : v.lang.toLowerCase().startsWith(base)).sort((a, b) => score(b) - score(a));
 }
 
 /** Las voces se cargan de forma asíncrona en Chrome/Edge. */
@@ -43,6 +44,7 @@ export function speak(text: string, lang: Lang, prefs: VoicePrefs, onBoundary?: 
   if (!ttsSupported() || !text.trim()) return Promise.resolve();
   speechSynthesis.cancel();
   const voice = voicesFor(lang).find((v) => v.voiceURI === prefs.voiceURI) ?? voicesFor(lang)[0];
+  if (lang === 'qu' && !voice) return Promise.resolve();
   const parts = text.match(/[^.!?¿¡:\n]+[.!?:]?|\n/g)?.map((s) => s.trim()).filter(Boolean) ?? [text];
   return new Promise((resolve) => {
     let i = 0;
@@ -77,10 +79,11 @@ const SRClass = () => {
   const w = window as unknown as { SpeechRecognition?: new () => SR; webkitSpeechRecognition?: new () => SR };
   return w.SpeechRecognition ?? w.webkitSpeechRecognition;
 };
-export const sttSupported = () => typeof window !== 'undefined' && !!SRClass();
+export const sttSupported = (lang: Lang = 'es') => typeof window !== 'undefined' && (lang === 'qu' ? kichwaRecordingSupported() : !!SRClass());
 
 /** Escucha una frase. `onInterim` recibe el texto parcial; resuelve con el texto final ('' si no se entendió). */
 export function listenOnce(lang: Lang, onInterim: (t: string) => void): { done: Promise<string>; stop: () => void; abort: () => void } {
+  if (lang === 'qu') return listenKichwa(onInterim);
   const C = SRClass();
   if (!C) return { done: Promise.reject(new Error('no-stt')), stop: () => undefined, abort: () => undefined };
   const r = new C();

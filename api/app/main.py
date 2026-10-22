@@ -23,6 +23,7 @@ from .search import vectors
 from .schemas import TranslationReportRequest, TranslationReportResponse
 from Mapas.app.db import engine as maps_engine
 from Mapas.app.main import router as maps_router
+from .kichwa_speech import router as speech_router
 
 
 def purge() -> None:
@@ -58,6 +59,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Yachi API", version="0.1.0", lifespan=lifespan)
+app.include_router(speech_router)
 app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins, allow_methods=["*"], allow_headers=["*"])
 app.include_router(maps_router)
 

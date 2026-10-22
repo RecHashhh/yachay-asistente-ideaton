@@ -52,3 +52,4 @@ api/app/data/*.local.json
 /docs/MAP_TEST_MODE.md
 /docs/POSTGRES_UNIFICATION.md
 /docs/SATELLITE_BASEMAP.md
+api/models/

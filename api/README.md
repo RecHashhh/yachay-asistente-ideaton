@@ -1,5 +1,28 @@
 # Yachi — backend (RAG)
 
+## Reconocimiento de voz Kichwa (experimental)
+
+Instala, desde `api/`, ` .venv\Scripts\python -m pip install -r requirements-speech.txt`
+y ejecuta `.venv\Scripts\python scripts/install_killkan.py`. Reinicia la API habitual;
+no se necesita otro servidor. El modelo pesa aproximadamente 1,3 GB y se descarga una vez
+en `api/models/` (fuera de Git). La primera transcripción carga el modelo en RAM;
+en CPU puede tardar. Consulta `/speech/capabilities` para comprobar la instalación.
+
+El micrófono en Kichwa captura hasta 15 segundos y llama a `/speech/transcribe`
+con WAV PCM16 mono a 16 kHz. Devuelve un borrador editable antes de enviar la consulta.
+El servidor no guarda audio ni entrena con él. ES/EN conservan el reconocimiento del navegador.
+La transcripción no traduce ni acredita la exactitud de la respuesta institucional.
+Sin una voz Kichwa instalada, no se usa una voz española para simular pronunciación Kichwa.
+
+Créditos: Chihiro Taguchi, Jefferson Saransig, Dayana Velásquez y David Chiang,
+[Killkan-ASR](https://huggingface.co/ctaguchi/killkan_asr), CC BY 4.0,
+revisión `2d00fbbb610ea6f7579d3a008cfe6aa4fbb95251`.
+[Dataset Killkan](https://huggingface.co/datasets/ctaguchi/killkan) y
+[artículo](https://arxiv.org/abs/2404.15501).
+La integración de audio y la interfaz de Yachi son adaptaciones; el modelo se usa sin reentrenar.
+No se incorporan sus conversaciones de radio como fuentes universitarias.
+Para redistribuir grabaciones originales consulta también la atribución y licencia de sus autores.
+
 FastAPI + LangGraph + PostgreSQL + Claude Haiku 5.5. Usa el corpus que preparó el equipo (`docs/rag/rag/`, **confidencial, fuera del repositorio**).
 
 ## Puesta en marcha (Windows, PostgreSQL 18 local)

@@ -2,7 +2,8 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { BRAND } from '../config';
 import { MOCK } from '../lib/api';
-import { LANGS, useT } from '../lib/i18n';
+import { useT } from '../lib/i18n';
+import { listenOnce } from '../lib/speech';
 import type { Attachment } from '../lib/types';
 import { IcCapture, IcClip, IcMic, IcSend, IcStop, IcWave } from './icons';
 
@@ -35,7 +36,9 @@ export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy
   const { t, lang } = useT();
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [rec, setRec] = useState<{ stop: () => void } | null>(null);
+  const [rec, setRec] = useState<{ stop: () => void; abort: () => void } | null>(null);
+  const activeRec = useRef<{ abort: () => void } | null>(null);
+  useEffect(() => () => activeRec.current?.abort(), [lang]);
   const [zoom, setZoom] = useState<string | null>(null);
 
   useEffect(() => {
@@ -88,19 +91,15 @@ export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy
 
   function mic() {
     if (rec) { rec.stop(); return; }
-    const w = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec };
-    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
-    if (!SR) { toast(t('micNo')); return; }
-    const r = new SR();
-    r.lang = LANGS.find((l) => l.id === lang)!.speech;
-    r.interimResults = true;
-    r.continuous = false;
     const base = value ? `${value.trim()} ` : '';
-    r.onresult = (ev) => onChange(base + Array.from(ev.results).map((x) => x[0]!.transcript).join(' '));
-    r.onerror = () => { setRec(null); toast(t('micNo')); };
-    r.onend = () => { setRec(null); ref.current?.focus(); };
-    r.start();
-    setRec({ stop: () => r.stop() });
+    const recording = listenOnce(lang, (text) => { if (lang === 'qu') toast(text); else onChange(base + text); });
+    activeRec.current = recording;
+    setRec(recording);
+    void recording.done.then((text) => {
+      if (text) onChange((base + text).slice(0, 1000));
+      if (lang === 'qu' && text) toast('Transcripción experimental. Revisa y corrige antes de enviar.');
+    }).catch((error: Error) => { if (error.name !== 'AbortError') toast(lang === 'qu' ? error.message : t('micNo')); })
+      .finally(() => { activeRec.current = null; setRec(null); ref.current?.focus(); });
   }
 
   const canSend = (value.trim() || files.length) && !disabled;
@@ -152,16 +151,4 @@ export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy
       </AnimatePresence>
     </div>
   );
-}
-
-/** Tipos mínimos de Web Speech API (no vienen en lib.dom). */
-interface SpeechRec {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  onresult: (ev: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
-  onerror: () => void;
-  onend: () => void;
-  start: () => void;
-  stop: () => void;
 }

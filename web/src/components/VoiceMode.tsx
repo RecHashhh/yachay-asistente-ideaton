@@ -67,6 +67,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
   const [prefs, setPrefsState] = useState<VoicePrefs>(loadPrefs);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [typed, setTyped] = useState('');
+  const [speechError, setSpeechError] = useState('');
   const spoken = useRef<Spoken>({ intro: '', steps: [], outro: '' });
   const step = useRef(-1);
   const last = useRef('');
@@ -75,7 +76,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
   const listener = useRef<{ stop: () => void; abort: () => void } | null>(null);
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
-  const stt = sttSupported();
+  const stt = sttSupported(lang);
   const startBtn = useRef<HTMLButtonElement>(null);
   const lang2: Lang = lang;
   // El ciclo de escucha es asíncrono: siempre lee la respuesta y las acciones actuales, nunca una copia vieja.
@@ -96,7 +97,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
     setState('speaking');
     await speak(text, lang2, prefsRef.current);
     setState((s) => (s === 'speaking' ? 'idle' : s));
-    if (thenListen && prefsRef.current.autoListen && stt) void listenRef.current();
+    if (thenListen && prefsRef.current.autoListen && stt && lang2 !== 'qu') void listenRef.current();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang2, stt]);
 
@@ -135,6 +136,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
     stopSpeaking();
     listener.current?.abort();
     setInterim('');
+    setSpeechError('');
     setState('listening');
     earcon('listen');
     const l = listenOnce(lang2, setInterim);
@@ -143,12 +145,14 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
       const text = await l.done;
       listener.current = null;
       if (!text) { setState('idle'); earcon('error'); return; }
-      handle(text);
+      if (lang2 === 'qu') { setTyped(text); setState('idle'); }
+      else handle(text);
     } catch (e) {
       listener.current = null;
       setState('idle');
       earcon('error');
-      void say((e as Error).message === 'not-allowed' ? x.micDenied : x.notHeard, false);
+      if (lang2 === 'qu') setSpeechError((e as Error).message);
+      else void say((e as Error).message === 'not-allowed' ? x.micDenied : x.notHeard, false);
     }
   }
 
@@ -166,7 +170,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answer?.id, answer?.streaming]);
 
-  const begin = async () => { earcon('done'); await say(x.welcome, true); if (!stt) setState('idle'); };
+  const begin = async () => { if (lang2 === 'qu' && stt) return listen(); earcon('done'); await say(x.welcome, true); if (!stt) setState('idle'); };
 
   const main = () => {
     if (state === 'start') return void begin();
@@ -198,6 +202,8 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
       </header>
 
       <div className="voice-stage">
+        {lang === 'qu' && <p className="small">Voz Kichwa experimental · hasta 15 segundos. El audio se envía a Yachi para transcribirlo y no se guarda. Revisa el texto antes de enviar. {voices.length === 0 ? 'No hay una voz Kichwa instalada para leer las respuestas.' : ''}</p>}
+        {speechError && <p className="err" role="alert">{speechError}</p>}
         <div className={`voice-orb ${state}`} aria-hidden="true">
           <span className="ring" /><span className="ring r2" />
           <Mascot size={132} mood={mood} decorative />
@@ -216,9 +222,9 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
           </button>
         )}
 
-        {!stt && state !== 'start' && (
+        {(!stt || lang === 'qu') && state !== 'start' && (
           <form className="voice-typed" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) { handle(typed.trim()); setTyped(''); } }}>
-            <p className="small">{x.noStt}</p>
+            <p className="small">{lang === 'qu' ? 'Edita la transcripción o escribe tu consulta en Kichwa.' : x.noStt}</p>
             <label className="sr" htmlFor="voice-q">{x.typed}</label>
             <input id="voice-q" className="inp" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={x.typed} />
             <button className="btn primary">{x.send}</button>
@@ -239,7 +245,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
             </select>
           </label>
         )}
-        <label className="check"><input type="checkbox" checked={prefs.autoListen} onChange={(e) => setPrefs({ autoListen: e.target.checked })} />{x.auto}</label>
+        {lang !== 'qu' && <label className="check"><input type="checkbox" checked={prefs.autoListen} onChange={(e) => setPrefs({ autoListen: e.target.checked })} />{x.auto}</label>}
         {!ttsSupported() && <p className="err">{lang === 'en' ? 'Speech output is not available in this browser.' : 'Este navegador no puede leer en voz alta.'}</p>}
       </footer>
     </motion.div>

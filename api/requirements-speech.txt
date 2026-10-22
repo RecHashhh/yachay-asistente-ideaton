@@ -1,0 +1,4 @@
+# Optional CPU inference. Install after requirements.txt.
+torch>=2.4,<3
+transformers>=4.45,<5
+soundfile>=0.12,<1
