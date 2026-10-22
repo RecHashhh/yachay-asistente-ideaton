@@ -1,6 +1,7 @@
 import { PLACES, placeById, placeName } from './campus';
 import type { Lang } from './i18n';
 import { kichwaRecordingSupported, listenKichwa } from './kichwaSpeech';
+import { serverSpeechSupported, speakKichwa, stopKichwaSpeech } from './kichwaTts';
 import type { MapAction, Procedure, Source, Unknown } from './types';
 
 /**
@@ -20,7 +21,7 @@ export const savePrefs = (p: VoicePrefs) => { try { localStorage.setItem(PREF_KE
 
 // ---------------- Síntesis ----------------
 
-export const ttsSupported = () => typeof window !== 'undefined' && 'speechSynthesis' in window;
+export const ttsSupported = (lang: Lang = 'es') => typeof window !== 'undefined' && ('speechSynthesis' in window || (lang === 'qu' && serverSpeechSupported()));
 
 /** Voces del idioma, las de mejor calidad primero (Natural/Neural de Edge, Google, luego locales del país). */
 export function voicesFor(lang: Lang): SpeechSynthesisVoice[] {
@@ -41,10 +42,11 @@ export function whenVoicesReady(): Promise<void> {
 
 /** Habla el texto por oraciones (evita el corte de Chrome en textos largos) y resuelve al terminar o al cancelarse. */
 export function speak(text: string, lang: Lang, prefs: VoicePrefs, onBoundary?: (i: number) => void): Promise<void> {
-  if (!ttsSupported() || !text.trim()) return Promise.resolve();
-  speechSynthesis.cancel();
+  if (!text.trim()) return Promise.resolve();
+  stopSpeaking();
   const voice = voicesFor(lang).find((v) => v.voiceURI === prefs.voiceURI) ?? voicesFor(lang)[0];
-  if (lang === 'qu' && !voice) return Promise.resolve();
+  if (lang === 'qu' && !voice) return speakKichwa(text, prefs.rate, onBoundary);
+  if (!ttsSupported()) return Promise.resolve();
   const parts = text.match(/[^.!?¿¡:\n]+[.!?:]?|\n/g)?.map((s) => s.trim()).filter(Boolean) ?? [text];
   return new Promise((resolve) => {
     let i = 0;
@@ -66,7 +68,7 @@ export function speak(text: string, lang: Lang, prefs: VoicePrefs, onBoundary?: 
     next();
   });
 }
-export const stopSpeaking = () => { if (ttsSupported()) speechSynthesis.cancel(); };
+export const stopSpeaking = () => { stopKichwaSpeech(); if (ttsSupported()) speechSynthesis.cancel(); };
 
 // ---------------- Reconocimiento ----------------
 

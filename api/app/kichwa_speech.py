@@ -8,6 +8,7 @@ import wave
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
+from . import kichwa_tts
 
 MODEL_ID = 'ctaguchi/killkan_asr'
 REVISION = '2d00fbbb610ea6f7579d3a008cfe6aa4fbb95251'
@@ -15,6 +16,7 @@ MODEL_DIR = Path(__file__).resolve().parents[1] / 'models' / 'killkan-asr'
 MAX_SECONDS = 15
 MAX_BYTES = 44 + 16000 * 2 * MAX_SECONDS + 4096
 router = APIRouter(prefix='/speech', tags=['speech'])
+router.include_router(kichwa_tts.router)
 _processor = None
 _model = None
 _lock = threading.Lock()
@@ -65,7 +67,8 @@ def transcribe(samples) -> str:
 def capabilities():
     return {'kichwaAsr': available(), 'model': MODEL_ID, 'revision': REVISION,
             'experimental': True, 'maxSeconds': MAX_SECONDS, 'audioStored': False,
-            'kichwaTts': False}
+            'kichwaTts': kichwa_tts.available(), 'ttsModel': kichwa_tts.MODEL_ID,
+            'ttsVariant': 'Kichwa de Tena (quw)', 'ttsLicense': 'CC-BY-NC-4.0'}
 
 
 @router.post('/transcribe')

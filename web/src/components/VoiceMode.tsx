@@ -4,6 +4,7 @@ import { BRAND } from '../config';
 import { useT, type Lang } from '../lib/i18n';
 import { earcon, listenOnce, loadPrefs, parseCommand, savePrefs, speak, stopSpeaking, sttSupported, toSpeech, ttsSupported, voicesFor, whenVoicesReady, type Spoken, type VoicePrefs } from '../lib/speech';
 import type { MapAction, Procedure, Source, Unknown } from '../lib/types';
+import { kichwaVoiceAvailable } from '../lib/kichwaTts';
 import { trapFocus } from './ConsentDialog';
 import { IcClose, IcMic, IcStop } from './icons';
 import { Mascot } from './Mascot';
@@ -68,6 +69,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [typed, setTyped] = useState('');
   const [speechError, setSpeechError] = useState('');
+  const [serverVoice, setServerVoice] = useState<boolean | null>(null);
   const spoken = useRef<Spoken>({ intro: '', steps: [], outro: '' });
   const step = useRef(-1);
   const last = useRef('');
@@ -85,6 +87,12 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
   const listenRef = useRef<() => Promise<void>>(async () => undefined);
 
   useEffect(() => { void whenVoicesReady().then(() => setVoices(voicesFor(lang2))); }, [lang2]);
+  useEffect(() => {
+    let active = true;
+    setServerVoice(null);
+    if (lang === 'qu') void kichwaVoiceAvailable().then((ready) => { if (active) setServerVoice(ready); });
+    return () => { active = false; };
+  }, [lang]);
   useEffect(() => { startBtn.current?.focus(); }, []);
   useEffect(() => () => { listener.current?.abort(); stopSpeaking(); }, []);
 
@@ -95,7 +103,8 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
     last.current = text;
     setSaid(text);
     setState('speaking');
-    await speak(text, lang2, prefsRef.current);
+    try { await speak(text, lang2, prefsRef.current); }
+    catch (error) { setSpeechError((error as Error).message); }
     setState((s) => (s === 'speaking' ? 'idle' : s));
     if (thenListen && prefsRef.current.autoListen && stt && lang2 !== 'qu') void listenRef.current();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -202,7 +211,8 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
       </header>
 
       <div className="voice-stage">
-        {lang === 'qu' && <p className="small">Voz Kichwa experimental · hasta 15 segundos. El audio se envía a Yachi para transcribirlo y no se guarda. Revisa el texto antes de enviar. {voices.length === 0 ? 'No hay una voz Kichwa instalada para leer las respuestas.' : ''}</p>}
+        {lang === 'qu' && <p className="small">Voz Kichwa experimental · hasta 15 segundos. El audio se envía a Yachi para transcribirlo y no se guarda. Revisa el texto antes de enviar. {serverVoice ? 'Lectura con voz sintética de Tena (Ecuador), pendiente de validación de pronunciación.' : serverVoice === null ? 'Comprobando voz…' : voices.length === 0 ? 'La voz Kichwa del servidor no está disponible.' : ''}</p>}
+        {lang === 'qu' && serverVoice && <><a className="small" href="https://huggingface.co/facebook/mms-tts-quw" target="_blank" rel="noreferrer">Voz de Meta MMS · CC BY-NC 4.0</a><button type="button" className="chip" disabled={state === 'speaking' || state === 'listening' || busy} onClick={() => void say('Imanalla. Ñuka shutika Yachi.', false)}>Probar voz Kichwa</button></>}
         {speechError && <p className="err" role="alert">{speechError}</p>}
         <div className={`voice-orb ${state}`} aria-hidden="true">
           <span className="ring" /><span className="ring r2" />
@@ -246,7 +256,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
           </label>
         )}
         {lang !== 'qu' && <label className="check"><input type="checkbox" checked={prefs.autoListen} onChange={(e) => setPrefs({ autoListen: e.target.checked })} />{x.auto}</label>}
-        {!ttsSupported() && <p className="err">{lang === 'en' ? 'Speech output is not available in this browser.' : 'Este navegador no puede leer en voz alta.'}</p>}
+        {!ttsSupported(lang) && <p className="err">{lang === 'en' ? 'Speech output is not available in this browser.' : 'Este navegador no puede leer en voz alta.'}</p>}
       </footer>
     </motion.div>
   );

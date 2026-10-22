@@ -509,14 +509,17 @@ function AssistantMsg({ m, question, transcript, theme, mapConfig, onVote, onRea
   const [copied, setCopied] = useState(false);
   const [openSrc, setOpenSrc] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
+  const [readingError, setReadingError] = useState('');
   useEffect(() => () => { if (reading) stopSpeaking(); }, [reading]);
   // Lectura completa de la respuesta (incluye los pasos del trámite y la fuente).
   const readAloud = async () => {
     if (reading) { stopSpeaking(); setReading(false); return; }
+    setReadingError('');
     const s = toSpeech(m, lang, t('unknownTitle'), t('unknownBody'));
     setReading(true);
-    await speak([s.intro.replace(/Di "siguiente"[^.]*\.|Say "next"[^.]*\./, ''), ...s.steps, s.outro].join(' '), lang, loadPrefs());
-    setReading(false);
+    try { await speak([s.intro.replace(/Di "siguiente"[^.]*\.|Say "next"[^.]*\./, ''), ...s.steps, s.outro].join(' '), lang, loadPrefs()); }
+    catch (error) { setReadingError((error as Error).message); }
+    finally { setReading(false); }
   };
   const mood = reading ? 'talking' : m.streaming ? (m.text ? 'talking' : 'thinking') : 'idle';
   const srcKey = (s: Source) => `${s.docId}|${s.locator ?? ''}`;
@@ -589,11 +592,12 @@ function AssistantMsg({ m, question, transcript, theme, mapConfig, onVote, onRea
             {m.text && <button className="icon-btn" aria-label={t('copy')} title={t('copy')} onClick={() => { void navigator.clipboard.writeText(m.text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>{copied ? <IcCheck /> : <IcCopy />}</button>}
             <button className="icon-btn" aria-label={t('good')} title={t('good')} aria-pressed={m.vote === 'up'} onClick={() => onVote('up')}><IcUp /></button>
             <button className="icon-btn" aria-label={t('bad')} title={t('bad')} aria-pressed={m.vote === 'down'} onClick={() => onVote('down')}><IcDown /></button>
-            {ttsSupported() && <button className="icon-btn" aria-label={reading ? t('stopReading') : t('readAloud')} title={reading ? t('stopReading') : t('readAloud')} aria-pressed={reading} onClick={readAloud}><IcSpeaker /></button>}
+            {ttsSupported(lang) && <button className="icon-btn" aria-label={reading ? t('stopReading') : t('readAloud')} title={reading ? t('stopReading') : t('readAloud')} aria-pressed={reading} onClick={readAloud}><IcSpeaker /></button>}
             <button className="icon-btn" aria-label={t('retry')} title={t('retry')} onClick={onRetry}><IcRetry /></button>
           </div>
         )}
 
+        {readingError && <p className="small muted" role="status">{readingError}</p>}
         {m.vote === 'down' && !m.streaming && (
           <FeedbackPanel office={m.procedure?.office ?? (lang === 'en' ? "Registrar's Office" : 'Secretaría General')} question={question ?? ''} transcript={transcript} onReason={onReason} />
         )}

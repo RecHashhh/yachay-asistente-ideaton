@@ -1,6 +1,7 @@
 /** Record bounded PCM WAV locally, then send only to the configured Yachi API. */
 const configured = ((import.meta.env.VITE_API_URL as string | undefined) ?? '').replace(/\/$/, '');
 const api = import.meta.env.DEV && /^https?:\/\//.test(configured) ? '/__yachi_api' : configured;
+export const speechApi = api;
 export const kichwaRecordingSupported = () => !!api && !!navigator.mediaDevices?.getUserMedia && typeof AudioContext !== 'undefined';
 
 export function listenKichwa(onStatus: (text: string) => void): { done: Promise<string>; stop: () => void; abort: () => void } {
