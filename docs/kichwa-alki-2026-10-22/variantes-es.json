@@ -1,0 +1,13 @@
+{
+  "purpose": "Comparar frases completas y comas conservando cada texto de entrada; no extraer etiquetas por fragmentos.",
+  "items": [
+    { "key": "copy.contexto", "es": "Deseo copiar respuesta." },
+    { "key": "copy.coma", "es": "Deseo, copiar respuesta." },
+    { "key": "copy.articulo", "es": "Deseo copiar la respuesta." },
+    { "key": "copy.quiero", "es": "Quiero copiar la respuesta." },
+    { "key": "send.contexto", "es": "Deseo enviar el mensaje." },
+    { "key": "send.coma", "es": "Deseo, enviar el mensaje." },
+    { "key": "demo.contexto", "es": "Estos son datos de ejemplo." },
+    { "key": "version.contexto", "es": "Esta es la versión del documento." }
+  ]
+}

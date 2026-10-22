@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "locale": "qu-EC",
+  "purpose": "Memoria persistente de traducciones compartidas en la conversación para futura recuperación por equivalencias o RAG.",
+  "source": "https://alki.ec/",
+  "sourceConfirmation": {
+    "date": "2026-10-22",
+    "statement": "El usuario confirma que todos los textos traducidos que compartió fueron obtenidos de Alki.",
+    "scope": "Traducciones aportadas por el usuario; no implica revisión lingüística individual."
+  },
+  "usage": {
+    "automaticallyTrainsModel": false,
+    "runtimeIntegrated": false,
+    "preserveExactSourceText": true,
+    "activationRequirement": "Revisión de la equivalencia y de su uso en contexto antes de incorporarla como respuesta o etiqueta definitiva.",
+    "futureRetrieval": "Usar primero equivalencias revisadas; conservar el origen y no extrapolar frases a reglas gramaticales ni concatenar traducciones por palabras."
+  },
+  "items": [
+    {
+      "id": "aporte-copy-001",
+      "es": "Deseo Copiar respuesta",
+      "qu": "Ñukaka riksichik.",
+      "context": "Prueba de traducción relacionada con la acción de copiar una respuesta; no equivale automáticamente a la etiqueta Copiar respuesta.",
+      "source": "https://alki.ec/",
+      "collectionMethod": "Resultado compartido por el usuario desde Alki",
+      "recordedOn": "2026-10-22",
+      "status": "pendiente_revision_humana",
+      "reviewedBy": null,
+      "approved": false
+    },
+    {
+      "id": "aporte-welcome-001",
+      "es": "¿Qué trámite o lugar de Yachay Tech necesitas?",
+      "qu": "¿Ima rikhuyka o llakta Yachay Techmanta kikinka?",
+      "context": "Pregunta de bienvenida del chatbot institucional Yachi.",
+      "source": "https://alki.ec/",
+      "collectionMethod": "Resultado compartido por el usuario desde Alki",
+      "recordedOn": "2026-10-22",
+      "status": "pendiente_revision_humana",
+      "reviewedBy": null,
+      "approved": false
+    }
+  ]
+}

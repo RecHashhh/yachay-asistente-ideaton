@@ -162,7 +162,7 @@ Resultado actual (simulador, 20-10-2026): **100 %** de exactitud, **0** alucinac
 
 - **Sin instrucciones previas:** bienvenida de 3 pasos en la primera visita (qué hace, cada respuesta trae su fuente, aviso de datos), tendencias y sugerencias mientras se escribe.
 - **Bilingüe:** selector ES/EN y detección automática que ofrece cambiar de idioma. Temas, oficinas, lugares y ubicaciones de las citas se traducen; el nombre oficial del documento y la cita textual se mantienen en el original y se marcan "original quote in Spanish".
-- **Kichwa:** ningún servicio de traducción automática soporta kichwa ecuatoriano (Google y DeepL ofrecen quechua sureño). Se dejaron los 81 textos en `docs/kichwa-traduccion.csv` para que los traduzca un hablante nativo, y la interfaz lo indica con honestidad ("Kichwa (Ecuador) · beta"). Es un argumento de rigor para el jurado.
+- **Kichwa (actualización 22-10-2026):** existe [Alki](https://alki.ec/), que ofrece traducción y recursos de kichwa. Se probaron ocho textos breves mediante su interfaz y se guardaron como propuestas, sin aprobarlas. La muestra incluye errores observables (texto sin traducir y una respuesta meta en español), por lo que no acredita fluidez ni permite activar traducción automática sin revisión. Hay una cola nueva de 110 textos de interfaz y un importador de traducciones revisadas; el CSV anterior de 81 textos se conserva. La etiqueta "Kichwa (Ecuador) · beta" sigue vigente y se requiere revisión humana de la variedad apropiada.
 - **Accesibilidad:** WCAG 2.2 AA verificado con axe-core, con **0 violaciones** en todas las pantallas, temas claro y oscuro y ambos idiomas. Además: lector de pantalla con un solo anuncio por respuesta, foco atrapado en diálogos, movimiento reducido y alto contraste de Windows.
 - **Respuesta inmediata:** el estado ("Buscando en los documentos oficiales…") aparece en menos de un segundo y el texto llega en streaming; la latencia se muestra en cada respuesta.
 - **Modo voz (accesibilidad y valor agregado):** conversación manos libres en `#/voz`, un enlace que se puede compartir con estudiantes ciegos o con baja visión, o desde el botón «Voz». Funciona así:
@@ -243,4 +243,4 @@ Preguntas probables del jurado:
 - ¿Cómo evitan que el modelo invente? → capas 1, 5 y 6 más la validación.
 - ¿Qué pasa si el reglamento cambia? → versionado, solo se usa la versión vigente, nuevas preguntas de control.
 - ¿Y los datos de los estudiantes? → LOPDP, art. 12: aviso, minimización, revocación.
-- ¿Por qué no está en kichwa? → no existe traducción automática confiable para el kichwa ecuatoriano; se propone validación humana.
+- ¿Qué falta para kichwa? → hay recursos como Alki y un flujo para incorporar traducciones revisadas; faltan revisión lingüística y pruebas con hablantes. La muestra automática no demuestra calidad del chatbot en kichwa.

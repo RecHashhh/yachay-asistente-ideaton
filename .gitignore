@@ -27,3 +27,5 @@ docs/**/*.pdf
 docs/auditoria-integral-2026-10-20/resultados.json
 docs/auditoria-integral-2026-10-20/index.html
 .codebase-memory/
+__pycache__/
+*.pyc
