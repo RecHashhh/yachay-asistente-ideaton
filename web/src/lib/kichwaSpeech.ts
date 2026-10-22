@@ -1,5 +1,6 @@
 /** Record bounded PCM WAV locally, then send only to the configured Yachi API. */
 import { VoiceActivity } from './voiceActivity';
+import { kichwaVoice, kichwaVoiceLabels } from './voiceKichwa';
 const configured = ((import.meta.env.VITE_API_URL as string | undefined) ?? '').replace(/\/$/, '');
 const api = import.meta.env.DEV && /^https?:\/\//.test(configured) ? '/__yachi_api' : configured;
 export const speechApi = api;
@@ -10,9 +11,9 @@ export function listenKichwa(onStatus: (text: string) => void): { done: Promise<
   let cancelled = false;
   const controller = new AbortController();
   const done = (async () => {
-    if (!kichwaRecordingSupported()) throw new Error('Necesitas conexión con la API y permiso de micrófono.');
+    if (!kichwaRecordingSupported()) throw new Error(kichwaVoice.micDenied);
     const status = await fetch(`${api}/speech/capabilities`, { signal: controller.signal });
-    if (!status.ok || !(await status.json() as { kichwaAsr: boolean }).kichwaAsr) throw new Error('El servidor todavía no tiene instalado el reconocimiento Kichwa.');
+    if (!status.ok || !(await status.json() as { kichwaAsr: boolean }).kichwaAsr) throw new Error(kichwaVoice.noStt);
     const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true }, video: false });
     if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return ''; }
     let context: AudioContext;
@@ -39,7 +40,7 @@ export function listenKichwa(onStatus: (text: string) => void): { done: Promise<
         };
         source!.connect(processor!); processor!.connect(context.destination);
         timer = setTimeout(resolve, 15000);
-        onStatus('Te escucho… terminaré cuando dejes de hablar.');
+        onStatus(kichwaVoice.listening);
       });
     } finally {
       clearTimeout(timer);
@@ -64,10 +65,10 @@ export function listenKichwa(onStatus: (text: string) => void): { done: Promise<
       const sample = Math.max(-1, Math.min(1, pcm[Math.floor(i * context.sampleRate / 16000)] ?? 0));
       view.setInt16(44 + i * 2, Math.round(sample * (sample < 0 ? 32768 : 32767)), true);
     }
-    onStatus('Transcribiendo Kichwa… revisa el texto antes de enviarlo.');
+    onStatus(kichwaVoiceLabels.transcribing);
     const response = await fetch(`${api}/speech/transcribe`, { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: wav, signal: controller.signal });
     const result = await response.json() as { text?: string; detail?: string };
-    if (!response.ok) throw new Error(result.detail ?? 'No se pudo transcribir el audio.');
+    if (!response.ok) throw new Error(kichwaVoice.notHeard);
     return result.text ?? '';
   })();
   return { done, stop: () => stop(), abort: () => { cancelled = true; controller.abort(); stop(); } };

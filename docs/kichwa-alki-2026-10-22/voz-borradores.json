@@ -1,0 +1,10 @@
+{
+  "catalog": "web/src/lib/voiceKichwa.ts",
+  "scope": "Interfaz del modo voz: estados, botones, ajustes, información, ayuda y errores",
+  "source": "Propuestas contextuales de Codex solicitadas por el usuario; reutilizan vocabulario del trabajo anterior",
+  "literalAlkiTranslations": false,
+  "humanReviewed": false,
+  "approved": false,
+  "status": "experimental_draft",
+  "note": "No son traducciones certificadas ni nuevas entradas aprobadas para entrenamiento. Los nombres propios y licencias conservan su escritura. El catálogo mantiene español e inglés para comparación."
+}

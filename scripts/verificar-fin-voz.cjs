@@ -26,9 +26,11 @@ const assert = require('node:assert/strict');
       return route.fulfill({ json: { text: 'alli puncha' } });
     });
     await page.goto('http://127.0.0.1:5180/#/voz?lang=qu');
-    await page.getByRole('button', { name: 'Empezar a hablar', exact: true }).click();
+    await page.getByRole('button', { name: 'Rimayta kallarina', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('#voice-q')?.value === 'alli puncha', null, { timeout: 12000 });
     assert.ok(audioSeconds > 0.8 && audioSeconds < 5, `Expected silence endpoint, recorded ${audioSeconds} s`);
+    assert.equal(await page.locator('.voice-status').innerText(), 'Kikinta uyankapakmi kani.');
+    assert.doesNotMatch(await page.locator('.voice-stage').innerText(), /Listo|Presiona espacio|Edita la transcripción|Enviar/);
     console.log(`Automatic silence endpoint: ${audioSeconds.toFixed(2)} s recorded, editable transcript, no manual stop: OK.`);
   } finally { await browser.close(); fs.unlinkSync(file); fs.rmdirSync(folder); }
 })().catch(error => { console.error(error); process.exit(1); });
