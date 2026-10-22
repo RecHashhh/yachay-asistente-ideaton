@@ -32,7 +32,9 @@ logger = logging.getLogger(__name__)
 
 # Comunicación ya etiqueta sus asuntos ("Entérate-", "Eventos-"…): se guarda como pista para clasificar.
 SUBJECT_PREFIX = re.compile(r"(Servicios|Eventos|Invitaci[oó]n|Ent[eé]rate|Convocatoria)\s*-\s*", re.IGNORECASE)
-FOOTER_MARK = "footermailing"  # imagen con la que empieza el pie común de la plantilla
+# Imagen con la que empieza el pie de la plantilla: «footermailing.png» (2026) o «Footer-Mailing.png» (2023–2024).
+FOOTER_MARK = re.compile(r"footer-?mailing", re.IGNORECASE)
+IMAGE_TEXT_LABEL = "Transcripción de las imágenes del comunicado (verificada por el equipo):"
 ECUADOR = timezone(timedelta(hours=-5))  # sin horario de verano; los correos llegan con hora UTC
 # El modelo de embeddings solo lee 128 tokens; el encabezado «Documento: <título>» usa ~25. Medido con el tokenizador:
 # ~4,2 caracteres/token en prosa, menos con nombres y URLs → 300 caracteres de cuerpo caben con margen.
@@ -125,7 +127,7 @@ def clean_body(text: str) -> str:
     """Limpia el text/plain de la plantilla de Comunicación: sin encabezado, marcas de imagen ni pie."""
     lines: list[str] = []
     for line in text.splitlines():
-        if FOOTER_MARK in line:
+        if FOOTER_MARK.search(line):
             break
         if re.fullmatch(r"\s*\[(?:https?://\S+|cid:\S+)\]\s*", line):
             continue
@@ -304,11 +306,25 @@ def classify(
     return result["parsed"] or fallback, tokens
 
 
-def ingest_email(raw: bytes, settings: Settings, forwarded_by: str | None = None) -> list[dict[str, object]]:
-    """`forwarded_by`: quién reenvió el comunicado cuando `raw` es el .eml original extraído por n8n (ya validado)."""
+def with_image_text(email: ParsedEmail, image_text: str | None) -> ParsedEmail:
+    """Agrega al cuerpo la transcripción de sus imágenes (tablas de horarios, paradas…), rotulada como tal.
+
+    El cuerpo en texto plano no trae lo que el comunicado publica como imagen; la transcripción queda en el mismo
+    documento, así la cita sigue apuntando al comunicado original.
+    """
+    if not image_text or not image_text.strip():
+        return email
+    return replace(email, body=f"{email.body}\n\n{IMAGE_TEXT_LABEL}\n\n{image_text.strip()}")
+
+
+def ingest_email(
+    raw: bytes, settings: Settings, forwarded_by: str | None = None, image_text: str | None = None
+) -> list[dict[str, object]]:
+    """`forwarded_by`: quién reenvió el comunicado cuando `raw` es el .eml original extraído por n8n (ya validado).
+    `image_text`: transcripción verificada de las imágenes del comunicado, si la hay."""
     from .search import vectors  # carga perezosa del modelo de embeddings, igual que processing.process
 
-    email = parse_email(raw, settings.allowed_email_senders, settings.allowed_email_forwarders)
+    email = with_image_text(parse_email(raw, settings.allowed_email_senders, settings.allowed_email_forwarders), image_text)
     if forwarded_by:
         email = replace(email, forwarded_by=forwarded_by)
     email = replace(email, attachments=_new_attachments(email.attachments))
@@ -388,8 +404,11 @@ def main(paths: list[str]) -> None:
     settings = get_settings()
     open_pool()
     for path in paths:
+        # Transcripción verificada de las imágenes, si existe al lado: «correo.eml» → «correo.imagenes.md».
+        sidecar = Path(path).with_suffix(".imagenes.md")
+        image_text = sidecar.read_text(encoding="utf-8") if sidecar.exists() else None
         try:
-            result = ingest_email(Path(path).read_bytes(), settings)
+            result = ingest_email(Path(path).read_bytes(), settings, image_text=image_text)
         except IngestError as exc:
             print(f"✗ {Path(path).name}: {exc}")
             continue

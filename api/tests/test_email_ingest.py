@@ -5,7 +5,9 @@ import pytest
 
 from app.email_ingest import (
     BODY_CHUNK_CHARS,
+    IMAGE_TEXT_LABEL,
     IngestError,
+    with_image_text,
     body_chunks,
     build_documents,
     same_title,
@@ -183,6 +185,20 @@ def test_same_title_detects_corpus_copies_but_not_new_versions() -> None:
     assert not same_title("Procedimiento de Retiro de Estudiantes de Carrera V5.0", corpus)
     assert not same_title("Calendario Academico 2027Sem01", "Calendario Academico 2026Sem02")
     assert not same_title("FORMATO ENTREGA TRABAJO DE TITULACION POSGRADO", "FORMATO ENTREGA TRABAJO DE TITULACION PREGRADO")
+
+
+def test_old_template_footer_is_also_cut() -> None:
+    old = BODY.replace("images/footermailing.png", "wp-content/uploads/2023/08/Footer-Mailing.png")
+    assert "Hacienda San José" not in clean_body(old)
+
+
+def test_image_transcription_is_appended_and_labeled() -> None:
+    email = parse_email(make_email().as_bytes(), ALLOWED)
+
+    assert with_image_text(email, None) is email
+    enriched = with_image_text(email, "- Bus de las 06h10: sale de Ibarra hacia Urcuquí.\n")
+    assert enriched.body.startswith(email.body)
+    assert enriched.body.endswith(f"{IMAGE_TEXT_LABEL}\n\n- Bus de las 06h10: sale de Ibarra hacia Urcuquí.")
 
 
 def test_attachment_without_text_is_skipped_not_fatal() -> None:

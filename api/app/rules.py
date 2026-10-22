@@ -69,7 +69,16 @@ CONFESIONARIO_OPTIONS = [
 STOP = {"de", "la", "el", "los", "las", "un", "una", "y", "o", "a", "en", "que", "por", "para", "con", "me", "mi", "se", "es", "lo", "al", "del",
         "the", "a", "an", "of", "to", "and", "or", "in", "on", "is", "it", "my", "i", "me", "you", "si", "no", "ya", "pues", "bueno", "eh", "ah", "mmm"}
 
-WHERE = re.compile(r"(donde|ubica|queda|llego|llegar|horario|abre|cierra|mapa|where|located|find|hours|open|close|how do i get)")
+WHERE = re.compile(r"(donde|ubica|queda|llego|llegar|mapa|where|located|find|how do i get)")
+HOURS = re.compile(r"(horario|abre|cierra|hours|open|close)")
+# El horario de atención de un servicio (médico, enfermería, una oficina) no es el horario de apertura del edificio:
+# esas preguntas van a la búsqueda (comunicados, documentos), no a la ficha del lugar.
+SERVICE_HOURS = re.compile(r"(atien|atencion|consulta|turno|doctor|medic|enfermer|attend|appointment|nurse)")
+
+
+def place_intent(n: str) -> bool:
+    """¿La pregunta (normalizada) pide ubicar un lugar o el horario de apertura de un edificio?"""
+    return bool(WHERE.search(n) or (HOURS.search(n) and not SERVICE_HOURS.search(n)))
 ROOM = re.compile(r"\b([A-Z]{1,3}\d{2,3}|JBY\d|AT\d{2})\b")
 
 
@@ -196,7 +205,7 @@ def split_origin(q: str) -> tuple[str, Place | None]:
 
 def place_lookup(q: str, need_intent: bool = True) -> Place | None:
     n = f" {norm(q)} "
-    if need_intent and not WHERE.search(n):
+    if need_intent and not place_intent(n):
         return None
     with conn() as c:
         rows = c.execute("SELECT id, name, name_en, uso, horario, lat, lon, maps_url, aliases, fuente FROM places").fetchall()
