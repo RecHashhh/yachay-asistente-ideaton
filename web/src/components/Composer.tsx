@@ -138,7 +138,7 @@ export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy
           </>}
           <button type="button" className={`icon-btn mic${rec ? ' on' : ''}`} title={t('mic')} aria-label={t('mic')} aria-pressed={!!rec} onClick={mic} disabled={disabled}><IcMic /></button>
           <span className="sp" />
-          {onVoice && <button type="button" className="voice-btn" onClick={onVoice} disabled={disabled} title={t('voiceMode')}><IcWave /><span>{lang === 'en' ? 'Voice' : 'Voz'}</span><span className="sr"> — {t('voiceMode')}</span></button>}
+          {onVoice && <button type="button" className="voice-btn" onClick={onVoice} disabled={disabled} title={t('voiceMode')}><IcWave /><span>{lang === 'qu' ? kichwaVoice.voice : lang === 'en' ? 'Voice' : 'Voz'}</span><span className="sr"> — {t('voiceMode')}</span></button>}
           {busy
             ? <button type="button" className="send" onClick={onStop} aria-label={t('stop')}><IcStop /></button>
             : <button type="submit" className="send" disabled={!canSend} aria-label={t('send')}><IcSend /></button>}
