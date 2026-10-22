@@ -183,7 +183,7 @@ export const adminLogout = () => {
 
 // ---------- Filtros del chat (crisis, denuncias, groserías, manipulación, fuera del ámbito, nunca filtrar) ----------
 
-export type FilterCategory = 'crisis' | 'denuncia' | 'manipulacion' | 'profanidad' | 'fuera_de_dominio' | 'permitido';
+export type FilterCategory = 'crisis' | 'denuncia' | 'manipulacion' | 'salud' | 'profanidad' | 'fuera_de_dominio' | 'permitido';
 export interface FilterTerm { category: FilterCategory; term: string; active: boolean; note: string | null; updatedBy: string; updatedAt: string }
 export interface FilterCheck { route: string; kind: string | null; matched: string | null; question: string; sensitive: boolean }
 export interface FilterTestRow { text: string; expect: string; got: string; ok: boolean; type: 'ruta' | 'datos' }

@@ -21,9 +21,15 @@ from .config import API_DIR, settings
 from .db import conn, open_pool
 from .search import vectors
 from .schemas import TranslationReportRequest, TranslationReportResponse
-from Mapas.app.db import engine as maps_engine
-from Mapas.app.main import router as maps_router
 from .kichwa_speech import router as speech_router
+
+# Mapas necesita PostGIS y geoalchemy2 (los trae Docker). Sin ellos la API arranca igual, sin las rutas /maps ni la herramienta de mapas.
+try:
+    from Mapas.app.db import engine as maps_engine
+    from Mapas.app.main import router as maps_router
+except Exception as e:
+    maps_engine = maps_router = None
+    print("Mapas no disponible (la API sigue sin mapas):", repr(e))
 
 
 def purge() -> None:
@@ -55,13 +61,15 @@ async def lifespan(_: FastAPI):
     task = asyncio.create_task(_purge_loop())
     yield
     task.cancel()
-    await asyncio.to_thread(maps_engine.dispose)
+    if maps_engine is not None:
+        await asyncio.to_thread(maps_engine.dispose)
 
 
 app = FastAPI(title="Yachi API", version="0.1.0", lifespan=lifespan)
 app.include_router(speech_router)
 app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins, allow_methods=["*"], allow_headers=["*"])
-app.include_router(maps_router)
+if maps_router is not None:
+    app.include_router(maps_router)
 
 # ------------------------------------------------------------------ chat
 
@@ -414,7 +422,7 @@ def admin_unanswered_patch(item_id: str, p: InboxPatch, who: str = Depends(admin
 
 # ------------------------------------------------------------------ filtros (editables por el equipo)
 
-FILTER_CATEGORIES = ("crisis", "denuncia", "manipulacion", "profanidad", "fuera_de_dominio", "permitido")
+FILTER_CATEGORIES = ("crisis", "denuncia", "manipulacion", "salud", "profanidad", "fuera_de_dominio", "permitido")
 
 
 @app.get("/admin/filters")
