@@ -1,0 +1,103 @@
+{
+  "source": "https://tikrachina.ups.edu.ec/traductor/",
+  "direction": "es-qu",
+  "limitation": "Comparación exploratoria; ninguno de los proveedores certifica estas frases. No activa cambios de interfaz.",
+  "items": [
+    {
+      "key": "cancel",
+      "es": "Cancelar",
+      "observedAt": "2026-10-22T17:55:35.033Z",
+      "httpStatus": 200,
+      "approved": false,
+      "upsQu": "chunka",
+      "alkiQu": "Kawsay.",
+      "alkiExactInput": true,
+      "flags": [],
+      "status": "pendiente_revision_linguistica"
+    },
+    {
+      "key": "steps",
+      "es": "Pasos",
+      "observedAt": "2026-10-22T17:55:37.903Z",
+      "httpStatus": 200,
+      "approved": false,
+      "upsQu": "kuyuchina",
+      "alkiQu": "Pukllay",
+      "alkiExactInput": true,
+      "flags": [],
+      "status": "pendiente_revision_linguistica"
+    },
+    {
+      "key": "copy",
+      "es": "Copiar respuesta",
+      "observedAt": "2026-10-22T17:55:40.889Z",
+      "httpStatus": 200,
+      "approved": false,
+      "upsQu": "charishkata",
+      "alkiQu": "Por favor, proporciona el texto que deseas traducir al Kichwa ecuatoriano.",
+      "alkiExactInput": true,
+      "flags": [],
+      "status": "pendiente_revision_linguistica"
+    },
+    {
+      "key": "newChat",
+      "es": "Nueva conversación",
+      "observedAt": "2026-10-22T17:55:43.802Z",
+      "httpStatus": 200,
+      "approved": false,
+      "upsQu": "karana",
+      "alkiQu": "Mushuk rimanakuy",
+      "alkiExactInput": true,
+      "flags": [],
+      "status": "pendiente_revision_linguistica"
+    },
+    {
+      "key": "helloSub",
+      "es": "¿Qué trámite o lugar de Yachay Tech necesitas?",
+      "observedAt": "2026-10-22T17:55:46.685Z",
+      "httpStatus": 200,
+      "approved": false,
+      "upsQu": "mishki",
+      "alkiQu": "¿Ima rikhuyka o llakta Yachay Techmanta kikinka?",
+      "alkiExactInput": true,
+      "flags": [],
+      "status": "pendiente_revision_linguistica"
+    },
+    {
+      "key": "themeLight",
+      "es": "Tema claro",
+      "observedAt": "2026-10-22T17:55:49.630Z",
+      "httpStatus": 200,
+      "approved": false,
+      "upsQu": "yuyay",
+      "alkiQu": "Tukuy yuyay",
+      "alkiExactInput": true,
+      "flags": [],
+      "status": "pendiente_revision_linguistica"
+    },
+    {
+      "key": "themeDark",
+      "es": "Tema oscuro",
+      "observedAt": "2026-10-22T17:55:52.563Z",
+      "httpStatus": 200,
+      "approved": false,
+      "upsQu": "hatun challi",
+      "alkiQu": "Sumaq ch'ulla",
+      "alkiExactInput": true,
+      "flags": [],
+      "status": "pendiente_revision_linguistica"
+    },
+    {
+      "key": "placeholder",
+      "es": "Pregúntale a Yachi…",
+      "observedAt": "2026-10-22T17:55:55.379Z",
+      "httpStatus": 200,
+      "approved": false,
+      "upsQu": "chaylla",
+      "alkiQu": null,
+      "alkiExactInput": false,
+      "flags": [],
+      "status": "pendiente_revision_linguistica"
+    }
+  ]
+}

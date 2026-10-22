@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-22",
+  "source": "https://tikrachina.ups.edu.ec/traductor/",
+  "sampleSize": 8,
+  "repeatedChecks": 2,
+  "method": "Formulario público en navegador; las dos repeticiones comprobaron que el español devuelto coincidía exactamente con el enviado. Sin subir archivos ni utilizar endpoints privados.",
+  "providerNotice": "El sitio se identifica como prototipo y advierte posibles errores por corpus limitado.",
+  "dictionary": "DICCIONARIO EN PDF KICHWA a ESPAÑOL.pdf, aportado por el usuario. Páginas del archivo PDF.",
+  "lexicalDiscrepancies": [
+    { "key": "cancel", "upsQu": "chunka", "documentedMeaning": "diez", "pdfPage": 20, "note": "No expresa la acción de cancelar. Se repitió el envío con el mismo resultado." },
+    { "key": "steps", "upsQu": "kuyuchina", "documentedMeaning": "mover, menear, mecer, batir, girar", "pdfPage": 45, "note": "No acredita el sentido de instrucciones de un trámite." },
+    { "key": "newChat", "upsQu": "karana", "documentedMeaning": "brindar, convidar, servir, dar de comer", "pdfPage": 35, "note": "No expresa una nueva conversación." },
+    { "key": "helloSub", "upsQu": "mishki", "documentedMeaning": "dulce, fragante, sabroso; otras acepciones nominales", "pdfPage": 58, "note": "No conserva la pregunta sobre el trámite o lugar que necesita el estudiante. Se repitió el envío con el mismo resultado." },
+    { "key": "themeLight", "upsQu": "yuyay", "documentedMeaning": "pensamiento, idea, memoria", "pdfPage": 118, "note": "No expresa apariencia clara de la interfaz." }
+  ],
+  "conclusion": "No sustituir las traducciones de Yachi por estas propuestas. La comparación identifica fallos en esta muestra; no mide la calidad general de Tikrachina ni establece superioridad lingüística de Alki.",
+  "humanApprovals": 0,
+  "runtimeChanges": false,
+  "remainingCases": "Copiar respuesta, Tema oscuro y Pregúntale a Yachi permanecen sin evaluación lingüística concluyente; no se aprueban por descarte."
+}
