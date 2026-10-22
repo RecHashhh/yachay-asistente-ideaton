@@ -12,7 +12,6 @@ El micrófono en Kichwa captura hasta 15 segundos y llama a `/speech/transcribe`
 con WAV PCM16 mono a 16 kHz. Devuelve un borrador editable antes de enviar la consulta.
 El servidor no guarda audio ni entrena con él. ES/EN conservan el reconocimiento del navegador.
 La transcripción no traduce ni acredita la exactitud de la respuesta institucional.
-Sin una voz Kichwa instalada, no se usa una voz española para simular pronunciación Kichwa.
 
 Créditos: Chihiro Taguchi, Jefferson Saransig, Dayana Velásquez y David Chiang,
 [Killkan-ASR](https://huggingface.co/ctaguchi/killkan_asr), CC BY 4.0,
@@ -22,6 +21,24 @@ revisión `2d00fbbb610ea6f7579d3a008cfe6aa4fbb95251`.
 La integración de audio y la interfaz de Yachi son adaptaciones; el modelo se usa sin reentrenar.
 No se incorporan sus conversaciones de radio como fuentes universitarias.
 Para redistribuir grabaciones originales consulta también la atribución y licencia de sus autores.
+
+## Lectura en voz Kichwa (experimental)
+
+Con las dependencias opcionales anteriores, ejecuta desde `api/`:
+`.venv\Scripts\python scripts/install_kichwa_tts.py` y reinicia la API.
+Descarga una voz de 145 MB; no requiere clave de pago ni una voz instalada en Windows.
+`POST /speech/synthesize` recibe `{"text":"Imanalla"}` (máximo 400 caracteres)
+y devuelve WAV mono PCM16. La interfaz divide las respuestas largas, permite detener
+la reproducción y conserva la velocidad elegida. No se guardan los textos ni los audios
+de estas peticiones. En modo voz aparece «Probar voz Kichwa».
+
+Modelo de Meta: [MMS-TTS quw](https://huggingface.co/facebook/mms-tts-quw),
+variante ecuatoriana de Tena, revisión `110330c764f39caf92839747412afcb98a0c8f79`.
+Licencia [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/): uso no comercial
+y atribución. Los pesos permanecen fuera de Git. La integración de Yachi adapta el
+transporte y la reproducción; no modifica ni reentrena los pesos de Meta.
+Es una voz sintética experimental: su pronunciación debe revisarse con hablantes y
+puede diferir del Kichwa de Imbabura. No usarla como prueba de corrección de la traducción.
 
 FastAPI + LangGraph + PostgreSQL + Claude Haiku 5.5. Usa el corpus que preparó el equipo (`docs/rag/rag/`, **confidencial, fuera del repositorio**).
 

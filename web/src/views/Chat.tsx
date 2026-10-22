@@ -17,7 +17,7 @@ import { ChatList } from '../components/ChatList';
 import { ClarifyCard, FeedbackPanel } from '../components/Feedback';
 import { TranslationReport } from '../components/TranslationReport';
 import { VoiceMode } from '../components/VoiceMode';
-import { loadPrefs, speak, stopSpeaking, toSpeech, ttsSupported, voicesFor, whenVoicesReady } from '../lib/speech';
+import { loadPrefs, speak, stopSpeaking, toSpeech, ttsSupported } from '../lib/speech';
 import type { FeedbackReason } from '../lib/inbox';
 import type { Attachment, ChatTurn, MapAction, Procedure, ProcessStep, Source, Topic, Trend, Unknown } from '../lib/types';
 import { ActivityPanel } from '../components/ActivityPanel';
@@ -515,14 +515,11 @@ function AssistantMsg({ m, question, transcript, theme, mapConfig, onVote, onRea
   const readAloud = async () => {
     if (reading) { stopSpeaking(); setReading(false); return; }
     setReadingError('');
-    if (lang === 'qu') {
-      await whenVoicesReady();
-      if (!voicesFor(lang).length) { setReadingError('No hay una voz Kichwa instalada para leer esta respuesta.'); return; }
-    }
     const s = toSpeech(m, lang, t('unknownTitle'), t('unknownBody'));
     setReading(true);
-    await speak([s.intro.replace(/Di "siguiente"[^.]*\.|Say "next"[^.]*\./, ''), ...s.steps, s.outro].join(' '), lang, loadPrefs());
-    setReading(false);
+    try { await speak([s.intro.replace(/Di "siguiente"[^.]*\.|Say "next"[^.]*\./, ''), ...s.steps, s.outro].join(' '), lang, loadPrefs()); }
+    catch (error) { setReadingError((error as Error).message); }
+    finally { setReading(false); }
   };
   const mood = reading ? 'talking' : m.streaming ? (m.text ? 'talking' : 'thinking') : 'idle';
   const srcKey = (s: Source) => `${s.docId}|${s.locator ?? ''}`;
@@ -595,7 +592,7 @@ function AssistantMsg({ m, question, transcript, theme, mapConfig, onVote, onRea
             {m.text && <button className="icon-btn" aria-label={t('copy')} title={t('copy')} onClick={() => { void navigator.clipboard.writeText(m.text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>{copied ? <IcCheck /> : <IcCopy />}</button>}
             <button className="icon-btn" aria-label={t('good')} title={t('good')} aria-pressed={m.vote === 'up'} onClick={() => onVote('up')}><IcUp /></button>
             <button className="icon-btn" aria-label={t('bad')} title={t('bad')} aria-pressed={m.vote === 'down'} onClick={() => onVote('down')}><IcDown /></button>
-            {ttsSupported() && <button className="icon-btn" aria-label={reading ? t('stopReading') : t('readAloud')} title={reading ? t('stopReading') : t('readAloud')} aria-pressed={reading} onClick={readAloud}><IcSpeaker /></button>}
+            {ttsSupported(lang) && <button className="icon-btn" aria-label={reading ? t('stopReading') : t('readAloud')} title={reading ? t('stopReading') : t('readAloud')} aria-pressed={reading} onClick={readAloud}><IcSpeaker /></button>}
             <button className="icon-btn" aria-label={t('retry')} title={t('retry')} onClick={onRetry}><IcRetry /></button>
           </div>
         )}

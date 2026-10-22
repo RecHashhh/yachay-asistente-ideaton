@@ -1,0 +1,19 @@
+{
+  "model": "facebook/mms-tts-quw",
+  "revision": "110330c764f39caf92839747412afcb98a0c8f79",
+  "creator": "Meta",
+  "license": "CC-BY-NC-4.0",
+  "variant": "Kichwa de Tena, Ecuador",
+  "experimental": true,
+  "text": "Imanalla. Ñuka shutika Yachi.",
+  "status": 200,
+  "audioSeconds": 2.35,
+  "generationSeconds": 0.89,
+  "sampleRate": 16000,
+  "channels": 1,
+  "bytes": 75308,
+  "audibleWaveform": true,
+  "pronunciationValidatedByNativeSpeaker": false,
+  "realBrowserPlaybackCompleted": true,
+  "browserPageErrors": []
+}

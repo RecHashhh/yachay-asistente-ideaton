@@ -10,7 +10,19 @@ const assert = require('node:assert/strict');
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.addInitScript(() => localStorage.setItem('yt-consent-2026-10c', '1'));
-    await page.route('**/speech/capabilities', route => route.fulfill({ json: { kichwaAsr: true } }));
+    await page.route('**/speech/capabilities', route => route.fulfill({ json: { kichwaAsr: true, kichwaTts: true } }));
+    let syntheses = 0;
+    const wav = Buffer.alloc(44 + 3200);
+    wav.write('RIFF', 0); wav.writeUInt32LE(wav.length - 8, 4); wav.write('WAVEfmt ', 8);
+    wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
+    wav.writeUInt32LE(16000, 24); wav.writeUInt32LE(32000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
+    wav.write('data', 36); wav.writeUInt32LE(3200, 40);
+    await page.route('**/speech/synthesize', route => {
+      const payload = route.request().postDataJSON();
+      assert.ok(payload.text.length > 0 && payload.text.length <= 400);
+      syntheses++;
+      return route.fulfill({ contentType: 'audio/wav', body: wav });
+    });
     let requests = 0;
     await page.route('**/speech/transcribe', async route => {
       const data = route.request().postDataBuffer();
@@ -44,9 +56,13 @@ const assert = require('node:assert/strict');
       return { calls, voices: module.voicesFor('qu').length };
     });
     assert.deepEqual(spoken, { calls: 0, voices: 0 }, 'Spanish voices must not impersonate Kichwa');
+    assert.equal(syntheses, 1, 'Without a native OS voice, play the server Kichwa waveform');
     await page.goto(url + '#/voz?lang=qu');
     await page.getByText(/Voz Kichwa experimental/).waitFor();
+    await page.getByRole('button', { name: 'Probar voz Kichwa', exact: true }).click();
+    await page.waitForFunction(() => !document.querySelector('.voice-stage .chip')?.disabled);
+    assert.equal(syntheses, 2);
     assert.deepEqual(errors, []);
-    console.log('Kichwa microphone: bounded WAV, editable transcript, no auto-send, voice notice: OK (mock inference).');
+    console.log('Kichwa: bounded recording, cancellation, editable transcript, server WAV playback and voice preview: OK (mock inference).');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exit(1); });
