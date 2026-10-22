@@ -5,6 +5,7 @@ import { useT, type Lang } from '../lib/i18n';
 import { earcon, listenOnce, loadPrefs, parseCommand, savePrefs, speak, stopSpeaking, sttSupported, toSpeech, ttsSupported, voicesFor, whenVoicesReady, type Spoken, type VoicePrefs } from '../lib/speech';
 import type { MapAction, Procedure, Source, Unknown } from '../lib/types';
 import { kichwaVoiceAvailable } from '../lib/kichwaTts';
+import { kichwaVoice, voiceLabels } from '../lib/voiceKichwa';
 import { trapFocus } from './ConsentDialog';
 import { IcClose, IcInfo, IcMic, IcStop } from './icons';
 import { Mascot } from './Mascot';
@@ -60,7 +61,8 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
   onClose: () => void;
 }) {
   const { t, lang } = useT();
-  const x = TEXT[lang === 'en' ? 'en' : 'es'];
+  const x = lang === 'qu' ? kichwaVoice : TEXT[lang];
+  const ui = voiceLabels[lang];
   const [state, setState] = useState<State>('start');
   const [interim, setInterim] = useState('');
   const [heard, setHeard] = useState('');
@@ -73,8 +75,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
   const [panel, setPanel] = useState<'info' | 'settings' | null>(null);
   const panelRef = useRef<HTMLElement>(null);
   const panelTrigger = useRef<HTMLButtonElement | null>(null);
-  const en = lang === 'en';
-  const panelTitle = panel === 'info' ? (en ? 'Voice information' : 'Información del modo voz') : (en ? 'Voice settings' : 'Configuración de voz');
+  const panelTitle = panel === 'info' ? ui.info : ui.settings;
   useEffect(() => { if (panel) panelRef.current?.querySelector<HTMLButtonElement>('button')?.focus(); }, [panel]);
   const closePanel = () => { setPanel(null); panelTrigger.current?.focus(); };
   const spoken = useRef<Spoken>({ intro: '', steps: [], outro: '' });
@@ -117,7 +118,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
     setSaid(text);
     setState('speaking');
     try { await speak(text, lang2, prefsRef.current); }
-    catch (error) { setSpeechError((error as Error).message); }
+    catch (error) { setSpeechError(lang2 === 'qu' ? voiceLabels.qu.voiceError : (error as Error).message); }
     setState((s) => (s === 'speaking' ? 'idle' : s));
     if (thenListen && prefsRef.current.autoListen && stt && lang2 !== 'qu') void listenRef.current();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,7 +148,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
 
   const ask = (text: string) => {
     pending.current = true;
-    setHeard(text.replace(new RegExp(HAS_PII.source, 'g'), lang2 === 'en' ? '[removed]' : '[dato omitido]'));
+    setHeard(text.replace(new RegExp(HAS_PII.source, 'g'), ui.omittedData));
     setState('thinking');
     earcon('done');
     live.current.onSend(text);
@@ -162,7 +163,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
     setState('listening');
     earcon('listen');
     const l = listenOnce(lang2, (text) => {
-      if (lang2 === 'qu') { if (text.startsWith('Transcribiendo')) setState('transcribing'); }
+      if (lang2 === 'qu') { if (text === voiceLabels.qu.transcribing) setState('transcribing'); }
       else setInterim(text);
     });
     listener.current = l;
@@ -176,7 +177,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
       listener.current = null;
       setState('idle');
       earcon('error');
-      if (lang2 === 'qu') { if ((e as Error).name !== 'AbortError') setSpeechError((e as Error).message); }
+      if (lang2 === 'qu') { if ((e as Error).name !== 'AbortError') setSpeechError((e as Error).name === 'NotAllowedError' ? x.micDenied : x.notHeard); }
       else void say((e as Error).message === 'not-allowed' ? x.micDenied : x.notHeard, false);
     }
   }
@@ -216,7 +217,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
     else if (e.key.toLowerCase() === 'n') handle('siguiente');
   };
 
-  const status = state === 'start' ? x.startHint : state === 'listening' ? x.listening : state === 'transcribing' ? 'Transcribiendo…' : state === 'thinking' || busy ? x.thinking : state === 'speaking' ? x.speaking : x.idle;
+  const status = state === 'start' ? x.startHint : state === 'listening' ? x.listening : state === 'transcribing' ? ui.transcribing : state === 'thinking' || busy ? x.thinking : state === 'speaking' ? x.speaking : x.idle;
   const mood = state === 'listening' ? 'happy' : state === 'thinking' ? 'thinking' : state === 'speaking' ? 'talking' : 'idle';
 
   return (
@@ -224,8 +225,8 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
       <header className="voice-top">
         <h1 id="voice-title" className="title">{x.title}</h1>
         <span className="sp" />
-        <button className="icon-btn" aria-label={en ? 'Voice information' : 'Información del modo voz'} title={en ? 'Voice information' : 'Información del modo voz'} aria-expanded={panel === 'info'} aria-controls="voice-options" onClick={(event) => { panelTrigger.current = event.currentTarget; setPanel(panel === 'info' ? null : 'info'); }}><IcInfo /></button>
-        <button className="icon-btn" aria-label={en ? 'Voice settings' : 'Configuración de voz'} title={en ? 'Voice settings' : 'Configuración de voz'} aria-expanded={panel === 'settings'} aria-controls="voice-options" onClick={(event) => { panelTrigger.current = event.currentTarget; setPanel(panel === 'settings' ? null : 'settings'); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="m9 3-1 3-3 1-2 3 2 2-1 3 3 2 3-1 2 3 3-1 1-3 3-1 1-3-2-2 1-3-3-2-3 1-2-2Z"/></svg></button>
+        <button className="icon-btn" aria-label={ui.info} title={ui.info} aria-expanded={panel === 'info'} aria-controls="voice-options" onClick={(event) => { panelTrigger.current = event.currentTarget; setPanel(panel === 'info' ? null : 'info'); }}><IcInfo /></button>
+        <button className="icon-btn" aria-label={ui.settings} title={ui.settings} aria-expanded={panel === 'settings'} aria-controls="voice-options" onClick={(event) => { panelTrigger.current = event.currentTarget; setPanel(panel === 'settings' ? null : 'settings'); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="m9 3-1 3-3 1-2 3 2 2-1 3 3 2 3-1 2 3 3-1 1-3 3-1 1-3-2-2 1-3-3-2-3 1-2-2Z"/></svg></button>
         <button className="icon-btn" aria-label={x.exit} title={x.exit} onClick={() => { stopSpeaking(); onClose(); }}><IcClose /></button>
       </header>
 
@@ -251,7 +252,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
 
         {(!stt || lang === 'qu') && state !== 'start' && (
           <form className="voice-typed" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) { handle(typed.trim()); setTyped(''); } }}>
-            <p className="small">{lang === 'qu' ? 'Edita la transcripción o escribe tu consulta en Kichwa.' : x.noStt}</p>
+            <p className="small">{lang === 'qu' ? ui.editTranscript : x.noStt}</p>
             <label className="sr" htmlFor="voice-q">{x.typed}</label>
             <input id="voice-q" className="inp" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={x.typed} />
             <button className="btn primary">{x.send}</button>
@@ -260,10 +261,10 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
       </div>
 
       {panel && <aside id="voice-options" ref={panelRef} className="voice-options" aria-label={panelTitle}>
-        <div className="voice-options-head"><h2>{panelTitle}</h2><button className="icon-btn" aria-label={en ? 'Close panel' : 'Cerrar panel'} onClick={closePanel}><IcClose /></button></div>
+        <div className="voice-options-head"><h2>{panelTitle}</h2><button className="icon-btn" aria-label={ui.closePanel} onClick={closePanel}><IcClose /></button></div>
         {panel === 'info' ? <div className="voice-info">
-          <p>{en ? 'Speak naturally. You can interrupt the answer using the microphone button.' : 'Habla con naturalidad. Puedes interrumpir la respuesta con el botón del micrófono.'}</p>
-          {lang === 'qu' ? <><p>La grabación termina al detectar silencio. Límite de seguridad: 15 segundos. El audio se procesa en Yachi y no se guarda. Revisa la transcripción antes de enviarla.</p><p>Voz experimental de Tena (Ecuador); la pronunciación está pendiente de validación.</p><a href="https://huggingface.co/facebook/mms-tts-quw" target="_blank" rel="noreferrer">Meta MMS · CC BY-NC 4.0</a></> : <p>{en ? 'Speech recognition uses your browser’s service. Pause when you finish speaking to end your turn.' : 'El reconocimiento utiliza el servicio de tu navegador. Haz una pausa al terminar para cerrar tu turno.'}</p>}
+          <p>{ui.naturalSpeech}</p>
+          {lang === 'qu' ? <><p>{ui.recordingNote}</p><p>{ui.voiceNote}</p><a href="https://huggingface.co/facebook/mms-tts-quw" target="_blank" rel="noreferrer">Meta MMS · CC BY-NC 4.0</a></> : <p>{ui.browserNote}</p>}
           <p className="small">{x.help}</p>
         </div> : <div className="voice-prefs">
         <label className="field"><span>{x.speed}</span>
@@ -274,14 +275,14 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
         {(
           <label className="field"><span>{x.voice}</span>
             <select className="inp" value={voices.some((v) => v.voiceURI === prefs.voiceURI) ? prefs.voiceURI : lang === 'qu' ? 'mms-quw' : voices[0]?.voiceURI ?? ''} onChange={(e) => setPrefs({ voiceURI: e.target.value || undefined })}>
-              {lang === 'qu' ? <option value="mms-quw">Kichwa de Tena · {serverVoice ? 'Meta MMS' : 'no disponible'}</option> : voices.length === 0 ? <option value="">{en ? 'System default' : 'Predeterminada del sistema'}</option> : null}
+              {lang === 'qu' ? <option value="mms-quw">{ui.tenaVoice} · {serverVoice ? 'Meta MMS' : ui.unavailable}</option> : voices.length === 0 ? <option value="">{ui.defaultVoice}</option> : null}
               {voices.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{v.name.replace(/^Microsoft |^Google /, '')} ({v.lang})</option>)}
             </select>
           </label>
         )}
-        {lang === 'qu' && serverVoice && <button type="button" className="chip" disabled={state === 'speaking' || state === 'listening' || busy} onClick={() => void say('Imanalla. Ñuka shutika Yachi.', false)}>Probar voz Kichwa</button>}
+        {lang === 'qu' && serverVoice && <button type="button" className="chip" disabled={state === 'speaking' || state === 'listening' || busy} onClick={() => void say('Imanalla. Ñuka shutika Yachi.', false)}>{ui.tryVoice}</button>}
         {lang !== 'qu' && <label className="check"><input type="checkbox" checked={prefs.autoListen} onChange={(e) => setPrefs({ autoListen: e.target.checked })} />{x.auto}</label>}
-        {!ttsSupported(lang) && <p className="err">{lang === 'en' ? 'Speech output is not available in this browser.' : 'Este navegador no puede leer en voz alta.'}</p>}
+        {!ttsSupported(lang) && <p className="err">{ui.ttsUnavailable}</p>}
       </div>}
       </aside>}
     </motion.div>
