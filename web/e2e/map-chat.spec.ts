@@ -58,4 +58,8 @@ test('renders compact map geometry streamed by the unified API', async ({ page }
   await expect(answer.getByText('Patomar queda en el mapa de Yachay.')).toBeVisible();
   await expect(answer.locator('.geo-map')).toBeVisible();
   await expect(answer.locator('.geo-map-marker.destination')).toHaveText('Patomar');
+  await expect(answer.locator('.geo-map-google-link')).toHaveAttribute(
+    'href',
+    'https://www.google.com/maps/search/?api=1&query=0.41,-78.17',
+  );
 });

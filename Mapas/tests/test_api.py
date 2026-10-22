@@ -66,12 +66,25 @@ def test_search_finds_exact_place_with_location(client: TestClient) -> None:
     assert len(first["location"]["coordinates"]) == 2
 
 
+def test_search_finds_place_with_a_small_spelling_error(client: TestClient) -> None:
+    results = _search(client, "Bloqe A")
+
+    assert any(result["display_name"] == "Bloque A" for result in results)
+
+
 def test_search_category_fallback_returns_all_toilets(client: TestClient) -> None:
     response = client.get("/api/places/search", params={"q": "baños", "limit": 10})
     assert response.status_code == 200
     results = response.json()["results"]
     assert len(results) >= 4
     assert all(result["subcategory"] == "toilets" for result in results)
+
+
+def test_search_corrects_a_known_category_typo_before_querying_places(client: TestClient) -> None:
+    results = _search(client, "restuarante", limit=10)
+
+    assert results
+    assert all(result["subcategory"] == "restaurant" for result in results)
 
 
 def test_patomar_override_is_searchable_by_name_and_internal_categories(client: TestClient) -> None:
