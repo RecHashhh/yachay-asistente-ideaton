@@ -1,0 +1,9 @@
+{
+  "purpose": "Experimento acotado de contexto. Las salidas pueden traducir la instrucción completa; no activar automáticamente.",
+  "items": [
+    { "key": "cancel", "targetEs": "Cancelar", "es": "Traduce al kichwa ecuatoriano solamente la etiqueta entre comillas, sin explicación. Contexto: botón para abandonar una operación sin guardar cambios. Etiqueta: «Cancelar»." },
+    { "key": "steps", "targetEs": "Pasos", "es": "Traduce al kichwa ecuatoriano solamente la etiqueta entre comillas, sin explicación. Contexto: título de una lista de instrucciones para realizar un trámite, no pasos al caminar. Etiqueta: «Pasos»." },
+    { "key": "helloSub", "targetEs": "¿Qué trámite o lugar de Yachay Tech necesitas?", "es": "Traduce al kichwa ecuatoriano solamente la pregunta entre comillas, sin explicación. Contexto: asistente universitario que orienta sobre trámites administrativos y ubicaciones del campus. Pregunta: «¿Qué trámite o lugar de Yachay Tech necesitas?»" },
+    { "key": "copy", "targetEs": "Copiar respuesta", "es": "Traduce al kichwa ecuatoriano solamente la etiqueta entre comillas, sin explicación. Contexto: botón que copia el texto de la respuesta de un chatbot al portapapeles. Etiqueta: «Copiar respuesta»." }
+  ]
+}

@@ -7,6 +7,27 @@ const configuredApi = ((import.meta.env.VITE_API_URL as string | undefined) ?? '
 const API = import.meta.env.DEV && /^https?:\/\//.test(configuredApi) ? '/__yachi_api' : configuredApi;
 /** Sin VITE_API_URL el frontend funciona con el simulador (mock.ts). */
 export const MOCK = !API;
+/** Nombres que usa la vista del chat y del Portal: con backend todo es real; sin él, todo es de ejemplo. */
+export const CHAT_MOCK = MOCK;
+export const SAMPLE_DATA = MOCK;
+export interface TranslationReportInput {
+  messageId: string; lang: 'qu'; question: string; answer: string; fragment: string; correction: string;
+}
+export interface TranslationReportSaved { id: string; status: 'pending_review'; storage: 'server' | 'local' }
+export async function sendTranslationReport(report: TranslationReportInput): Promise<TranslationReportSaved> {
+  if (CHAT_MOCK) {
+    const key = 'yt-translation-reports';
+    const stored: unknown = JSON.parse(localStorage.getItem(key) ?? '[]');
+    if (!Array.isArray(stored)) throw new Error('Invalid report storage');
+    if (stored.length >= 100) throw new Error('Local report storage full');
+    const saved = { ...report, id: crypto.randomUUID(), status: 'pending_review' as const, at: new Date().toISOString() };
+    localStorage.setItem(key, JSON.stringify([...stored, saved]));
+    return { id: saved.id, status: 'pending_review', storage: 'local' };
+  }
+  const saved = await json<{ id: string; status: 'pending_review' }>('/translation-reports', { method: 'POST', body: JSON.stringify(report) });
+  if (!saved.id || saved.status !== 'pending_review') throw new Error('Unexpected report response');
+  return { ...saved, storage: 'server' };
+}
 
 const ADMIN_TOKEN_KEY = 'yt-admin-token';
 const adminToken = () => { try { return sessionStorage.getItem(ADMIN_TOKEN_KEY) ?? ''; } catch { return ''; } };
@@ -23,16 +44,42 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
   return r.json() as Promise<T>;
 }
 
+const connectionError = (lang: ChatRequest['lang']) => lang === 'en'
+  ? 'Could not connect to the assistant. Check that the backend is running and try again.'
+  : 'No se pudo conectar con el asistente. Comprueba que el backend esté activo e inténtalo de nuevo.';
+
+/** Mensaje legible para un error del backend (FastAPI responde {"detail": ...}); traduce los códigos conocidos. */
+async function responseError(response: Response, lang: ChatRequest['lang']): Promise<Error> {
+  const body = await response.text().catch(() => '');
+  let detail = body;
+  try {
+    const parsed = JSON.parse(body) as { detail?: unknown };
+    if (typeof parsed.detail === 'string') detail = parsed.detail;
+  } catch { /* puede ser texto plano */ }
+  const known: Record<string, [string, string]> = {
+    database_unavailable: ['La base de datos no está disponible. Inténtalo de nuevo en unos minutos.', 'The database is unavailable. Please try again shortly.'],
+    rag_index_empty: ['La base de documentos todavía no está indexada.', 'The document index is not ready yet.'],
+  };
+  const translated = known[detail];
+  if (translated) return new Error(lang === 'en' ? translated[1] : translated[0]);
+  if (response.status === 429 && !detail) detail = lang === 'en' ? 'You are sending too many messages. Please wait a minute.' : 'Estás enviando muchos mensajes seguidos. Espera un minuto y vuelve a intentarlo.';
+  return new Error(detail || connectionError(lang));
+}
+
 /** Chat por SSE: POST /chat con ChatRequest y respuesta text/event-stream, un StreamEvent por bloque `data:`. */
 export async function* streamChat(req: ChatRequest, signal?: AbortSignal): AsyncGenerator<StreamEvent> {
   if (MOCK) { yield* mock.mockChat(req, signal); return; }
-  const r = await fetch(`${API}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify(req), signal });
-  if (r.status === 429) {
-    // Límite de mensajes por minuto: el servidor explica cuánto esperar.
-    const detail = await r.json().then((b: { detail?: string }) => b.detail).catch(() => undefined);
-    throw new Error(detail ?? 'Estás enviando muchos mensajes seguidos. Espera un minuto y vuelve a intentarlo.');
+  let r: Response;
+  try {
+    r = await fetch(`${API}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify(req), signal });
+  } catch (error) {
+    if ((error as Error).name === 'AbortError') throw error;
+    throw new Error(connectionError(req.lang));
   }
-  if (!r.ok || !r.body) throw new Error(`El asistente no respondió (${r.status})`);
+  if (!r.ok) throw await responseError(r, req.lang);
+  if (!r.body || !r.headers.get('content-type')?.includes('text/event-stream')) {
+    throw new Error(req.lang === 'en' ? 'The backend returned an unexpected response.' : 'El backend devolvió una respuesta inesperada.');
+  }
   const reader = r.body.pipeThrough(new TextDecoderStream()).getReader();
   let buf = '';
   for (;;) {
@@ -78,6 +125,10 @@ export interface RegisteredInquiry {
   transcript: string | null; status: 'nueva' | 'en_atencion' | 'resuelta'; created_at: string;
 }
 export const listInquiries = (): Promise<RegisteredInquiry[]> => MOCK ? Promise.resolve([]) : json('/admin/inquiries');
+
+/** Bitácora del Portal: quién cambió la base de conocimiento y cuándo (últimas 200 acciones). */
+export interface AuditEntry { at: string; email: string; action: string; target: string | null }
+export const listAudit = (): Promise<AuditEntry[]> => (MOCK ? Promise.resolve([]) : json('/admin/audit'));
 export const updateInquiry = (code: string, status: RegisteredInquiry['status']): Promise<void> =>
   json(`/admin/inquiries/${encodeURIComponent(code)}`, { method: 'PATCH', body: JSON.stringify({ status }) });
 export function updateInbox(id: string, patch: Partial<Pick<inbox.InboxItem, 'status' | 'controlId'>>): Promise<void> {

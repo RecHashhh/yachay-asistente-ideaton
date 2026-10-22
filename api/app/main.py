@@ -20,6 +20,7 @@ from . import filters, graph, procedures, processing, rules
 from .config import API_DIR, settings
 from .db import conn, open_pool
 from .search import vectors
+from .schemas import TranslationReportRequest, TranslationReportResponse
 
 
 def purge() -> None:
@@ -54,13 +55,24 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Yachi API", version="0.1.0", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=[settings.frontend_origin], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins, allow_methods=["*"], allow_headers=["*"])
 
 # ------------------------------------------------------------------ chat
 
+class SourcePayload(BaseModel):
+    """Fuente que el frontend devuelve con un turno anterior; el agente la revalida contra el índice antes de reutilizarla."""
+    docId: str = Field(max_length=200)
+    title: str = Field(max_length=300)
+    version: str | None = Field(default=None, max_length=120)
+    docDate: str | None = None
+    locator: str | None = Field(default=None, max_length=300)
+    snippet: str | None = Field(default=None, max_length=900)
+
+
 class Turn(BaseModel):
     role: str
-    content: str
+    content: str = Field(max_length=6000)
+    sources: list[SourcePayload] | None = Field(default=None, max_length=10)
 
 
 class ChatRequest(BaseModel):
@@ -90,7 +102,7 @@ async def chat(req: ChatRequest, request: Request):
 
     async def events():
         try:
-            async for ev in graph.run(req.message, "es" if lang == "qu" else lang, [t.model_dump() for t in req.history[-6:]], req.sessionId):
+            async for ev in graph.run(req.message, lang, [t.model_dump(exclude_none=True) for t in req.history[-6:]], req.sessionId):
                 yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
         except Exception as e:  # el cliente ve un error legible; el detalle queda en el log del servidor
             print("Error en /chat:", repr(e))
@@ -101,6 +113,33 @@ async def chat(req: ChatRequest, request: Request):
 
 
 # ------------------------------------------------------------------ público
+
+@app.post('/translation-reports', response_model=TranslationReportResponse, status_code=201)
+def translation_report(request: TranslationReportRequest):
+    report_id = str(uuid.uuid4())
+    try:
+        with conn() as c:
+            c.execute('INSERT INTO translation_reports (id, message_id, question, answer, fragment, correction, status) '
+                      'VALUES (%s, %s, %s, %s, %s, %s, %s)',
+                      (report_id, request.messageId, request.question, request.answer, request.fragment,
+                       request.correction, 'pending_review'))
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail='translation_report_unavailable') from exc
+    return TranslationReportResponse(id=report_id)
+
+@app.get("/health")
+def health():
+    """Estado del índice (para el balanceador o docker-compose): 503 si la base no responde o no hay fragmentos."""
+    try:
+        with conn() as c:
+            r = c.execute("SELECT (SELECT count(*) FROM documents WHERE is_current AND status = 'indexado') AS d, "
+                          "(SELECT count(*) FROM chunks WHERE embedding IS NOT NULL) AS c").fetchone()
+    except Exception as exc:
+        raise HTTPException(503, "database_unavailable") from exc
+    if not r["c"]:
+        raise HTTPException(503, "rag_index_empty")
+    return {"status": "ok", "documents": r["d"], "chunks": r["c"], "agent": settings.agent_enabled}
+
 
 @app.get('/procedures')
 def public_procedures(lang: str = 'es'):

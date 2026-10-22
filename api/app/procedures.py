@@ -108,8 +108,34 @@ def match(question: str, items: list[dict] | None = None) -> dict | None:
             continue
         for t in p["triggers"]:
             if f" {t} " in n and (best is None or len(t) > best[0]):
-                best = (len(t), p)
-    return best[1] if best else None
+                best = (len(t), p, t)
+    if not best:
+        return None
+    return _more_specific(n, best[1], best[2], _all() if items is None else items)
+
+
+def _distinctive(p: dict, others: list[dict]) -> set[str]:
+    """Palabras que aparecen en la mitad o más de las frases de un trámite y en ninguna de otro (p. ej. «nivelacion»)."""
+    other_words = {w for o in others if o["id"] != p["id"] for t in o["triggers"] for w in t.split()}
+    counts: dict[str, int] = {}
+    for t in p["triggers"]:
+        for w in set(t.split()):
+            counts[w] = counts.get(w, 0) + 1
+    return {w for w, c in counts.items() if len(w) > 3 and c * 2 >= len(p["triggers"]) and w not in other_words}
+
+
+def _more_specific(n: str, chosen: dict, trigger: str, items: list[dict]) -> dict:
+    """«Estoy en nivelación… retiro voluntario»: la frase «retiro voluntario» es de retiro de carrera, pero «nivelación» es
+    distintiva de retiro de nivelación, que comparte el tema («retiro»). Gana el trámite más específico."""
+    words = set(n.split())
+    topic = {w for w in trigger.split() if len(w) > 3}
+    for p in items:
+        if p["id"] == chosen["id"]:
+            continue
+        shares_topic = any(topic & set(t.split()) for t in p["triggers"])
+        if shares_topic and _distinctive(p, items) & words and not _distinctive(chosen, items) & words:
+            return p
+    return chosen
 
 
 

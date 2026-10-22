@@ -1,0 +1,37 @@
+{
+  "cases": [
+    {
+      "width": 1280,
+      "mode": "local",
+      "savedPending": true,
+      "download": true,
+      "retryPreservesText": false,
+      "pageErrors": []
+    },
+    {
+      "width": 1280,
+      "mode": "server",
+      "savedPending": true,
+      "download": true,
+      "retryPreservesText": true,
+      "pageErrors": []
+    },
+    {
+      "width": 390,
+      "mode": "local",
+      "savedPending": true,
+      "download": true,
+      "retryPreservesText": false,
+      "pageErrors": []
+    },
+    {
+      "width": 390,
+      "mode": "server",
+      "savedPending": true,
+      "download": true,
+      "retryPreservesText": true,
+      "pageErrors": []
+    }
+  ],
+  "realModelCalled": false
+}

@@ -1,0 +1,58 @@
+{
+  "source": "https://alki.ec/",
+  "purpose": "Comparar contexto y comas; no sustituye las etiquetas originales",
+  "items": [
+    {
+      "key": "cancel",
+      "es": "Traduce al kichwa ecuatoriano solamente la etiqueta entre comillas, sin explicación. Contexto: botón para abandonar una operación sin guardar cambios. Etiqueta: «Cancelar».",
+      "qu": "«Ñukay»",
+      "observedAt": "2026-10-22T15:50:00.830Z",
+      "method": "Interfaz pública con Playwright",
+      "providerLabel": "No identificado",
+      "placeholdersOk": true,
+      "flags": [],
+      "status": "pendiente_revision_humana",
+      "reviewedBy": null,
+      "approved": false
+    },
+    {
+      "key": "steps",
+      "es": "Traduce al kichwa ecuatoriano solamente la etiqueta entre comillas, sin explicación. Contexto: título de una lista de instrucciones para realizar un trámite, no pasos al caminar. Etiqueta: «Pasos».",
+      "qu": "«Rishunchik»",
+      "observedAt": "2026-10-22T15:50:04.643Z",
+      "method": "Interfaz pública con Playwright",
+      "providerLabel": "No identificado",
+      "placeholdersOk": true,
+      "flags": [],
+      "status": "pendiente_revision_humana",
+      "reviewedBy": null,
+      "approved": false
+    },
+    {
+      "key": "helloSub",
+      "es": "Traduce al kichwa ecuatoriano solamente la pregunta entre comillas, sin explicación. Contexto: asistente universitario que orienta sobre trámites administrativos y ubicaciones del campus. Pregunta: «¿Qué trámite o lugar de Yachay Tech necesitas?»",
+      "qu": "«¿Ima trámite o llakta Yachay Techmanta yuyayki?»",
+      "observedAt": "2026-10-22T15:50:08.953Z",
+      "method": "Interfaz pública con Playwright",
+      "providerLabel": "No identificado",
+      "placeholdersOk": true,
+      "flags": [],
+      "status": "pendiente_revision_humana",
+      "reviewedBy": null,
+      "approved": false
+    },
+    {
+      "key": "copy",
+      "es": "Traduce al kichwa ecuatoriano solamente la etiqueta entre comillas, sin explicación. Contexto: botón que copia el texto de la respuesta de un chatbot al portapapeles. Etiqueta: «Copiar respuesta».",
+      "qu": "«Rikch'ari rimanakuy»",
+      "observedAt": "2026-10-22T15:50:13.133Z",
+      "method": "Interfaz pública con Playwright",
+      "providerLabel": "No identificado",
+      "placeholdersOk": true,
+      "flags": [],
+      "status": "pendiente_revision_humana",
+      "reviewedBy": null,
+      "approved": false
+    }
+  ]
+}

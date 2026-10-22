@@ -5,6 +5,14 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
+__pycache__/
+.pytest_cache/
+*.py[cod]
+
+# Corpus preparado (fuente institucional): solo se versionan las descripciones y el README.
+rag/*
+!rag/descripciones.csv
+!rag/README.md
 
 # Documentos fuente del reto: confidenciales (sección 7 del planteamiento). No subir al repositorio público.
 docs/*.pdf
@@ -29,3 +37,4 @@ docs/auditoria-integral-2026-10-20/index.html
 .codebase-memory/
 __pycache__/
 *.pyc
+api/app/data/*.local.json

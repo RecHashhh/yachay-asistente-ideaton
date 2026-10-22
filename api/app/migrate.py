@@ -1,11 +1,29 @@
-"""Aplica el esquema (todos los sql/*.sql en orden) y siembra los filtros: `python -m app.migrate`."""
+"""Aplica el esquema (todos los sql/*.sql en orden), siembra los filtros y carga las descripciones del catálogo: `python -m app.migrate`."""
 
+import csv
 from pathlib import Path
 
 import psycopg
 
 from .config import settings
 from .filters import DEFAULT_TERMS
+
+ROOT = Path(__file__).resolve().parent.parent.parent
+# El catálogo del agente usa otros nombres para dos fuentes de datos del campus.
+DESCRIPTION_ALIASES = {"distribucion_de_aulas_del_campus": "distribucion_aulas", "sitios_importantes_del_campus": "puntos_importantes_universidad"}
+
+
+def load_descriptions(c: psycopg.Connection) -> int:
+    """rag/descripciones.csv (versionado) → documents.description. Devuelve cuántos documentos quedaron descritos."""
+    # En el contenedor el corpus (con las descripciones) se monta en RAG_DIR; en desarrollo están en rag/ del repositorio.
+    path = next((p for p in (settings.rag_dir / "descripciones.csv", ROOT / "rag" / "descripciones.csv") if p.exists()), None)
+    if path is None:
+        return 0
+    n = 0
+    for r in csv.DictReader(path.open(encoding="utf-8")):
+        doc_id = DESCRIPTION_ALIASES.get(r["doc_id"], r["doc_id"])
+        n += c.execute("UPDATE documents SET description = %s WHERE id = %s", (r["descripcion"].strip(), doc_id)).rowcount
+    return n
 
 
 def main() -> None:
@@ -18,7 +36,8 @@ def main() -> None:
         for cat, terms in DEFAULT_TERMS.items():
             for t in terms:
                 c.execute("INSERT INTO filter_terms (category, term) VALUES (%s, %s) ON CONFLICT DO NOTHING", (cat, t))
-    print("Esquema aplicado.")
+        n = load_descriptions(c)
+    print(f"Esquema aplicado. {n} documentos con descripción para el catálogo del agente.")
 
 
 if __name__ == "__main__":

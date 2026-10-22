@@ -8,12 +8,13 @@ import { Markdown } from '../components/Markdown';
 import { Mascot } from '../components/Mascot';
 import { ProcedureCard, UnknownCard } from '../components/ProcedureCard';
 import { IcSpeaker, IcExternal, IcSpark, IcCheck, IcClose, IcCopy, IcDown, IcArrowDown, IcExpand, IcGlobe, IcInfo, IcLock, IcShield, IcMenu, IcMoon, IcPlus, IcRetry, IcSun, IcTrend, IcUp } from '../components/icons';
-import { docHref, getTopics, getTrends, sendFeedback, streamChat } from '../lib/api';
+import { CHAT_MOCK, docHref, getTopics, getTrends, sendFeedback, streamChat } from '../lib/api';
 import { displayStream } from '../lib/displayStream';
 import { LANGS, detectLang, locatorLabel, topicLabel, useT, type Lang } from '../lib/i18n';
 import { placeById, placeName } from '../lib/campus';
 import { ChatList } from '../components/ChatList';
 import { ClarifyCard, FeedbackPanel } from '../components/Feedback';
+import { TranslationReport } from '../components/TranslationReport';
 import { VoiceMode } from '../components/VoiceMode';
 import { loadPrefs, speak, stopSpeaking, toSpeech, ttsSupported } from '../lib/speech';
 import type { FeedbackReason } from '../lib/inbox';
@@ -23,6 +24,7 @@ import { ActivityPanel } from '../components/ActivityPanel';
 interface Msg {
   id: string;
   role: 'user' | 'assistant';
+  lang?: Lang;
   text: string;
   files?: Attachment[];
   status?: string;
@@ -179,6 +181,10 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
   async function send(raw: string, base: Msg[] = msgs, att: Attachment[] = files, piiMode?: 'skip') {
     let text = raw.trim();
     if ((!text && !att.length) || busy || !consent) return;
+    if (!CHAT_MOCK && att.length) {
+      setToastMsg(t('chatTextOnly'));
+      return;
+    }
     if (piiMode !== 'skip' && (PII_ID.test(text) || PII_EMAIL.test(text))) {
       setPii({ text, base, att }); setInput(text); return;
     }
@@ -189,8 +195,12 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
     setAwayFromEnd(false);
     setInput(''); setFiles([]);
     const user: Msg = { id: uid(), role: 'user', text, files: att.length ? att : undefined };
-    const ai: Msg = { id: uid(), role: 'assistant', text: '', streaming: true, status: t('thinking') };
-    const history: ChatTurn[] = base.filter((m) => !m.error && m.text).slice(-HISTORY_TURNS).map((m) => ({ role: m.role, content: m.text }));
+    const ai: Msg = { id: uid(), role: 'assistant', lang, text: '', streaming: true, status: t('thinking') };
+    const history: ChatTurn[] = base.filter((m) => !m.error && m.text).slice(-HISTORY_TURNS).map((m) => ({
+      role: m.role,
+      content: m.text,
+      ...(m.role === 'assistant' && m.sources?.length ? { sources: m.sources } : {}),
+    }));
     setMsgs([...base, user, ai]);
     const ctrl = new AbortController();
     abort.current = ctrl;
@@ -285,7 +295,7 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
   const composer = (
     <motion.div layoutId={composerId} layout="position" transition={{ layout: { duration: reducedMotion ? 0 : 0.3, ease: [0.2, 0.8, 0.2, 1] } }}>
     <Composer value={input} onChange={setInput} files={files} onFiles={setFiles} onSend={() => void send(input)} onStop={stop} busy={busy}
-      disabled={!consent} autoFocus={empty && !embed} hints={empty ? [] : hints} onHint={(q) => void send(q)} toast={setToastMsg} onVoice={() => setVoiceOpen(true)} />
+      disabled={!consent} attachmentsEnabled={CHAT_MOCK} autoFocus={empty && !embed} hints={empty ? [] : hints} onHint={(q) => void send(q)} toast={setToastMsg} onVoice={() => setVoiceOpen(true)} />
     </motion.div>
   );
 
@@ -337,6 +347,7 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
             <button className="icon-btn" aria-label={t('recent')} aria-controls="chat-sidebar" aria-expanded={window.matchMedia('(max-width: 820px)').matches ? mobileRail : railOpen} onClick={() => (window.matchMedia('(max-width: 820px)').matches ? setMobileRail(true) : setRailOpen((o) => !o))}><IcMenu /></button>
           )}
           <h1 className="title">{BRAND.mascotName}</h1>
+          {CHAT_MOCK && <span className="badge-demo" title={t('demoTitle')}>{t('demo')}</span>}
           <span className="sp" />
           {langSelect}
           {!embed && <button className="icon-btn" aria-label={theme === 'dark' ? t('themeLight') : t('themeDark')} title={theme === 'dark' ? t('themeLight') : t('themeDark')} onClick={toggleTheme}>{theme === 'dark' ? <IcSun /> : <IcMoon />}</button>}
@@ -410,6 +421,7 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
               </motion.div>
             </div>
             <div className="composer-wrap">
+              {lang === 'qu' && <p className="kichwa-note" role="note">{t('kichwaNote')}</p>}
               {awayFromEnd && <button className="jump-to-latest" onClick={() => {
                 followEnd.current = true; setAwayFromEnd(false);
                 scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: reducedMotion ? 'instant' : 'smooth' });
@@ -470,12 +482,13 @@ function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAs
         <AnimatePresence mode="wait">
           {m.streaming && m.status && !(m.steps && m.steps.length > 0) && (
             <motion.span key={m.status} className="status" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.2 }}>
-              <span className="working">{m.status}…</span>
+              <span className="working">{m.status.replace(/[.…]+$/, '')}…</span>
             </motion.span>
           )}
         </AnimatePresence>
         {m.map && !mapAfter && <CampusMap action={m.map} />}
         {m.text && <div className={extractive ? 'extractive-answer' : undefined}>
+          {m.lang === 'qu' && <p className="small muted" lang="es">Kichwa · experimental</p>}
           {extractive && <p className="extractive-label">{lang === 'en' ? 'Document excerpt' : 'Fragmento del documento'}</p>}
           <Markdown text={answerText} animate={!!m.streaming} />
           {extractive && <p className="extractive-note">{lang === 'en' ? 'Literal text from the source, without an AI-written summary.' : 'Texto literal de la fuente, sin resumen redactado por IA.'}</p>}
@@ -491,7 +504,7 @@ function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAs
           <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div className="sources" aria-label={t('sources')}>
               {m.sources.map((s) => (
-                <button key={srcKey(s)} className="src" aria-expanded={openSrc === srcKey(s)} onClick={() => setOpenSrc(openSrc === srcKey(s) ? null : srcKey(s))} title={`${s.title} · ${s.version} · ${s.docDate}`}>
+                <button key={srcKey(s)} className="src" aria-expanded={openSrc === srcKey(s)} onClick={() => setOpenSrc(openSrc === srcKey(s) ? null : srcKey(s))} title={`${s.title} · ${s.version}${s.docDate ? ` · ${s.docDate}` : ''}`}>
                   <span className="kind">{s.version}</span><span className="t">{s.title}</span>
                 </button>
               ))}
@@ -500,7 +513,7 @@ function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAs
               {src && (
                 <motion.div className="src-detail" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
                   <b>{src.title}</b>
-                  <span className="mono small">{t('version')} {src.version}{src.periodo && src.periodo !== src.version ? ` · ${src.periodo}` : ''} · {src.dateKind === 'consulta' ? t('consultedOn') : t('docOf')} {src.docDate}{src.locator ? ` · ${locatorLabel(src.locator, lang)}` : ''}</span>
+                  <span className="mono small">{t('version')} {src.version}{src.periodo && src.periodo !== src.version ? ` · ${src.periodo}` : ''} {src.docDate ? ` · ${src.dateKind === 'consulta' ? t('consultedOn') : t('docOf')} ${src.docDate}` : ''}{src.locator ? ` · ${locatorLabel(src.locator, lang)}` : ''}</span>
                   <span lang="es">“{src.snippet}”{t('originalQuote') && <span className="small" lang={lang}> ({t('originalQuote')})</span>}</span>
                   <span className="row" style={{ marginTop: 4 }}>
                     {src.url && (
@@ -531,6 +544,8 @@ function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAs
           <FeedbackPanel office={m.procedure?.office ?? (lang === 'en' ? "Registrar's Office" : 'Secretaría General')} question={question ?? ''} transcript={transcript} onReason={onReason} />
         )}
 
+        {!m.streaming && m.lang === 'qu' && !!m.text && <TranslationReport messageId={m.serverId ?? m.id} question={question ?? ''} answer={m.text} />}
+
         {!m.streaming && m.suggestions && m.suggestions.length > 0 && (
           <div className="follow">
             {m.suggestions.map((q, i) => (
@@ -559,13 +574,13 @@ function AboutDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
                 <li><b>Only official documents.</b> It answers from regulations, calendars and procedures uploaded by the university. Every answer shows the document, version and date.</li>
                 <li><b>No official information, no answer.</b> If no document supports the answer, it says so and gives you the office to contact.</li>
                 <li><b>Step-by-step procedures:</b> what it is, what you need, in which order and where.</li>
-                <li><b>Spanish and English</b>, with automatic detection. Kichwa greeting in beta.</li>
+                <li><b>Spanish and English</b>, with automatic detection. Experimental Kichwa conversation with translation reports.</li>
                 <li><b>Checked regularly</b> against a set of control questions with known answers.</li>
               </> : <>
                 <li><b>Solo documentos oficiales.</b> Responde con reglamentos, calendarios y procedimientos cargados por la universidad. Cada respuesta muestra el documento, la versión y la fecha.</li>
                 <li><b>Sin información oficial, no responde.</b> Si ningún documento respalda la respuesta, lo indica y te da la dependencia a la que puedes acudir.</li>
                 <li><b>Trámites paso a paso:</b> qué es, qué necesitas, en qué orden y dónde.</li>
-                <li><b>Español e inglés</b>, con detección automática. Saludo en kichwa en prueba.</li>
+                <li><b>Español e inglés</b>, con detección automática. Conversación experimental en kichwa con reportes de traducción.</li>
                 <li><b>Se verifica</b> con un set de preguntas de control con respuesta conocida.</li>
               </>}
             </ul>

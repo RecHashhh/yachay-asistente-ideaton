@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
-import { addControlCase, listControlCases, listInbox, replaceControlSet, runControl, updateInbox, type ControlResult, type InboxItem } from '../lib/api';
+import { MOCK, addControlCase, listControlCases, listInbox, replaceControlSet, runControl, updateInbox, type ControlResult, type InboxItem } from '../lib/api';
 import type { DocMeta } from '../lib/types';
 
 // ---------------------------------------------------------------------------
@@ -134,7 +134,10 @@ export function Validation() {
           </tbody>
         </table>
       </div>
-      <p className="small muted">Con datos de ejemplo, el resultado mide el simulador, no un modelo real. El set definitivo se arma con los documentos del Día 1: al menos 100 preguntas por mitades en español e inglés, y un 20 % que deben responderse con "sin información oficial". Usa «Importar CSV» para cargarlo y «Exportar resultados» para adjuntar la evidencia al paper.</p>
+      <p className="small muted">{MOCK
+        ? 'Con datos de ejemplo, el resultado mide el simulador, no un modelo real.'
+        : 'Se evalúa contra el backend real. Sin clave de Anthropic se mide la búsqueda (se muestra el fragmento literal); con clave, cada pregunta que llega al modelo consume tokens (aprox. US$ 0,001 a 0,008).'}{' '}
+        Usa «Importar CSV» para cargar o reemplazar el set y «Exportar resultados» para adjuntar la evidencia al paper.</p>
     </>
   );
 }

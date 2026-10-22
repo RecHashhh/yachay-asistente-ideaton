@@ -3,12 +3,13 @@
 const fs = require('node:fs'), path = require('node:path');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || require.resolve('playwright', { paths: [path.resolve('web')] }));
 const variants = process.argv.includes('--variants');
-const base = path.resolve('docs/kichwa-alki-2026-10-22'), file = path.join(base, variants ? 'variantes-resultados.json' : 'muestras.json');
+const context = process.argv.includes('--context');
+const base = path.resolve('docs/kichwa-alki-2026-10-22'), file = path.join(base, context ? 'contexto-resultados.json' : variants ? 'variantes-resultados.json' : 'muestras.json');
 const samples = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : { source: 'https://alki.ec/', purpose: 'Comparar contexto y comas; no sustituye las etiquetas originales', items: [] };
 const all = process.argv.includes('--all');
-const queue = variants ? JSON.parse(fs.readFileSync(path.join(base, 'variantes-es.json'), 'utf8')).items : [...JSON.parse(fs.readFileSync(path.join(base, 'cola-es-qu.json'), 'utf8')).items,
+const queue = context ? JSON.parse(fs.readFileSync(path.join(base, 'contexto-pruebas.json'), 'utf8')).items : variants ? JSON.parse(fs.readFileSync(path.join(base, 'variantes-es.json'), 'utf8')).items : [...JSON.parse(fs.readFileSync(path.join(base, 'cola-es-qu.json'), 'utf8')).items,
   ...(all ? JSON.parse(fs.readFileSync(path.join(base, 'consultas-es.json'), 'utf8')).items : [])];
-const keys = all || variants ? queue.map(x => x.key) : ['send', 'cancel', 'copy', 'retry', 'steps', 'docs', 'hello'];
+const keys = all || variants || context ? queue.map(x => x.key) : ['send', 'cancel', 'copy', 'retry', 'steps', 'docs', 'hello'];
 function translation(data) {
   if (!data || typeof data !== 'object') return null;
   for (const key of ['translation', 'translated_text', 'translatedText', 'kichwa', 'result']) if (typeof data[key] === 'string' && data[key].trim()) return data[key].trim();
