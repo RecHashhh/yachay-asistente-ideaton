@@ -17,7 +17,8 @@ import { ClarifyCard, FeedbackPanel } from '../components/Feedback';
 import { VoiceMode } from '../components/VoiceMode';
 import { loadPrefs, speak, stopSpeaking, toSpeech, ttsSupported } from '../lib/speech';
 import type { FeedbackReason } from '../lib/inbox';
-import type { Attachment, ChatTurn, MapAction, Procedure, Source, Topic, Trend, Unknown } from '../lib/types';
+import type { Attachment, ChatTurn, MapAction, Procedure, ProcessStep, Source, Topic, Trend, Unknown } from '../lib/types';
+import { ActivityPanel } from '../components/ActivityPanel';
 
 interface Msg {
   id: string;
@@ -26,6 +27,8 @@ interface Msg {
   files?: Attachment[];
   status?: string;
   activity?: string[];
+  /** Pasos reales del proceso (panel de actividad). */
+  steps?: ProcessStep[];
   answerMode?: 'extractive';
   sources?: Source[];
   map?: MapAction;
@@ -198,6 +201,12 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
       const events = streamChat({ sessionId: chatId, message: text, lang, history, attachments: att.length ? att : undefined }, ctrl.signal);
       for await (const ev of displayStream(events, ctrl.signal, !!reducedMotion)) {
         if (ev.type === 'status') patch(ai.id, (m) => ({ status: ev.label, activity: [...new Set([...(m.activity ?? []), ev.label])].slice(-8) }));
+        else if (ev.type === 'step') patch(ai.id, (m) => {
+          const { type: _t, ...step } = ev;
+          const list = m.steps ?? [];
+          const i = list.findIndex((x) => x.id === step.id);
+          return { steps: i < 0 ? [...list, step] : list.map((x, k) => (k === i ? { ...x, ...step } : x)) };
+        });
         else if (ev.type === 'answer_mode') patch(ai.id, () => ({ answerMode: ev.mode }));
         else if (ev.type === 'token') patch(ai.id, (m) => ({ text: m.text + ev.text, status: m.status ?? (lang === 'en' ? 'Responding' : 'Respondiendo') }));
         else if (ev.type === 'tool') patch(ai.id, () => ({ map: ev.input }));
@@ -457,8 +466,9 @@ function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAs
     <motion.div className="msg-ai" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
       <Mascot size={36} mood={mood} decorative />
       <div className="body">
+        {m.steps && m.steps.length > 0 && <ActivityPanel steps={m.steps} streaming={!!m.streaming} latencyMs={m.latencyMs} />}
         <AnimatePresence mode="wait">
-          {m.streaming && m.status && (
+          {m.streaming && m.status && !(m.steps && m.steps.length > 0) && (
             <motion.span key={m.status} className="status" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.2 }}>
               <span className="working">{m.status}…</span>
             </motion.span>
