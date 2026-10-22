@@ -1,0 +1,8 @@
+{
+  "fuente": "Descripción del proyecto compartida por el usuario en la conversación del 22-10-2026",
+  "arquitectura_descrita": ["Recuperación aumentada con generación (RAG)", "Memoria semántica Qdrant", "Backend FastAPI y Gemini", "Revisión de correcciones por lingüistas y hablantes nativos antes de incorporarlas"],
+  "distincion": "La validación de correcciones incorporadas al corpus no confirma una revisión humana individual de cada salida nueva generada.",
+  "uso_en_yachi": "Frases completas de interfaz y ejemplos de consulta; se conservan procedencia y alertas técnicas. No se presenta la salida como validación institucional de Yachi.",
+  "alcance": {"interfaz": 110, "ejemplos_de_consulta": 12},
+  "no_verificado": ["Documentación pública del contrato de integración", "Condiciones de reutilización y redistribución", "Revisión lingüística individual de cada salida"]
+}

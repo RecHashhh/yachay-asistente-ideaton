@@ -1,0 +1,110 @@
+{
+  "source": "https://alki.ec/",
+  "purpose": "Comparar contexto y comas; no sustituye las etiquetas originales",
+  "items": [
+    {
+      "key": "copy.contexto",
+      "es": "Deseo copiar respuesta.",
+      "qu": "Ñukaka riksichik riksichik.",
+      "observedAt": "2026-10-22T15:35:10.721Z",
+      "method": "Interfaz pública con Playwright",
+      "providerLabel": "No identificado",
+      "placeholdersOk": true,
+      "flags": [],
+      "status": "pendiente_revision_humana",
+      "reviewedBy": null,
+      "approved": false
+    },
+    {
+      "key": "copy.coma",
+      "es": "Deseo, copiar respuesta.",
+      "qu": "Ñukaka, rishunchik respuesta.",
+      "observedAt": "2026-10-22T15:35:14.788Z",
+      "method": "Interfaz pública con Playwright",
+      "providerLabel": "No identificado",
+      "placeholdersOk": true,
+      "flags": [],
+      "status": "pendiente_revision_humana",
+      "reviewedBy": null,
+      "approved": false
+    },
+    {
+      "key": "copy.articulo",
+      "es": "Deseo copiar la respuesta.",
+      "qu": "Ñukaka riksichik riksichik.",
+      "observedAt": "2026-10-22T15:35:19.535Z",
+      "method": "Interfaz pública con Playwright",
+      "providerLabel": "No identificado",
+      "placeholdersOk": true,
+      "flags": [],
+      "status": "pendiente_revision_humana",
+      "reviewedBy": null,
+      "approved": false
+    },
+    {
+      "key": "copy.quiero",
+      "es": "Quiero copiar la respuesta.",
+      "qu": "Ñukaka riksichik riksichik.",
+      "observedAt": "2026-10-22T15:35:24.346Z",
+      "method": "Interfaz pública con Playwright",
+      "providerLabel": "No identificado",
+      "placeholdersOk": true,
+      "flags": [],
+      "status": "pendiente_revision_humana",
+      "reviewedBy": null,
+      "approved": false
+    },
+    {
+      "key": "send.contexto",
+      "es": "Deseo enviar el mensaje.",
+      "qu": "Ñukaka riksichik rimanakuy.",
+      "observedAt": "2026-10-22T15:35:28.593Z",
+      "method": "Interfaz pública con Playwright",
+      "providerLabel": "No identificado",
+      "placeholdersOk": true,
+      "flags": [],
+      "status": "pendiente_revision_humana",
+      "reviewedBy": null,
+      "approved": false
+    },
+    {
+      "key": "send.coma",
+      "es": "Deseo, enviar el mensaje.",
+      "qu": "Ñukaka, rishunchik mensaje.",
+      "observedAt": "2026-10-22T15:35:32.569Z",
+      "method": "Interfaz pública con Playwright",
+      "providerLabel": "No identificado",
+      "placeholdersOk": true,
+      "flags": [],
+      "status": "pendiente_revision_humana",
+      "reviewedBy": null,
+      "approved": false
+    },
+    {
+      "key": "demo.contexto",
+      "es": "Estos son datos de ejemplo.",
+      "qu": "Ima kawsaykuna chaymi.",
+      "observedAt": "2026-10-22T15:35:37.220Z",
+      "method": "Interfaz pública con Playwright",
+      "providerLabel": "No identificado",
+      "placeholdersOk": true,
+      "flags": [],
+      "status": "pendiente_revision_humana",
+      "reviewedBy": null,
+      "approved": false
+    },
+    {
+      "key": "version.contexto",
+      "es": "Esta es la versión del documento.",
+      "qu": "Ima kawsaykuna riksichik.",
+      "observedAt": "2026-10-22T15:35:41.009Z",
+      "method": "Interfaz pública con Playwright",
+      "providerLabel": "No identificado",
+      "placeholdersOk": true,
+      "flags": [],
+      "status": "pendiente_revision_humana",
+      "reviewedBy": null,
+      "approved": false
+    }
+  ]
+}

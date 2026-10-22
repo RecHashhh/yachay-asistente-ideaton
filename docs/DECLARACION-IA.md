@@ -4,6 +4,8 @@ Requisito obligatorio de la sección 13 del reto. Distingue qué decidió el equ
 
 ## Actualización verificable — 20 de octubre de 2026
 
+Actualización 22-10-2026: por solicitud del usuario se consultó Alki mediante Playwright para ocho textos públicos de interfaz. El sitio muestra la etiqueta «GEMINI»; no se verificó la arquitectura del proveedor. Los resultados permanecen como propuestas no aprobadas, con procedencia y alertas. Codex preparó la cola de 110 textos y el importador técnico de traducciones con revisión atribuida. No se declararon revisores humanos ficticios y, por solicitud del usuario, se activaron 101 propuestas de interfaz como vista previa, sin atribuirles aprobación lingüística. Este trabajo no traduce las respuestas institucionales ni valida kichwa con hablantes.
+
 En esta fase se utilizó **OpenAI Codex** como asistente de programación: cambios en React/TypeScript y Python, mascota vectorial y animaciones CSS, auditoría con Playwright, corrección de conexiones y errores, investigación web de chatbots institucionales y preparación de documentación. Los modelos exactos utilizados en todas las sesiones anteriores no se pueden reconstruir a partir de este repositorio; el equipo debe confirmar los identificadores antes de la entrega.
 
 El usuario decidió el enfoque minimalista, la identidad de Yachi, la adaptación de la mascota de referencia, la barra lateral colapsada y las prioridades de interacción. La IA asistió en código, propuestas visuales, investigación y borradores. La aprobación de una apariencia por el usuario no equivale a revisión humana de cada respuesta institucional, del código completo o del aviso legal.

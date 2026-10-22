@@ -1,0 +1,16 @@
+{
+  "items": [
+    { "key": "consulta.cambioCarrera", "es": "¿Cómo solicito un cambio de carrera?" },
+    { "key": "consulta.documentos", "es": "¿Qué documentos necesito?" },
+    { "key": "consulta.requisitos", "es": "¿Cuáles son los requisitos?" },
+    { "key": "consulta.fechas", "es": "¿Hasta qué fecha puedo presentar la solicitud?" },
+    { "key": "consulta.duracion", "es": "¿Cuánto tarda este trámite?" },
+    { "key": "consulta.residencia", "es": "¿Cómo solicito una residencia universitaria?" },
+    { "key": "consulta.biblioteca", "es": "¿Dónde está la biblioteca?" },
+    { "key": "consulta.ubicacion", "es": "¿Cómo llego a esta oficina?" },
+    { "key": "consulta.contacto", "es": "¿Con qué dependencia debo comunicarme?" },
+    { "key": "consulta.fuente", "es": "¿Cuál es el documento oficial de esta información?" },
+    { "key": "consulta.aclaracion", "es": "No entendí la respuesta. ¿Puedes explicarlo de otra manera?" },
+    { "key": "consulta.representantes", "es": "¿Cómo contacto a mis representantes estudiantiles?" }
+  ]
+}

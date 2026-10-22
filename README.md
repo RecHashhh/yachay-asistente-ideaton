@@ -71,6 +71,29 @@ En la base local se han curado nueve guías, incluyendo residencias y participac
 
 Prueba de interfaz: `node scripts/verificar-utilidad.cjs`, con los mismos requisitos de Playwright de arriba y datos sintéticos. Comprobación opcional de lectura real: `api/tests/verify_guides_live.py` desde `api`; verifica las guías del corpus local y el enrutamiento ES/EN, sin invocar al modelo ni registrar consultas. Las fechas de las convocatorias históricas no se actualizan por inferencia.
 
+### Kichwa: propuestas de Alki y revisión humana
+
+El 22-10-2026 se probó [Alki](https://alki.ec/) mediante su formulario público, con ocho textos breves de interfaz. Las propuestas y su procedencia están en `docs/kichwa-alki-2026-10-22/muestras.json`. Se detectaron resultados iguales al original y una respuesta en español pidiendo texto en vez de traducir. Las muestras no tienen aprobación lingüística. Por solicitud del usuario, se activó una vista previa de interfaz con las propuestas sin alertas técnicas. La etiqueta visible «GEMINI» identifica lo que muestra la interfaz, no demuestra qué entrenamiento o arquitectura usa el proveedor.
+
+Se preparó una cola de **110 textos actuales** en `cola-es-qu.json` y `revision.csv`. El CSV anterior de 81 textos se conserva como material histórico. Cada propuesta guarda clave, texto español, variables, procedencia y estado. No se descargó el diccionario completo ni se enviaron conversaciones, adjuntos o documentos institucionales.
+
+Flujo de revisión:
+
+1. `node scripts/kichwa-preparar.cjs` exporta los textos actuales. Si ya existe `revision.csv`, escribe `revision-propuestas.csv` para conservar la revisión anterior. `--replace-review` reemplaza el CSV: usar solo si no contiene trabajo humano que conservar.
+2. Un revisor competente en la variedad de kichwa ecuatoriano elegida completa `kichwa_revisado`, `revisado_por`, `fecha` (AAAA-MM-DD) y `aprobada=si`. La propuesta automática no cuenta como revisión.
+3. `python scripts/kichwa-aprobar.py --check` comprueba el CSV contra los textos actuales y sus variables.
+4. `python scripts/kichwa-aprobar.py` importa únicamente filas aprobadas al catálogo completo `web/src/lib/kichwa.approved.json`. Usar el CSV completo, no uno parcial. Con cero aprobaciones conserva la interfaz existente. Después ejecutar la compilación.
+
+El importador rechaza claves duplicadas, textos españoles que cambiaron, traducciones vacías, revisiones sin responsable/fecha y variables ausentes o repetidas. Cuatro pruebas verifican estas condiciones (`python -m unittest discover -s scripts -p test_kichwa_aprobar.py`). Esto verifica el contrato técnico, no la corrección lingüística.
+
+El muestreo acotado de `scripts/kichwa-muestrear-alki.cjs` usa Playwright y el formulario visible, reutiliza lo guardado y se detiene ante errores; no califica resultados, crea cuentas ni elude límites. La web usa una llamada a `https://api.alki.ec/translate`, observada en el navegador. No se encontró documentación pública de integración, licencia o límites en las páginas revisadas: confirmar con el equipo de Alki antes de conectar el servicio a producción o redistribuir conjuntos de datos. No hay dependencia de Alki en tiempo de ejecución del chat. Las respuestas institucionales, voz y corpus no se traducen mediante este flujo de interfaz.
+
+Ampliación solicitada: `node scripts/kichwa-muestrear-alki.cjs --all` consulta secuencialmente los 110 textos de interfaz y 12 ejemplos genéricos de consulta, reutilizando propuestas ya guardadas. `python scripts/kichwa-exportar-consultas.py` crea una hoja separada para revisar esas preguntas: no las confunde con claves de interfaz ni convierte por sí sola al backend en un chatbot conversacional kichwa. Se trabaja con frases completas, porque traducir palabras aisladas no conserva necesariamente la gramática ni el sentido de un botón o una consulta.
+
+Recopilación completada el 22-10-2026: **121 propuestas guardadas** (109 de interfaz y 12 preguntas); la clave `originalQuote` tiene texto español vacío y no se envió al traductor. Las 13 frases con variables conservaron sus marcadores. Seis resultados tienen alertas técnicas: tres iguales al original y tres respuestas meta en español. Esto no constituye una tasa de precisión lingüística. Las hojas finales son `revision.csv` (110 claves, incluida la vacía) y `consultas-revision.csv` (12 preguntas); el inventario comprobado está en `cobertura.json`. No quedan frases con contenido sin consultar dentro de este alcance. No se atribuyeron revisiones humanas. Se activaron 101 textos de interfaz en vista previa mediante scripts/kichwa-vista-previa.cjs; el informe está en vista-previa.json. Se conservan en español los fallos técnicos y las claves cuyo original cambió. Las traducciones aprobadas tienen prioridad sobre la vista previa. Los aportes del usuario obtenidos de Alki se conservan en aportes-conversacion.json.
+
+Según la descripción del proyecto compartida por el usuario, Alki emplea RAG, Qdrant y FastAPI/Gemini, y las correcciones aportadas por usuarios pasan por lingüistas/hablantes antes de incorporarse a la memoria. Ese proceso respalda la curación de su base; no documenta una revisión humana individual de cada salida nueva. Se conserva esa distinción en `contexto-alki.json` y en el registro de propuestas. Las alertas registran fallos observables, no una evaluación lingüística automática completa.
+
 ## Incrustar el asistente en cualquier página
 
 ```html

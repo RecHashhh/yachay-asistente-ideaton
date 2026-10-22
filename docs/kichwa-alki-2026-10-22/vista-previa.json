@@ -1,0 +1,42 @@
+{
+  "source": "https://alki.ec/",
+  "mode": "vista_previa_solicitada_por_usuario",
+  "approvedLinguistically": false,
+  "activeInterfaceKeys": 101,
+  "omitted": [
+    {
+      "key": "send",
+      "reason": "igual_al_original"
+    },
+    {
+      "key": "copy",
+      "reason": "respuesta_meta_en_espanol"
+    },
+    {
+      "key": "trending",
+      "reason": "origen_modificado"
+    },
+    {
+      "key": "demo",
+      "reason": "respuesta_meta_en_espanol"
+    },
+    {
+      "key": "version",
+      "reason": "respuesta_meta_en_espanol"
+    },
+    {
+      "key": "docOf",
+      "reason": "igual_al_original"
+    },
+    {
+      "key": "inqSend",
+      "reason": "igual_al_original"
+    },
+    {
+      "key": "kichwaNote",
+      "reason": "origen_modificado"
+    }
+  ],
+  "exampleQuestionsStored": 12,
+  "institutionalAnswersTranslated": false
+}
