@@ -517,6 +517,8 @@ async def generate(state: State) -> State:
             # No enviar una marca a medio escribir ("[F" al final).
             cut = clean.rfind("[")
             safe = clean if cut == -1 or "]" in clean[cut:] else clean[:cut]
+            # El espacio final se retiene: si sigue una marca, MARK lo borra y el texto ya enviado se correría (se perdían saltos de línea).
+            safe = safe.rstrip()
             if len(safe) > sent:
                 w({"type": "token", "text": safe[sent:]})
                 sent = len(safe)
