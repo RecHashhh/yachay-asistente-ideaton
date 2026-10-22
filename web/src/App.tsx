@@ -38,7 +38,14 @@ export function App() {
   const [lang, setLangState] = useState<Lang>(initialLang);
 
   useEffect(() => {
-    const on = () => setPage(route());
+    const on = () => {
+      setPage(route());
+      const requested = new URLSearchParams(location.hash.split('?')[1] ?? '').get('lang');
+      if (requested === 'es' || requested === 'en' || requested === 'qu') {
+        setLangState(requested);
+        try { localStorage.setItem(LANG_KEY, requested); } catch { /* sin almacenamiento */ }
+      }
+    };
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);
   }, []);
@@ -46,8 +53,7 @@ export function App() {
     document.documentElement.dataset.theme = theme;
     try { localStorage.setItem(THEME_KEY, theme); } catch { /* sin almacenamiento */ }
   }, [theme]);
-  // En kichwa casi todo sigue en español; el saludo lleva lang="qu-EC".
-  useEffect(() => { document.documentElement.lang = lang === 'qu' ? 'es' : lang; }, [lang]);
+  useEffect(() => { document.documentElement.lang = lang === 'qu' ? 'qu-EC' : lang; }, [lang]);
 
   const setLang = (l: Lang) => { setLangState(l); try { localStorage.setItem(LANG_KEY, l); } catch { /* sin almacenamiento */ } };
   const ctx = useMemo(() => ({ lang, t: makeT(lang) }), [lang]);

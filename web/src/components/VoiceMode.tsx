@@ -221,7 +221,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
   const mood = state === 'listening' ? 'happy' : state === 'thinking' ? 'thinking' : state === 'speaking' ? 'talking' : 'idle';
 
   return (
-    <motion.div className="voice" role="dialog" aria-modal="true" aria-labelledby="voice-title" onKeyDown={onKey} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    <motion.div lang={lang === 'qu' ? 'qu-EC' : lang} translate={lang === 'qu' ? 'no' : undefined} className="voice" role="dialog" aria-modal="true" aria-labelledby="voice-title" onKeyDown={onKey} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <header className="voice-top">
         <h1 id="voice-title" className="title">{x.title}</h1>
         <span className="sp" />
