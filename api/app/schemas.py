@@ -34,3 +34,19 @@ class HealthResponse(BaseModel):
     status: Literal["ok"]
     documents: int
     chunks: int
+
+
+class TranslationReportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    messageId: str = Field(min_length=1, max_length=100)
+    lang: Literal['qu'] = 'qu'
+    question: str = Field(default='', max_length=6000)
+    answer: str = Field(min_length=1, max_length=16000)
+    fragment: str = Field(min_length=1, max_length=2000)
+    correction: str = Field(default='', max_length=6000)
+
+
+class TranslationReportResponse(BaseModel):
+    id: str
+    status: Literal['pending_review'] = 'pending_review'

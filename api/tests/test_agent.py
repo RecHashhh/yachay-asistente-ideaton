@@ -370,7 +370,10 @@ async def test_kichwa_support_reaches_selection_and_answer_without_becoming_sour
     answer_prompt = model.answer_messages[0][0].content
     assert 'KICHWA LANGUAGE SUPPORT' in selector_prompt
     assert 'kawsay' in selector_prompt
-    assert 'Answer in Spanish' in answer_prompt
+    assert 'do not answer or translate the final response' in selector_prompt
+    assert 'Answer in Ecuadorian Kichwa' not in selector_prompt
+    assert 'Answer in Kichwa' in answer_prompt
+    assert 'concise Spanish' in answer_prompt
     assert 'NOT INSTITUTIONAL EVIDENCE' in answer_prompt
     values = [payload for mode, payload in events if mode == 'values'][-1]
     assert [item['doc_id'] for item in values['retrieved']] == ['d1']

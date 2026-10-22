@@ -14,6 +14,7 @@ import { LANGS, detectLang, locatorLabel, topicLabel, useT, type Lang } from '..
 import { placeById, placeName } from '../lib/campus';
 import { ChatList } from '../components/ChatList';
 import { ClarifyCard, FeedbackPanel } from '../components/Feedback';
+import { TranslationReport } from '../components/TranslationReport';
 import { VoiceMode } from '../components/VoiceMode';
 import { loadPrefs, speak, stopSpeaking, toSpeech, ttsSupported } from '../lib/speech';
 import type { FeedbackReason } from '../lib/inbox';
@@ -23,6 +24,7 @@ import { ActivityPanel } from '../components/ActivityPanel';
 interface Msg {
   id: string;
   role: 'user' | 'assistant';
+  lang?: Lang;
   text: string;
   files?: Attachment[];
   status?: string;
@@ -193,7 +195,7 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
     setAwayFromEnd(false);
     setInput(''); setFiles([]);
     const user: Msg = { id: uid(), role: 'user', text, files: att.length ? att : undefined };
-    const ai: Msg = { id: uid(), role: 'assistant', text: '', streaming: true, status: t('thinking') };
+    const ai: Msg = { id: uid(), role: 'assistant', lang, text: '', streaming: true, status: t('thinking') };
     const history: ChatTurn[] = base.filter((m) => !m.error && m.text).slice(-HISTORY_TURNS).map((m) => ({
       role: m.role,
       content: m.text,
@@ -419,6 +421,7 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
               </motion.div>
             </div>
             <div className="composer-wrap">
+              {lang === 'qu' && <p className="kichwa-note" role="note">{t('kichwaNote')}</p>}
               {awayFromEnd && <button className="jump-to-latest" onClick={() => {
                 followEnd.current = true; setAwayFromEnd(false);
                 scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: reducedMotion ? 'instant' : 'smooth' });
@@ -485,6 +488,7 @@ function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAs
         </AnimatePresence>
         {m.map && !mapAfter && <CampusMap action={m.map} />}
         {m.text && <div className={extractive ? 'extractive-answer' : undefined}>
+          {m.lang === 'qu' && <p className="small muted" lang="es">Kichwa · experimental</p>}
           {extractive && <p className="extractive-label">{lang === 'en' ? 'Document excerpt' : 'Fragmento del documento'}</p>}
           <Markdown text={answerText} animate={!!m.streaming} />
           {extractive && <p className="extractive-note">{lang === 'en' ? 'Literal text from the source, without an AI-written summary.' : 'Texto literal de la fuente, sin resumen redactado por IA.'}</p>}
@@ -540,6 +544,8 @@ function AssistantMsg({ m, question, transcript, onVote, onReason, onRetry, onAs
           <FeedbackPanel office={m.procedure?.office ?? (lang === 'en' ? "Registrar's Office" : 'Secretaría General')} question={question ?? ''} transcript={transcript} onReason={onReason} />
         )}
 
+        {!m.streaming && m.lang === 'qu' && !!m.text && <TranslationReport messageId={m.serverId ?? m.id} question={question ?? ''} answer={m.text} />}
+
         {!m.streaming && m.suggestions && m.suggestions.length > 0 && (
           <div className="follow">
             {m.suggestions.map((q, i) => (
@@ -568,13 +574,13 @@ function AboutDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
                 <li><b>Only official documents.</b> It answers from regulations, calendars and procedures uploaded by the university. Every answer shows the document, version and date.</li>
                 <li><b>No official information, no answer.</b> If no document supports the answer, it says so and gives you the office to contact.</li>
                 <li><b>Step-by-step procedures:</b> what it is, what you need, in which order and where.</li>
-                <li><b>Spanish and English</b>, with automatic detection. Kichwa greeting in beta.</li>
+                <li><b>Spanish and English</b>, with automatic detection. Experimental Kichwa conversation with translation reports.</li>
                 <li><b>Checked regularly</b> against a set of control questions with known answers.</li>
               </> : <>
                 <li><b>Solo documentos oficiales.</b> Responde con reglamentos, calendarios y procedimientos cargados por la universidad. Cada respuesta muestra el documento, la versión y la fecha.</li>
                 <li><b>Sin información oficial, no responde.</b> Si ningún documento respalda la respuesta, lo indica y te da la dependencia a la que puedes acudir.</li>
                 <li><b>Trámites paso a paso:</b> qué es, qué necesitas, en qué orden y dónde.</li>
-                <li><b>Español e inglés</b>, con detección automática. Saludo en kichwa en prueba.</li>
+                <li><b>Español e inglés</b>, con detección automática. Conversación experimental en kichwa con reportes de traducción.</li>
                 <li><b>Se verifica</b> con un set de preguntas de control con respuesta conocida.</li>
               </>}
             </ul>

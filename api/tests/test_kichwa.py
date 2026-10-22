@@ -43,7 +43,9 @@ def test_support_is_only_for_kichwa_and_not_institutional_evidence(monkeypatch):
     assert language_context('kawsay', 'en') == ''
     support = language_context('kawsay', 'qu')
     assert 'NOT INSTITUTIONAL EVIDENCE' in support
-    assert 'Answer in Spanish' in support
+    assert 'Answer in Ecuadorian Kichwa' in support
+    assert 'Answer in Spanish and' not in support
+    assert 'concise Spanish' in support
     assert 'no human-approved conversational translations yet' in support
     assert 'kawsay' in support
     assert 'https://alki.ec/gramatica' in support

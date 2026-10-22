@@ -1,0 +1,8 @@
+{
+  "realPostgres": true,
+  "endpointStatus": 201,
+  "storedStatus": "pending_review",
+  "syntheticDataOnly": true,
+  "testRowRemoved": true,
+  "realModelCalled": false
+}

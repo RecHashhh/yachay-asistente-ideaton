@@ -26,6 +26,7 @@ from langgraph.graph import END, START, StateGraph
 from . import contacts, filters, procedures, rules
 from .config import settings
 from .db import conn
+from .kichwa import language_context
 from .search import Hit, expand, hits_by_ids, hybrid
 
 client = anthropic.AsyncAnthropic() if settings.has_anthropic_key else None
@@ -190,6 +191,8 @@ async def route(state: State) -> State:
     base = {"question": q, "triage": t.kind, "sensitive": t.sensitive}
     if t.route == "crisis":
         return {**base, "route": "crisis"}
+    if state['lang'] == 'qu' and re.sub(r'[^\w\s]', '', q.casefold()).strip() in {'imanalla', 'alli puncha', 'alli chishi', 'alli tuta'}:
+        return {**base, 'triage': 'saludo', 'route': 'smalltalk'}
     if t.route == "smalltalk":
         return {**base, "route": "smalltalk"}
     if t.route == "ood":
@@ -256,6 +259,17 @@ async def out_of_domain(state: State) -> State:
 
 
 async def smalltalk(state: State) -> State:
+    if state['lang'] == 'qu' and client is not None and state.get('triage') in {'saludo', 'cierre'}:
+        response = await client.messages.create(
+            model=settings.anthropic_model, max_tokens=250,
+            system='You are Yachi. Respond briefly to this greeting or farewell only. Do not add institutional facts. '
+                   + language_context(state['question'], 'qu'),
+            messages=[{'role': 'user', 'content': state['question']}],
+        )
+        text = ''.join(getattr(part, 'text', '') for part in response.content).strip()
+        if text:
+            _say(text)
+            return {'kind': 'saludo', 'doc_ids': [], 'tokens_in': response.usage.input_tokens, 'tokens_out': response.usage.output_tokens}
     s = rules.smalltalk(state["question"], state["lang"], state.get("triage"))
     get_stream_writer()({"type": "clarify", "question": s["question"], "options": s["options"]})
     return {"kind": s["kind"], "doc_ids": []}
@@ -436,7 +450,8 @@ async def generate(state: State) -> State:
         msgs.pop(0)
     if msgs and msgs[-1]["role"] == "user":
         msgs.pop()
-    msgs.append({"role": "user", "content": f"IDIOMA: {'inglés' if lang == 'en' else 'español'}\n\nFRAGMENTOS:\n<fragmentos>\n{frags}\n</fragmentos>\n\n"
+    language = {'en': 'inglés', 'qu': 'kichwa ecuatoriano'}.get(lang, 'español')
+    msgs.append({"role": "user", "content": f"IDIOMA: {language}\n\nFRAGMENTOS:\n<fragmentos>\n{frags}\n</fragmentos>\n\n"
                                             f"PREGUNTA (texto del usuario):\n<pregunta>{_quote(state['question'])}</pregunta>"})
 
     buf, sent, cited = "", 0, set()
@@ -444,7 +459,8 @@ async def generate(state: State) -> State:
     w({"type": "status", "label": _t(lang, "Redactando respuesta", "Writing response")})
     _step("write", _t(lang, "Redactando solo con esos fragmentos", "Writing only from those excerpts"), "running")
     async with client.messages.stream(
-        model=settings.anthropic_model, max_tokens=900, system=SYSTEM, messages=msgs,
+        model=settings.anthropic_model, max_tokens=1400 if lang == 'qu' else 900,
+        system=SYSTEM + language_context(state['question'], lang), messages=msgs,
         thinking={"type": "disabled"}, cache_control={"type": "ephemeral"},
     ) as stream:
         async for text in stream.text_stream:

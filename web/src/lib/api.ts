@@ -10,6 +10,24 @@ export const MOCK = !API;
 /** Nombres que usa la vista del chat y del Portal: con backend todo es real; sin él, todo es de ejemplo. */
 export const CHAT_MOCK = MOCK;
 export const SAMPLE_DATA = MOCK;
+export interface TranslationReportInput {
+  messageId: string; lang: 'qu'; question: string; answer: string; fragment: string; correction: string;
+}
+export interface TranslationReportSaved { id: string; status: 'pending_review'; storage: 'server' | 'local' }
+export async function sendTranslationReport(report: TranslationReportInput): Promise<TranslationReportSaved> {
+  if (CHAT_MOCK) {
+    const key = 'yt-translation-reports';
+    const stored: unknown = JSON.parse(localStorage.getItem(key) ?? '[]');
+    if (!Array.isArray(stored)) throw new Error('Invalid report storage');
+    if (stored.length >= 100) throw new Error('Local report storage full');
+    const saved = { ...report, id: crypto.randomUUID(), status: 'pending_review' as const, at: new Date().toISOString() };
+    localStorage.setItem(key, JSON.stringify([...stored, saved]));
+    return { id: saved.id, status: 'pending_review', storage: 'local' };
+  }
+  const saved = await json<{ id: string; status: 'pending_review' }>('/translation-reports', { method: 'POST', body: JSON.stringify(report) });
+  if (!saved.id || saved.status !== 'pending_review') throw new Error('Unexpected report response');
+  return { ...saved, storage: 'server' };
+}
 
 const ADMIN_TOKEN_KEY = 'yt-admin-token';
 const adminToken = () => { try { return sessionStorage.getItem(ADMIN_TOKEN_KEY) ?? ''; } catch { return ''; } };

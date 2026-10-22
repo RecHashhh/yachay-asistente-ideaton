@@ -668,3 +668,10 @@ select option{background:var(--surface);color:var(--ink)}
   .adm-login-card{padding:32px 24px}
 }
 @media (max-width: 560px){ .adm-summary,.adm .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .adm-summary button:nth-child(2n),.adm .kpi:nth-child(2n){border-right:0} .adm-summary button,.adm .kpi{border-bottom:1px solid var(--line)} }
+/* Reporte opcional de traducción, integrado debajo de las acciones del mensaje. */
+.translation-report { margin-top: 8px; }
+.translation-report-trigger { color: var(--muted, #606a80); background: none; border: 0; padding: 4px 0; font: inherit; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.translation-report form { display: grid; gap: 8px; }
+.translation-report label { font-size: 13px; }
+.translation-report textarea { box-sizing: border-box; width: 100%; min-width: 0; resize: vertical; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; }
+.translation-report .row { flex-wrap: wrap; }
