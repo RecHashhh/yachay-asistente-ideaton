@@ -114,14 +114,14 @@ def smalltalk(q: str, lang: str, kind: str | None = None) -> dict | None:
 
 @dataclass
 class Triage:
-    route: str          # crisis, smalltalk, ood, denuncia, normal
+    route: str          # crisis, smalltalk, salud, ood, denuncia, normal
     question: str       # texto para buscar (sin saludo ni groserías, datos personales ocultos)
     kind: str | None = None
     sensitive: bool = False
 
 
 def triage(q: str, lang: str) -> Triage:
-    """Orden: datos personales → crisis → denuncia → manipulación → insulto → charla → fuera del ámbito → consulta."""
+    """Orden: datos personales → crisis → denuncia → manipulación → insulto → síntoma de salud → charla → fuera del ámbito → consulta."""
     q = filters.redact(q)
     v = filters.classify(q)
     if v.kind == "crisis":
@@ -130,6 +130,8 @@ def triage(q: str, lang: str) -> Triage:
         return Triage("denuncia", strip_greeting(v.clean), "denuncia", True)
     if v.kind in ("manipulacion", "respeto"):
         return Triage("smalltalk", q, v.kind, v.sensitive)
+    if v.kind == "salud":
+        return Triage("salud", q, "salud", True)
     s = smalltalk(v.clean, lang)
     if s:
         return Triage("smalltalk", q, s["kind"])
@@ -201,6 +203,14 @@ def split_origin(q: str) -> tuple[str, Place | None]:
         return q, None
     origin = place_lookup(m.group(2), need_intent=False)
     return (n[: m.start()] + " " + n[m.end():]).strip(), origin
+
+
+def place_by_id(pid: str) -> Place | None:
+    with conn() as c:
+        r = c.execute("SELECT id, name, name_en, uso, horario, lat, lon, maps_url, fuente FROM places WHERE id = %s", (pid,)).fetchone()
+    if not r:
+        return None
+    return Place(r["id"], r["name"], r["name_en"], r["uso"], r["horario"], r["lat"], r["lon"], r["maps_url"], r["fuente"])
 
 
 def place_lookup(q: str, need_intent: bool = True) -> Place | None:

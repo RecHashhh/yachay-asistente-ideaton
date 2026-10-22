@@ -5,22 +5,23 @@ import { useT, type Lang } from '../lib/i18n';
 import { earcon, listenOnce, loadPrefs, parseCommand, savePrefs, speak, stopSpeaking, sttSupported, toSpeech, ttsSupported, voicesFor, whenVoicesReady, type Spoken, type VoicePrefs } from '../lib/speech';
 import type { MapAction, Procedure, Source, Unknown } from '../lib/types';
 import { kichwaVoiceAvailable } from '../lib/kichwaTts';
+import { kichwaVoice, voiceLabels } from '../lib/voiceKichwa';
 import { trapFocus } from './ConsentDialog';
-import { IcClose, IcMic, IcStop } from './icons';
+import { IcClose, IcInfo, IcMic, IcStop } from './icons';
 import { Mascot } from './Mascot';
 
 export interface VoiceAnswer { id: string; text: string; streaming?: boolean; procedure?: Procedure; unknown?: Unknown; clarify?: { question: string; options: string[] }; map?: MapAction; sources?: Source[]; error?: string }
 
-type State = 'start' | 'idle' | 'listening' | 'thinking' | 'speaking';
+type State = 'start' | 'idle' | 'listening' | 'transcribing' | 'thinking' | 'speaking';
 
 const TEXT = {
   es: {
     title: `Modo voz de ${BRAND.mascotName}`,
     start: 'Empezar a hablar',
-    startHint: 'Presiona Enter o toca el botón. Después, la barra espaciadora para hablar o interrumpir.',
+    startHint: 'Habla con Yachi cuando quieras.',
     welcome: `Hola, soy ${BRAND.mascotName}. Estás en el modo voz. Haz tu pregunta después del sonido. Puedes decir "ayuda" en cualquier momento.`,
     help: 'Puedes preguntar por trámites, normativa, servicios y lugares del campus. En un trámite, di "siguiente", "anterior", "repetir" o "todos los pasos". Para responder una aclaración, di el número de la opción. También puedes decir "más despacio", "más rápido" o "salir". Con teclado: barra espaciadora para hablar, R para repetir, N para el siguiente paso y Escape para salir.',
-    listening: 'Te escucho…', thinking: 'Buscando en los documentos oficiales…', speaking: 'Hablando… (espacio para interrumpir)', idle: 'Listo. Presiona espacio o el botón para hablar.',
+    listening: 'Te escucho…', thinking: 'Buscando en los documentos oficiales…', speaking: 'Yachi está hablando…', idle: 'Listo para escucharte.',
     talk: 'Hablar', stop: 'Detener', exit: 'Salir del modo voz',
     notHeard: 'No te escuché. Intenta de nuevo.', noStt: 'Este navegador no reconoce voz (usa Chrome o Edge). Puedes escribir aquí y te leeré la respuesta.',
     micDenied: 'No tengo permiso para usar el micrófono. Revisa los permisos del navegador.',
@@ -32,10 +33,10 @@ const TEXT = {
   en: {
     title: `${BRAND.mascotName} voice mode`,
     start: 'Start talking',
-    startHint: 'Press Enter or tap the button. Then use the space bar to talk or interrupt.',
+    startHint: 'Talk to Yachi whenever you’re ready.',
     welcome: `Hi, I'm ${BRAND.mascotName}. You are in voice mode. Ask your question after the tone. You can say "help" at any time.`,
     help: 'You can ask about procedures, regulations, services and campus places. In a procedure, say "next", "previous", "repeat" or "all steps". To answer a clarification, say the option number. You can also say "slower", "faster" or "exit". Keyboard: space bar to talk, R to repeat, N for next step and Escape to exit.',
-    listening: 'Listening…', thinking: 'Searching official documents…', speaking: 'Speaking… (space to interrupt)', idle: 'Ready. Press space or the button to talk.',
+    listening: 'Listening…', thinking: 'Searching official documents…', speaking: 'Yachi is speaking…', idle: 'Ready to listen.',
     talk: 'Talk', stop: 'Stop', exit: 'Exit voice mode',
     notHeard: 'I did not hear you. Please try again.', noStt: 'This browser cannot recognize speech (use Chrome or Edge). You can type here and I will read the answer aloud.',
     micDenied: 'I do not have permission to use the microphone. Check your browser permissions.',
@@ -60,7 +61,8 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
   onClose: () => void;
 }) {
   const { t, lang } = useT();
-  const x = TEXT[lang === 'en' ? 'en' : 'es'];
+  const x = lang === 'qu' ? kichwaVoice : TEXT[lang];
+  const ui = voiceLabels[lang];
   const [state, setState] = useState<State>('start');
   const [interim, setInterim] = useState('');
   const [heard, setHeard] = useState('');
@@ -70,6 +72,12 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
   const [typed, setTyped] = useState('');
   const [speechError, setSpeechError] = useState('');
   const [serverVoice, setServerVoice] = useState<boolean | null>(null);
+  const [panel, setPanel] = useState<'info' | 'settings' | null>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const panelTrigger = useRef<HTMLButtonElement | null>(null);
+  const panelTitle = panel === 'info' ? ui.info : ui.settings;
+  useEffect(() => { if (panel) panelRef.current?.querySelector<HTMLButtonElement>('button')?.focus(); }, [panel]);
+  const closePanel = () => { setPanel(null); panelTrigger.current?.focus(); };
   const spoken = useRef<Spoken>({ intro: '', steps: [], outro: '' });
   const step = useRef(-1);
   const last = useRef('');
@@ -86,7 +94,13 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
   live.current = { answer, onSend, onClose, onStopAnswer };
   const listenRef = useRef<() => Promise<void>>(async () => undefined);
 
-  useEffect(() => { void whenVoicesReady().then(() => setVoices(voicesFor(lang2))); }, [lang2]);
+  useEffect(() => {
+    let active = true;
+    const update = () => { if (active) setVoices(voicesFor(lang2)); };
+    void whenVoicesReady().then(update);
+    if ('speechSynthesis' in window) speechSynthesis.addEventListener('voiceschanged', update);
+    return () => { active = false; if ('speechSynthesis' in window) speechSynthesis.removeEventListener('voiceschanged', update); };
+  }, [lang2]);
   useEffect(() => {
     let active = true;
     setServerVoice(null);
@@ -104,7 +118,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
     setSaid(text);
     setState('speaking');
     try { await speak(text, lang2, prefsRef.current); }
-    catch (error) { setSpeechError((error as Error).message); }
+    catch (error) { setSpeechError(lang2 === 'qu' ? voiceLabels.qu.voiceError : (error as Error).message); }
     setState((s) => (s === 'speaking' ? 'idle' : s));
     if (thenListen && prefsRef.current.autoListen && stt && lang2 !== 'qu') void listenRef.current();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -134,7 +148,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
 
   const ask = (text: string) => {
     pending.current = true;
-    setHeard(text.replace(new RegExp(HAS_PII.source, 'g'), lang2 === 'en' ? '[removed]' : '[dato omitido]'));
+    setHeard(text.replace(new RegExp(HAS_PII.source, 'g'), ui.omittedData));
     setState('thinking');
     earcon('done');
     live.current.onSend(text);
@@ -148,7 +162,10 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
     setSpeechError('');
     setState('listening');
     earcon('listen');
-    const l = listenOnce(lang2, setInterim);
+    const l = listenOnce(lang2, (text) => {
+      if (lang2 === 'qu') { if (text === voiceLabels.qu.transcribing) setState('transcribing'); }
+      else setInterim(text);
+    });
     listener.current = l;
     try {
       const text = await l.done;
@@ -160,7 +177,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
       listener.current = null;
       setState('idle');
       earcon('error');
-      if (lang2 === 'qu') setSpeechError((e as Error).message);
+      if (lang2 === 'qu') { if ((e as Error).name !== 'AbortError') setSpeechError((e as Error).name === 'NotAllowedError' ? x.micDenied : x.notHeard); }
       else void say((e as Error).message === 'not-allowed' ? x.micDenied : x.notHeard, false);
     }
   }
@@ -185,6 +202,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
     if (state === 'start') return void begin();
     if (state === 'speaking') { stopSpeaking(); return void listen(); }
     if (state === 'listening') { listener.current?.stop(); return; }
+    if (state === 'transcribing') { listener.current?.abort(); return setState('idle'); }
     if (state === 'thinking') { live.current.onStopAnswer(); pending.current = false; return setState('idle'); }
     if (stt) void listen();
   };
@@ -192,14 +210,14 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
   const onKey = (e: KeyboardEvent<HTMLElement>) => {
     trapFocus(e);
     const tag = (e.target as HTMLElement).tagName;
-    if (e.key === 'Escape') { e.preventDefault(); stopSpeaking(); onClose(); return; }
-    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    if (e.key === 'Escape') { e.preventDefault(); if (panel) { closePanel(); return; } stopSpeaking(); onClose(); return; }
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || panel) return;
     if (e.key === ' ' && state !== 'start') { e.preventDefault(); main(); }
     else if (e.key.toLowerCase() === 'r') handle('repetir');
     else if (e.key.toLowerCase() === 'n') handle('siguiente');
   };
 
-  const status = state === 'start' ? x.startHint : state === 'listening' ? x.listening : state === 'thinking' || busy ? x.thinking : state === 'speaking' ? x.speaking : x.idle;
+  const status = state === 'start' ? x.startHint : state === 'listening' ? x.listening : state === 'transcribing' ? ui.transcribing : state === 'thinking' || busy ? x.thinking : state === 'speaking' ? x.speaking : x.idle;
   const mood = state === 'listening' ? 'happy' : state === 'thinking' ? 'thinking' : state === 'speaking' ? 'talking' : 'idle';
 
   return (
@@ -207,12 +225,12 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
       <header className="voice-top">
         <h1 id="voice-title" className="title">{x.title}</h1>
         <span className="sp" />
+        <button className="icon-btn" aria-label={ui.info} title={ui.info} aria-expanded={panel === 'info'} aria-controls="voice-options" onClick={(event) => { panelTrigger.current = event.currentTarget; setPanel(panel === 'info' ? null : 'info'); }}><IcInfo /></button>
+        <button className="icon-btn" aria-label={ui.settings} title={ui.settings} aria-expanded={panel === 'settings'} aria-controls="voice-options" onClick={(event) => { panelTrigger.current = event.currentTarget; setPanel(panel === 'settings' ? null : 'settings'); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="m9 3-1 3-3 1-2 3 2 2-1 3 3 2 3-1 2 3 3-1 1-3 3-1 1-3-2-2 1-3-3-2-3 1-2-2Z"/></svg></button>
         <button className="icon-btn" aria-label={x.exit} title={x.exit} onClick={() => { stopSpeaking(); onClose(); }}><IcClose /></button>
       </header>
 
       <div className="voice-stage">
-        {lang === 'qu' && <p className="small">Voz Kichwa experimental · hasta 15 segundos. El audio se envía a Yachi para transcribirlo y no se guarda. Revisa el texto antes de enviar. {serverVoice ? 'Lectura con voz sintética de Tena (Ecuador), pendiente de validación de pronunciación.' : serverVoice === null ? 'Comprobando voz…' : voices.length === 0 ? 'La voz Kichwa del servidor no está disponible.' : ''}</p>}
-        {lang === 'qu' && serverVoice && <><a className="small" href="https://huggingface.co/facebook/mms-tts-quw" target="_blank" rel="noreferrer">Voz de Meta MMS · CC BY-NC 4.0</a><button type="button" className="chip" disabled={state === 'speaking' || state === 'listening' || busy} onClick={() => void say('Imanalla. Ñuka shutika Yachi.', false)}>Probar voz Kichwa</button></>}
         {speechError && <p className="err" role="alert">{speechError}</p>}
         <div className={`voice-orb ${state}`} aria-hidden="true">
           <span className="ring" /><span className="ring r2" />
@@ -227,14 +245,14 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
           <button ref={startBtn} className="voice-main" onClick={main}><IcMic />{x.start}</button>
         ) : (
           <button className={`voice-main ${state}`} onClick={main} aria-pressed={state === 'listening'} disabled={!stt && state === 'idle'}>
-            {state === 'listening' || state === 'thinking' || state === 'speaking' ? <IcStop /> : <IcMic />}
-            {state === 'listening' ? x.stop : state === 'speaking' ? x.talk : state === 'thinking' ? x.stop : x.talk}
+            {state === 'listening' || state === 'transcribing' || state === 'thinking' || state === 'speaking' ? <IcStop /> : <IcMic />}
+            {state === 'listening' || state === 'transcribing' ? x.stop : state === 'speaking' ? x.talk : state === 'thinking' ? x.stop : x.talk}
           </button>
         )}
 
         {(!stt || lang === 'qu') && state !== 'start' && (
           <form className="voice-typed" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) { handle(typed.trim()); setTyped(''); } }}>
-            <p className="small">{lang === 'qu' ? 'Edita la transcripción o escribe tu consulta en Kichwa.' : x.noStt}</p>
+            <p className="small">{lang === 'qu' ? ui.editTranscript : x.noStt}</p>
             <label className="sr" htmlFor="voice-q">{x.typed}</label>
             <input id="voice-q" className="inp" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={x.typed} />
             <button className="btn primary">{x.send}</button>
@@ -242,22 +260,31 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
         )}
       </div>
 
-      <footer className="voice-prefs">
+      {panel && <aside id="voice-options" ref={panelRef} className="voice-options" aria-label={panelTitle}>
+        <div className="voice-options-head"><h2>{panelTitle}</h2><button className="icon-btn" aria-label={ui.closePanel} onClick={closePanel}><IcClose /></button></div>
+        {panel === 'info' ? <div className="voice-info">
+          <p>{ui.naturalSpeech}</p>
+          {lang === 'qu' ? <><p>{ui.recordingNote}</p><p>{ui.voiceNote}</p><a href="https://huggingface.co/facebook/mms-tts-quw" target="_blank" rel="noreferrer">Meta MMS · CC BY-NC 4.0</a></> : <p>{ui.browserNote}</p>}
+          <p className="small">{x.help}</p>
+        </div> : <div className="voice-prefs">
         <label className="field"><span>{x.speed}</span>
           <select className="inp" value={prefs.rate} onChange={(e) => setPrefs({ rate: Number(e.target.value) })}>
             {[0.7, 0.85, 1, 1.15, 1.3, 1.5].map((r) => <option key={r} value={r}>{r}×</option>)}
           </select>
         </label>
-        {voices.length > 1 && (
+        {(
           <label className="field"><span>{x.voice}</span>
-            <select className="inp" value={prefs.voiceURI ?? voices[0]!.voiceURI} onChange={(e) => setPrefs({ voiceURI: e.target.value })}>
+            <select className="inp" value={voices.some((v) => v.voiceURI === prefs.voiceURI) ? prefs.voiceURI : lang === 'qu' ? 'mms-quw' : voices[0]?.voiceURI ?? ''} onChange={(e) => setPrefs({ voiceURI: e.target.value || undefined })}>
+              {lang === 'qu' ? <option value="mms-quw">{ui.tenaVoice} · {serverVoice ? 'Meta MMS' : ui.unavailable}</option> : voices.length === 0 ? <option value="">{ui.defaultVoice}</option> : null}
               {voices.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{v.name.replace(/^Microsoft |^Google /, '')} ({v.lang})</option>)}
             </select>
           </label>
         )}
+        {lang === 'qu' && serverVoice && <button type="button" className="chip" disabled={state === 'speaking' || state === 'listening' || busy} onClick={() => void say('Imanalla. Ñuka shutika Yachi.', false)}>{ui.tryVoice}</button>}
         {lang !== 'qu' && <label className="check"><input type="checkbox" checked={prefs.autoListen} onChange={(e) => setPrefs({ autoListen: e.target.checked })} />{x.auto}</label>}
-        {!ttsSupported(lang) && <p className="err">{lang === 'en' ? 'Speech output is not available in this browser.' : 'Este navegador no puede leer en voz alta.'}</p>}
-      </footer>
+        {!ttsSupported(lang) && <p className="err">{ui.ttsUnavailable}</p>}
+      </div>}
+      </aside>}
     </motion.div>
   );
 }

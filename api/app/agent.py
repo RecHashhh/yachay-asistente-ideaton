@@ -13,7 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.kichwa import language_context
-from app.maps_tool import MapActionInput, compact_map_result, execute_map_action
+try:  # sin PostGIS/geoalchemy2 (fuera de Docker) el agente trabaja sin la herramienta de mapas
+    from app.maps_tool import MapActionInput, compact_map_result, execute_map_action
+except Exception:
+    MapActionInput = None
 from app.retrieval import RetrievedChunk, Retriever
 from app.schemas import ChatRequest
 
@@ -193,17 +196,21 @@ class RagAgent:
         ) -> str:
             """Busca lugares, resuelve referencias, calcula proximidad y rutas con PostGIS."""
             nonlocal map_found
-            result, geometry = await asyncio.to_thread(
-                execute_map_action,
-                intent=intent,
-                query=query,
-                category=category,
-                reference=reference,
-                radius_m=radius_m,
-                origin=origin,
-                destination=destination,
-                mode=mode,
-            )
+            try:
+                result, geometry = await asyncio.to_thread(
+                    execute_map_action,
+                    intent=intent,
+                    query=query,
+                    category=category,
+                    reference=reference,
+                    radius_m=radius_m,
+                    origin=origin,
+                    destination=destination,
+                    mode=mode,
+                )
+            except Exception as e:  # base sin PostGIS o sin el esquema de mapas: el agente sigue con los documentos
+                print("map_action falló:", repr(e))
+                return json.dumps({"status": "unavailable", "message": "Map service unavailable"})
             map_results.append(result)
             map_found = map_found or result.get("status") in {"ok", "ambiguous"}
             if geometry:
@@ -246,7 +253,7 @@ class RagAgent:
             turn.get("role") == "assistant" and turn.get("sources")
             for turn in state.get("history", [])[-6:]
         )
-        tools = [list_documents, search_rag, map_action]
+        tools = [list_documents, search_rag] + ([map_action] if MapActionInput is not None else [])
         if has_sourced_history:
             tools.append(reuse_history)
 

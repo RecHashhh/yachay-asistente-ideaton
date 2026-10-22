@@ -5,6 +5,7 @@ const CATS: { id: FilterCategory; label: string; help: string }[] = [
   { id: 'crisis', label: 'Crisis', help: 'Autolesión o riesgo de vida. Yachi responde con un mensaje fijo: ECU 911 y Psicología/Bienestar. No se guarda el texto.' },
   { id: 'denuncia', label: 'Acoso y violencia', help: 'Nunca se trata como insulto. Yachi ofrece la Consejería de Derechos y responde con los documentos. No se guarda el texto.' },
   { id: 'manipulacion', label: 'Manipulación', help: 'Intentos de cambiar las reglas del asistente o ver sus instrucciones internas.' },
+  { id: 'salud', label: 'Síntomas de salud', help: 'Dolor, fiebre, lesiones… Yachi no diagnostica: recomienda el Centro de Salud del campus (con mapa y horario) y ECU 911 en emergencia. Si el mensaje es un trámite (justificar faltas, seguro, exámenes), sigue como consulta. No se guarda el texto.' },
   { id: 'profanidad', label: 'Groserías', help: 'Solo el insulto sin consulta recibe el aviso de respeto. Si hay una pregunta real, se responde sin la grosería.' },
   { id: 'fuera_de_dominio', label: 'Fuera del ámbito', help: 'Temas ajenos a la universidad (clima, chistes, cripto…). Usa frases precisas para no bloquear consultas válidas.' },
   { id: 'permitido', label: 'Nunca filtrar', help: 'Identidad, salud sexual y salud mental: se retiran antes de revisar las otras listas para no discriminar ni impedir consultas.' },
@@ -12,7 +13,7 @@ const CATS: { id: FilterCategory; label: string; help: string }[] = [
 
 const KIND: Record<string, string> = {
   normal: 'Consulta normal (va a la búsqueda)', crisis: 'Crisis', denuncia: 'Acoso o violencia', manipulacion: 'Manipulación', respeto: 'Insulto',
-  saludo: 'Saludo', cierre: 'Despedida o agradecimiento', vacio: 'Sin contenido', confesionario: 'Confesionario (no es canal oficial)', fuera_de_dominio: 'Fuera del ámbito',
+  saludo: 'Saludo', cierre: 'Despedida o agradecimiento', vacio: 'Sin contenido', confesionario: 'Confesionario (no es canal oficial)', fuera_de_dominio: 'Fuera del ámbito', salud: 'Síntoma de salud (Centro de Salud)',
 };
 
 /** Listas de filtros editables, prueba de una frase y casos de prueba (falsos positivos y negativos). */

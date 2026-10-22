@@ -4,6 +4,7 @@ import { BRAND } from '../config';
 import { MOCK } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { listenOnce } from '../lib/speech';
+import { kichwaVoice, kichwaVoiceLabels } from '../lib/voiceKichwa';
 import type { Attachment } from '../lib/types';
 import { IcCapture, IcClip, IcMic, IcSend, IcStop, IcWave } from './icons';
 
@@ -93,14 +94,14 @@ export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy
   function mic() {
     if (rec) { rec.stop(); return; }
     const base = value ? `${value.trim()} ` : '';
-    if (lang === 'qu') setVoiceStatus('Preparando el micrófono Kichwa… el audio se procesa en Yachi y no se guarda.');
+    if (lang === 'qu') setVoiceStatus(kichwaVoice.listening);
     const recording = listenOnce(lang, (text) => { if (lang === 'qu') setVoiceStatus(text); else onChange(base + text); });
     activeRec.current = recording;
     setRec(recording);
     void recording.done.then((text) => {
       if (text) onChange((base + text).slice(0, 1000));
-      if (lang === 'qu' && text) toast('Transcripción experimental. Revisa y corrige antes de enviar.');
-    }).catch((error: Error) => { if (error.name !== 'AbortError') toast(lang === 'qu' ? error.message : t('micNo')); })
+      if (lang === 'qu' && text) toast(kichwaVoiceLabels.editTranscript);
+    }).catch((error: Error) => { if (error.name !== 'AbortError') toast(lang === 'qu' ? error.name === 'NotAllowedError' ? kichwaVoice.micDenied : kichwaVoice.notHeard : t('micNo')); })
       .finally(() => { activeRec.current = null; setRec(null); setVoiceStatus(''); ref.current?.focus(); });
   }
 
@@ -144,7 +145,7 @@ export function Composer({ value, onChange, files, onFiles, onSend, onStop, busy
         </div>
         {attachmentsEnabled && <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple hidden onChange={(e) => { add([...(e.target.files ?? [])]); e.target.value = ''; }} />}
       </form>
-      {voiceStatus && <div className="small muted"><span role="status">{voiceStatus}</span> <button type="button" className="chip" onClick={() => activeRec.current?.abort()}>Cancelar</button></div>}
+      {voiceStatus && <div className="small muted"><span role="status">{voiceStatus}</span> <button type="button" className="chip" onClick={() => activeRec.current?.abort()}>{t('cancel')}</button></div>}
       <AnimatePresence>
         {zoom && (
           <motion.div className="scrim" role="dialog" aria-modal="true" aria-label="Vista previa" tabIndex={-1} ref={(el) => el?.focus()} onKeyDown={(e) => e.key === 'Escape' && setZoom(null)} onClick={() => setZoom(null)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>

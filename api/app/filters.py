@@ -17,7 +17,7 @@ import time
 import unicodedata
 from dataclasses import dataclass, field
 
-# Categorías: crisis, denuncia, manipulacion, profanidad, fuera_de_dominio, permitido.
+# Categorías: crisis, denuncia, manipulacion, salud, profanidad, fuera_de_dominio, permitido.
 # Formato de cada término: palabras separadas por espacio; "*" al final de una palabra = cualquier terminación.
 DEFAULT_TERMS: dict[str, list[str]] = {
     "crisis": [
@@ -43,6 +43,15 @@ DEFAULT_TERMS: dict[str, list[str]] = {
         "mierda*", "idiota*", "estupid*", "imbecil*", "pendej*", "cabron*", "marica", "maricon*", "carajo", "culo", "cojud*", "huevon*", "huevona*",
         "huevada*", "malparid*", "gonorrea", "chucha", "chuchatumadre", "zorra", "longo",
         "fuck*", "shit*", "bitch*", "asshole", "stupid", "idiot*", "moron", "retard*",
+    ],
+    # Síntomas o lesiones: Yachi no diagnostica; deriva al Centro de Salud del campus (y ECU 911 en emergencia). No se guarda el texto.
+    "salud": [
+        "duele*", "me dolio", "dolor de", "dolor en", "tengo dolor", "mucho dolor", "fiebre", "gripe", "resfri*", "tengo tos", "vomit*", "nausea*",
+        "mareo*", "mareada", "mareado", "estoy enferm*", "me enferme", "me siento mal", "me lastime", "me lesione", "me torci*", "esguince",
+        "fractur*", "me cai", "me queme", "me corte el", "me corte la", "estoy sangrando", "me sale sangre", "diarrea", "migrana", "me pico",
+        "picadura", "tengo alergia", "reaccion alergica", "tengo asma",
+        "hurts", "it hurts", "i feel sick", "i am sick", "im sick", "fever", "headache", "stomachache", "toothache", "i got hurt", "injured",
+        "sprained", "vomiting", "dizzy", "i have the flu",
     ],
     "fuera_de_dominio": [
         "clima de hoy", "clima manana", "como esta el clima", "que clima", "pronostico del tiempo", "va a llover", "weather", "forecast",
@@ -106,11 +115,19 @@ def current() -> Compiled:
     terms: dict[str, list[str]] = {k: [] for k in DEFAULT_TERMS}
     try:
         from .db import conn
+        seen: set[str] = set()
         with conn() as c:
-            for r in c.execute("SELECT category, term FROM filter_terms WHERE active").fetchall():
-                terms.setdefault(r["category"], []).append(r["term"])
-        if not any(terms.values()):
+            for r in c.execute("SELECT category, term, active FROM filter_terms").fetchall():
+                seen.add(r["category"])
+                if r["active"]:
+                    terms.setdefault(r["category"], []).append(r["term"])
+        if not seen:
             terms = DEFAULT_TERMS
+        else:
+            # Categoría nueva que aún no se sembró (falta `python -m app.migrate`): se usa la semilla en vez de dejarla vacía.
+            for k, v in DEFAULT_TERMS.items():
+                if k not in seen:
+                    terms[k] = list(v)
     except Exception:
         terms = DEFAULT_TERMS
     comp = compile_terms(terms)
@@ -129,9 +146,14 @@ REPORTED = re.compile(r"\b(me|nos|le|les) (dijo|dijeron|dice|dicen|lamo|lamaron|
                       r"|\b(caled me|told me|said to me)\b")
 
 
+# Un síntoma dentro de una pregunta de trámite ("estoy enfermo, ¿cómo justifico la falta?") es una consulta normal, no una derivación.
+ACADEMIC = re.compile(r"\b(justific\w*|falta\w*|inasisten\w*|examen\w*|exam|exams|prueba|clases?|matricul\w*|certificad\w*|permiso|licencia"
+                      r"|seguro|reembolso|beca\w*|tramite\w*|reglament\w*|absence\w*|insurance|certificate)\b")
+
+
 @dataclass
 class Verdict:
-    kind: str | None  # crisis, denuncia, manipulacion, respeto, fuera_de_dominio o None (consulta normal)
+    kind: str | None  # crisis, denuncia, manipulacion, salud, respeto, fuera_de_dominio o None (consulta normal)
     clean: str        # pregunta para buscar (sin groserías)
     sensitive: bool = False  # no se guarda el texto (LOPDP: datos de salud o de terceros)
     matched: str | None = None
@@ -152,6 +174,8 @@ def classify(q: str, comp: Compiled | None = None) -> Verdict:
         return Verdict("denuncia", no_prof(), True, x.group(0))
     if x := hit("manipulacion"):
         return Verdict("manipulacion", q, False, x.group(0))
+    if (x := hit("salud")) and not ACADEMIC.search(m):
+        return Verdict("salud", q, True, x.group(0))
     if x := hit("profanidad"):
         if REPORTED.search(m):  # "mi profesor me dijo p***": la persona cuenta lo que le pasó, no insulta
             return Verdict("denuncia", no_prof(), True, x.group(0))
