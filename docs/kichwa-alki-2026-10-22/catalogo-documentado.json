@@ -1,0 +1,20 @@
+{
+  "scope": "Etiquetas breves propuestas con evidencia léxica; no atribuye revisión humana ni fluidez conversacional.",
+  "documents": { "esQu": "DICCIONARIO EN PDF ESPAÑOL A KICHWA.pdf", "quEs": "DICCIONARIO EN PDF KICHWA a ESPAÑOL.pdf" },
+  "pageNumbering": "Página del PDF; no numeración impresa.",
+  "entries": [
+    { "key": "send", "es": "Enviar", "qu": "Kachana", "refs": [{ "document": "esQu", "page": 18 }, { "document": "quEs", "page": 32 }] },
+    { "key": "inqSend", "es": "Enviar", "qu": "Kachana", "refs": [{ "document": "esQu", "page": 18 }, { "document": "quEs", "page": 32 }] },
+    { "key": "close", "es": "Cerrar", "qu": "Wichkana", "refs": [{ "document": "esQu", "page": 9 }, { "document": "quEs", "page": 113 }] },
+    { "key": "today", "es": "Hoy", "qu": "Kunan", "refs": [{ "document": "esQu", "page": 23 }, { "document": "quEs", "page": 42 }] },
+    { "key": "yesterday", "es": "Ayer", "qu": "Kayna", "refs": [{ "document": "esQu", "page": 5 }, { "document": "quEs", "page": 38 }] },
+    { "key": "delete", "es": "Eliminar", "qu": "Pichana", "refs": [{ "document": "esQu", "page": 6 }], "note": "La entrada documenta borrar. Se propone ese sentido para eliminar una conversación; falta revisión del uso digital." },
+    { "key": "allTopics", "es": "Todos", "qu": "Tukuy", "refs": [{ "document": "esQu", "page": 45 }, { "document": "quEs", "page": 96 }] },
+    { "key": "page", "es": "pág.", "qu": "Panka", "refs": [{ "document": "esQu", "page": 34 }], "note": "La entrada español-kichwa documenta página, no solo hoja de árbol." },
+    { "key": "where", "es": "Dónde", "qu": "Maypi", "refs": [{ "document": "quEs", "page": 56 }], "note": "Etiqueta de ubicación estática: en dónde, no dirección hacia dónde." },
+    { "key": "stop", "es": "Detener respuesta", "qu": "Harkana", "refs": [{ "document": "esQu", "page": 15 }], "note": "Etiqueta abreviada Detener para el botón que interrumpe la respuesta; no es una traducción completa del sustantivo respuesta." },
+    { "key": "themeLight", "es": "Tema claro", "qu": "Achik", "refs": [{ "document": "esQu", "page": 9 }, { "document": "quEs", "page": 1 }], "note": "Etiqueta abreviada Claro." },
+    { "key": "themeDark", "es": "Tema oscuro", "qu": "Amsa", "refs": [{ "document": "esQu", "page": 33 }, { "document": "quEs", "page": 4 }], "note": "Etiqueta abreviada Oscuro; revisar variedad regional." }
+  ],
+  "humanApproved": false
+}

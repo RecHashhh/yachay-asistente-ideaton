@@ -21,3 +21,16 @@ test('Every preview key exists and preserves all placeholders', () => {
     assert.deepEqual(vars(value), vars(es[key]), key);
   }
 });
+test('Visible proposals require dictionary evidence or explicit phrase allowance', () => {
+  const catalogue = read('docs/kichwa-alki-2026-10-22/catalogo-documentado.json');
+  const documented = new Map(catalogue.entries.map(x => [x.key, x]));
+  for (const [key, value] of Object.entries(preview)) {
+    assert.ok(documented.has(key) || policy.allowedProposals.includes(key), key);
+    if (documented.has(key)) {
+      const item = documented.get(key);
+      assert.equal(value, item.qu);
+      assert.ok(item.refs.every(ref => ref.page > 0 && ref.document in catalogue.documents));
+    }
+    assert.doesNotMatch(value, /proporciona el|lo siento|no puedo ayudar/i, key);
+  }
+});

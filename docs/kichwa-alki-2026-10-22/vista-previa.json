@@ -1,12 +1,21 @@
 {
-  "source": "https://alki.ec/",
-  "mode": "vista_previa_solicitada_por_usuario",
+  "sources": [
+    "PDF aportados por el usuario",
+    "https://alki.ec/"
+  ],
+  "mode": "catalogo_documentado_y_propuestas_limitadas",
   "approvedLinguistically": false,
-  "activeInterfaceKeys": 92,
+  "documentedInterfaceKeys": 12,
+  "experimentalPhraseKeys": [
+    "hello",
+    "newChat"
+  ],
+  "activeInterfaceKeys": 14,
+  "omittedScope": "Propuestas originales de Alki omitidas; algunas claves cuentan con un reemplazo de diccionario activo.",
   "omitted": [
     {
       "key": "send",
-      "reason": "igual_al_original"
+      "reason": "sin_respaldo_suficiente_en_contexto"
     },
     {
       "key": "cancel",
@@ -14,7 +23,7 @@
     },
     {
       "key": "copy",
-      "reason": "respuesta_meta_en_espanol"
+      "reason": "sin_respaldo_suficiente_en_contexto"
     },
     {
       "key": "retry",
@@ -38,7 +47,11 @@
     },
     {
       "key": "trending",
-      "reason": "origen_modificado"
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "recent",
+      "reason": "sin_respaldo_suficiente_en_contexto"
     },
     {
       "key": "notice",
@@ -53,32 +66,380 @@
       "reason": "discrepancia_en_revision"
     },
     {
+      "key": "admin",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "about",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
       "key": "disclaimer",
       "reason": "discrepancia_en_revision"
     },
     {
+      "key": "thinking",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
       "key": "demo",
-      "reason": "respuesta_meta_en_espanol"
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "stop",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "mic",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "micOn",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "micNo",
+      "reason": "sin_respaldo_suficiente_en_contexto"
     },
     {
       "key": "attach",
       "reason": "discrepancia_en_revision"
     },
     {
+      "key": "capture",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "captureNo",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "pasteHint",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "removeFile",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "good",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "bad",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "stopped",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "sources",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
       "key": "version",
-      "reason": "respuesta_meta_en_espanol"
+      "reason": "sin_respaldo_suficiente_en_contexto"
     },
     {
       "key": "docOf",
-      "reason": "igual_al_original"
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "consultedOn",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "institutional",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "openMaps",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "hours",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "where",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "time",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "office",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "showMap",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "done",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "unknownTitle",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "unknownBody",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "outOfDomain",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "outOfDomainBody",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "fbTitle",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "fbIncorrect",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "fbOutdated",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "fbNotAnswered",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "fbConfusing",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "fbSkip",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "fbThanks",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "talkHuman",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "voiceMode",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "readAloud",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "stopReading",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "attachChat",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "deadlines",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "addCal",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "sendToOffice",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "inqEmail",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "inqQuestion",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "inqConsent",
+      "reason": "sin_respaldo_suficiente_en_contexto"
     },
     {
       "key": "inqSend",
-      "reason": "igual_al_original"
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "inqSending",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "inqDone",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "inqError",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "inqInvalid",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "options",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "rename",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "delete",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "deleted",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "undo",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "today",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "yesterday",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "older",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "forYou",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "piiTitle",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "piiBody",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "piiRemove",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "piiEdit",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "piiId",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "piiEmail",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "typingHints",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "langAuto",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "change",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "open",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "close",
+      "reason": "sin_respaldo_suficiente_en_contexto"
     },
     {
       "key": "kichwaNote",
-      "reason": "origen_modificado"
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "docsNav",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "docsTitle",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "docsSub",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "docsSearch",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "allTopics",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "originWeb",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "originInternal",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "openDoc",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "openDocAt",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "viewRecord",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "internalNote",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "askAbout",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "askAboutQ",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "backChat",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "docsCount",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "noDocs",
+      "reason": "sin_respaldo_suficiente_en_contexto"
+    },
+    {
+      "key": "page",
+      "reason": "sin_respaldo_suficiente_en_contexto"
     }
   ],
   "exampleQuestionsStored": 12,
