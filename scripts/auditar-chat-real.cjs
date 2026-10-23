@@ -16,6 +16,13 @@ const questions = {
       page.on('pageerror', error => pageErrors.push(error.message));
       page.on('response', response => { if (response.url().includes('127.0.0.1') && response.status() >= 400) failedLocalRequests.push({ path: new URL(response.url()).pathname, status: response.status() }); });
       await page.addInitScript(() => localStorage.setItem('yt-consent-2026-10c', '1'));
+      // Preserve the real request/response, marking only the session as a test so
+      // these questions never count as separate people in public trends.
+      await page.route('**/__yachi_api/chat', route => {
+        const payload = route.request().postDataJSON();
+        payload.sessionId = 'verif-browser-' + payload.sessionId.slice(-40);
+        return route.continue({ postData: JSON.stringify(payload) });
+      });
       await page.goto(`http://127.0.0.1:5180/#/?lang=${lang}`);
       for (const [index, question] of questions[lang].entries()) {
         const started = Date.now();

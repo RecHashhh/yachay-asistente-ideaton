@@ -38,7 +38,7 @@ CASES = {
 
 def request_events(opener, lang, question, history=None):
     request = urllib.request.Request('http://127.0.0.1:8000/chat',
-        data=json.dumps({'sessionId': 'audit-' + uuid.uuid4().hex[:16], 'message': question,
+        data=json.dumps({'sessionId': 'verif-audit-' + uuid.uuid4().hex[:16], 'message': question,
                          'lang': lang, 'history': history or []}).encode(),
         headers={'Content-Type': 'application/json'})
     with opener.open(request, timeout=90) as response:
