@@ -69,7 +69,7 @@ CONFESIONARIO_OPTIONS = [
 STOP = {"de", "la", "el", "los", "las", "un", "una", "y", "o", "a", "en", "que", "por", "para", "con", "me", "mi", "se", "es", "lo", "al", "del",
         "the", "a", "an", "of", "to", "and", "or", "in", "on", "is", "it", "my", "i", "me", "you", "si", "no", "ya", "pues", "bueno", "eh", "ah", "mmm"}
 
-WHERE = re.compile(r"(donde|ubica|queda|llego|llegar|horario|abre|cierra|mapa|where|located|find|hours|open|close|how do i get)")
+WHERE = re.compile(r"(donde|ubica|queda|llego|llegar|horario|abre|cierra|mapa|where|located|find|hours|open|close|how do i get|\bmaypi(?:ta|tak)?\b|\bmayman\b)")
 ROOM = re.compile(r"\b([A-Z]{1,3}\d{2,3}|JBY\d|AT\d{2})\b")
 
 
@@ -214,7 +214,8 @@ def place_lookup(q: str, need_intent: bool = True) -> Place | None:
     for r in rows:
         names = [norm(r["name"])] + [norm(a) for a in r["aliases"]] + ([norm(r["name_en"])] if r["name_en"] else [])
         for nm in names:
-            if nm and f" {nm} " in n and (best is None or len(nm) > best[0]):
+            kichwa_suffix = bool(re.search(r'\bmaypi(?:ta|tak)?\b|\bmayman\b', n)) and bool(re.search(r'(?<!\w)' + re.escape(nm) + r'(?:ka|pi|man|manta)?(?!\w)', n))
+            if nm and (f" {nm} " in n or kichwa_suffix) and (best is None or len(nm) > best[0]):
                 best = (len(nm), r)
     if not best:
         return None

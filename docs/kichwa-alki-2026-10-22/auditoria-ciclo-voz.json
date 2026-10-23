@@ -1,0 +1,56 @@
+{
+  "results": [
+    {
+      "lang": "es",
+      "mapLink": true,
+      "interruptionRecovered": true,
+      "procedureSteps": true,
+      "allSteps": true,
+      "keyboardNext": true,
+      "sourceLink": true,
+      "cancelledAnswerNotSpoken": true,
+      "errorsRecoverable": true,
+      "optionalKichwaHandsFree": false,
+      "microphoneReleasedOnExit": true,
+      "focusRestored": true,
+      "existingAnswerSteps": true,
+      "maxNativeMicrophones": 1,
+      "simulatedModel": true
+    },
+    {
+      "lang": "en",
+      "mapLink": true,
+      "interruptionRecovered": true,
+      "procedureSteps": true,
+      "allSteps": true,
+      "keyboardNext": true,
+      "sourceLink": true,
+      "cancelledAnswerNotSpoken": true,
+      "errorsRecoverable": true,
+      "optionalKichwaHandsFree": false,
+      "microphoneReleasedOnExit": true,
+      "focusRestored": true,
+      "existingAnswerSteps": true,
+      "maxNativeMicrophones": 1,
+      "simulatedModel": true
+    },
+    {
+      "lang": "qu",
+      "mapLink": true,
+      "interruptionRecovered": true,
+      "procedureSteps": true,
+      "allSteps": true,
+      "keyboardNext": true,
+      "sourceLink": true,
+      "cancelledAnswerNotSpoken": true,
+      "errorsRecoverable": true,
+      "optionalKichwaHandsFree": true,
+      "microphoneReleasedOnExit": true,
+      "focusRestored": true,
+      "existingAnswerSteps": true,
+      "maxNativeMicrophones": 0,
+      "simulatedModel": true
+    }
+  ],
+  "scope": "Browser interaction audit using simulated model/STT/TTS; not a native-speaker assessment."
+}

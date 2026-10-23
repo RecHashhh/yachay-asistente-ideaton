@@ -97,6 +97,13 @@ def _all() -> list[dict]:
 def match(question: str, items: list[dict] | None = None) -> dict | None:
     """Trámite cuya frase disparadora aparece en la pregunta (la más larga gana)."""
     n = f" {norm(question)} "
+    # Limited intent glosses for Kichwa/code-switched questions; not a translator.
+    # Keep the original query (including years/periods) for specificity checks.
+    if re.search(r'\bimashina\b', n):
+        if re.search(r'\bcarrera(?:ka|ta)?\b', n) and re.search(r'\b(?:cambio(?:ta)?|tikrachina|tikray)\b', n):
+            n += ' cambio de carrera '
+        if re.search(r'\bkimsa\b', n) and re.search(r'\bmatricula(?:ka|ta)?\b', n):
+            n += ' tercera matricula '
     best = None
     for p in _all() if items is None else items:
         # Una convocatoria de otro período no responde una consulta explícita sobre uno nuevo.
