@@ -114,6 +114,9 @@ def classify_local(message: str, pending_action: str | None = None) -> IntentDec
         folded,
     )
     route = _route_entities(message, folded)
+    # "¿A qué hora sale el bus de Urcuquí a Ibarra?" pregunta un horario, no una ruta a pie por el campus.
+    if route and re.search(r"\b(?:a\s+que\s+hora|horarios?|bus(?:es)?|transporte|what\s+time|schedule)\b", folded):
+        return _decision(GeoIntent.DOCUMENT_SEARCH, confidence=0.94)
     if route:
         origin, destination = route
         if document_request:

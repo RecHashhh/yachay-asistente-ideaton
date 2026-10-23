@@ -18,6 +18,7 @@ from app.intent_router import GeoIntent, classify_local, classify_request, valid
         ("Quiero ir a SENESCYT", GeoIntent.ROUTE_REQUEST, None, "SENESCYT", None),
         ("Y ahora a la biblioteca", GeoIntent.ROUTE_REQUEST, None, "la biblioteca", None),
         ("Qué servicios presta SENESCYT", GeoIntent.DOCUMENT_SEARCH, None, None, None),
+        ("¿A qué hora sale el último bus de Urcuquí a Ibarra?", GeoIntent.DOCUMENT_SEARCH, None, None, None),
         ("Dónde queda SENESCYT y qué servicios presta", GeoIntent.MIXED_REQUEST, None, None, "SENESCYT"),
         ("Cómo llego a SENESCYT y qué trámites puedo realizar allí", GeoIntent.MIXED_REQUEST, None, "SENESCYT", None),
     ],
