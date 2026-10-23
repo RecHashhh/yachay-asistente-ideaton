@@ -77,6 +77,13 @@ def _decision(
     )
 
 
+PROCEDURE_WORDS = re.compile(
+    r"\b(?:cambi\w*|traslad\w*|transfer\w*|matricul\w*|reingres\w*|retir\w*|solicit\w*|tramite\w*|requisit\w*|beca\w*|"
+    r"postul\w*|homolog\w*|convalid\w*|carrera\w*|universidad\w*|ies|major|enroll\w*|apply|application)\b"
+)
+MOTION_WORDS = re.compile(r"\b(?:llego|llegar|llegas|voy|ir|camin\w*|ruta|recorrido|route|walk\w*|get\s+to|directions?|mapa|map)\b")
+
+
 def _route_entities(message: str, folded: str) -> tuple[str | None, str] | None:
     patterns = (
         r"\bdesde\s+(.+)\s+(?:hasta|hacia|a)\s+(.+)$",
@@ -117,6 +124,10 @@ def classify_local(message: str, pending_action: str | None = None) -> IntentDec
     # "¿A qué hora sale el bus de Urcuquí a Ibarra?" pregunta un horario, no una ruta a pie por el campus.
     if route and re.search(r"\b(?:a\s+que\s+hora|horarios?|bus(?:es)?|transporte|what\s+time|schedule)\b", folded):
         return _decision(GeoIntent.DOCUMENT_SEARCH, confidence=0.94)
+    # "¿Cómo me cambio de otra universidad a Yachay Tech?" es un trámite (cambio de IES), no una ruta: sin un verbo de
+    # desplazamiento, las palabras de trámite mandan la consulta a la búsqueda documental.
+    if route and PROCEDURE_WORDS.search(folded) and not MOTION_WORDS.search(folded):
+        return _decision(GeoIntent.DOCUMENT_SEARCH, confidence=0.93)
     if route:
         origin, destination = route
         if document_request:

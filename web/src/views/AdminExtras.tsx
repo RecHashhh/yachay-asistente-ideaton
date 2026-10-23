@@ -293,10 +293,32 @@ export function Cost() {
         <table>
           <thead><tr><th>Escenario</th><th>Consultas/día</th><th>Por consulta</th><th>Modelo al mes</th><th>Total al mes</th></tr></thead>
           <tbody>{scenarios.map((s) => (
-            <tr key={s.name}><td className="t">{s.name}</td><td className="mono">{Math.round(s.qDay).toLocaleString('es-EC')}</td><td className="mono">{usd(s.perQuery, 5)}</td><td className="mono">{usd(s.llmMonthly)}</td><td className="mono">{usd(s.total)}</td></tr>
-          ))}</tbody>
+            <tr key={s.name}><td className="t">{s.name} <span className="tag">estimado</span></td><td className="mono">{Math.round(s.qDay).toLocaleString('es-EC')}</td><td className="mono">{usd(s.perQuery, 5)}</td><td className="mono">{usd(s.llmMonthly)}</td><td className="mono">{usd(s.total)}</td></tr>
+          ))}
+          {use?.real?.perQueryUsd != null && [{ name: 'Normal', f: 1 }, { name: 'Matrículas (pico)', f: a.peakFactor }].map((s) => {
+            const q = r.qDay * s.f; const llm = use.real!.perQueryUsd! * q * 30;
+            return <tr key={`m-${s.name}`}><td className="t">{s.name} <span className="tag">medido</span></td><td className="mono">{Math.round(q).toLocaleString('es-EC')}</td><td className="mono">{usd(use.real!.perQueryUsd!, 5)}</td><td className="mono">{usd(llm)}</td><td className="mono">{usd(llm + a.infraMonthly)}</td></tr>;
+          })}</tbody>
         </table>
       </div>
+      <section className="card" aria-labelledby="reducir-costo">
+        <h3 id="reducir-costo">Medidas para reducir el costo del modelo</h3>
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Medida</th><th>Estado</th><th>Efecto esperado</th></tr></thead>
+            <tbody>
+              <tr><td>Rutas sin modelo: saludos, crisis, salud, lugares y aulas, guías de trámite, filtros</td><td><span className="st indexado">Activa</span></td><td className="small">Esas consultas cuestan $0 (en la validación, ~25 % de las preguntas no llamaron al modelo)</td></tr>
+              <tr><td>Tope de gasto (<span className="mono">ANTHROPIC_BUDGET_USD</span>) e interruptor <span className="mono">YACHI_LLM</span></td><td><span className="st indexado">Activa</span></td><td className="small">Al alcanzar el tope el chat sigue en modo sin modelo; el gasto nunca supera el presupuesto</td></tr>
+              <tr><td>Catálogo compacto para el agente (id, título, descripción breve, vigencia)</td><td><span className="st indexado">Activa</span></td><td className="small">≈ 45 % menos tokens del catálogo, que se reenvía en cada paso del agente</td></tr>
+              <tr><td>Caché de prompt en el ciclo del agente y en la redacción</td><td><span className="st indexado">Activa</span></td><td className="small">Lo ya enviado se relee al 10 % del precio de entrada</td></tr>
+              <tr><td>Catálogo fijo en el prompt del sistema, compartido entre consultas</td><td><span className="st procesando">Propuesta</span></td><td className="small">La caché se reutiliza entre estudiantes (5 min); elimina una llamada por consulta</td></tr>
+              <tr><td>Usar el agente solo si la búsqueda directa no es clara (similitud alta → responder directo)</td><td><span className="st procesando">Propuesta</span></td><td className="small">Las preguntas claras pasan de ~3 llamadas a 1</td></tr>
+              <tr><td>Caché de respuestas para preguntas frecuentes (tendencias) con fuentes vigentes</td><td><span className="st procesando">Propuesta</span></td><td className="small">Las preguntas repetidas no vuelven a llamar al modelo</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="small muted">Detalle, mediciones y metodología en <span className="mono">docs/entrega/costo-computacional.md</span>.</p>
+      </section>
       <p className="small muted">Precios de la API de Anthropic por millón de tokens, consultados el 20-10-2026: Haiku 5.5 $0.10 entrada / $0.50 salida / $0.01 lectura de caché (prompts de hasta 100K tokens); Sonnet 5.5 $2 / $10 / $0.10. La escritura de caché (5 min) cuesta 1,25× la entrada y el prefijo mínimo cacheable es de 512 tokens. Fuente: platform.claude.com/docs/en/about-claude/pricing. Servidor: DigitalOcean Droplet Basic 4 vCPU / 8 GB, $48 al mes (digitalocean.com/pricing/droplets, consultado el 20-10-2026); alternativa con base de datos administrada: Droplet 2 vCPU / 4 GB $24 + PostgreSQL administrado $15,15.</p>
     </>
   );
