@@ -405,7 +405,9 @@ class RagAgent:
             tools.append(reuse_history)
 
         max_calls = max(1, self.settings.rag_max_tool_calls)
-        selector = self.llm.bind_tools(tools, tool_choice="auto", parallel_tool_calls=True)
+        # Caché de prompt: cada paso reenvía lo anterior (catálogo y resultados de búsqueda); con el punto de caché al final,
+        # el paso siguiente lo lee al 10 % del precio de entrada. Medido: el agente era el 87 % del gasto sin caché.
+        selector = self.llm.bind_tools(tools, tool_choice="auto", parallel_tool_calls=True, cache_control={"type": "ephemeral"})
         messages = _decision_messages(state.get("history", []), state["message"], max_calls, state.get("lang", "es"))
         calls_used = 0
         reuse_attempted = False

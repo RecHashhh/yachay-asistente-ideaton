@@ -130,8 +130,33 @@ export const listInquiries = (): Promise<RegisteredInquiry[]> => MOCK ? Promise.
 export interface LlmUsage {
   llmOn: boolean; hasKey: boolean; active: boolean; model: string; budgetUsd: number; spentUsd: number; calls: number; answeredWithModel: number;
   bySource: { source: string; calls: number; inputTokens: number; outputTokens: number; usd: number }[];
+  /** Costo real por consulta desde el primer registro (incluye las consultas respondidas sin modelo). */
+  real?: { since: string | null; queries: number; modelQueries: number; perQueryUsd: number | null; perModelAnswerUsd: number | null };
 }
 export const getUsage = (): Promise<LlmUsage | null> => (MOCK ? Promise.resolve(null) : json('/admin/usage'));
+
+/** Métricas de una corrida del set de control. */
+export interface ValidationRun {
+  id: string; at: string; model: string; total: number; ok: number; accuracy: number | null; es: number | null; en: number | null;
+  refusal: number | null; clarify: number | null; hallucinations: number; p50: number | null; p95: number | null;
+}
+export const listValidationRuns = (): Promise<ValidationRun[]> => (MOCK ? Promise.resolve([]) : json('/admin/validation/runs'));
+
+/** Inicio del Portal: uso de los últimos 7 días (sin sesiones de prueba), pendientes, gasto y última validación. */
+export interface AdminSummary {
+  week: { total: number; today: number; sessions: number; answered: number; unanswered: number; ood: number; care: number; conversation: number; p50: number | null; p95: number | null };
+  langs: Record<string, number>; feedback: { up: number; down: number };
+  pending: { inbox: number; inquiries: number; docs: number; doc_errors: number };
+  guides: number; usage: LlmUsage | null; lastValidation: (Omit<ValidationRun, 'id'>) | null;
+}
+export const getAdminSummary = (): Promise<AdminSummary | null> => (MOCK ? Promise.resolve(null) : json('/admin/summary'));
+
+/** Guía de trámite publicada, con el número de citas verificadas que la respaldan. */
+export interface AdminGuide {
+  id: string; docId: string; period: string | null; locator: string | null; title: string; summary: string | null; office: string | null;
+  steps: { title: string; detail?: string }[]; documents: string[]; deadlines: { title: string; start: string; end?: string }[]; evidence: number; hasEnglish: boolean;
+}
+export const listAdminGuides = (): Promise<AdminGuide[]> => (MOCK ? Promise.resolve([]) : json('/admin/procedures'));
 
 /** Bitácora del Portal: quién cambió la base de conocimiento y cuándo (últimas 200 acciones). */
 export interface AuditEntry { at: string; email: string; action: string; target: string | null }
