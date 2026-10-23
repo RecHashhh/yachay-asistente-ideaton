@@ -621,7 +621,7 @@ function AssistantMsg({ m, question, transcript, theme, mapConfig, onVote, onRea
 
         {!m.streaming && (m.text || m.error || m.unknown || m.clarify) && (
           <div className="actions">
-            {m.text && <button className="icon-btn" aria-label={t('copy')} title={t('copy')} onClick={() => { void navigator.clipboard.writeText(m.text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>{copied ? <IcCheck /> : <IcCopy />}</button>}
+            {m.text && <button className="icon-btn" aria-label={t('copy')} title={t('copy')} onClick={() => { void navigator.clipboard?.writeText(m.text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>{copied ? <IcCheck /> : <IcCopy />}</button>}
             <button className="icon-btn" aria-label={t('good')} title={t('good')} aria-pressed={m.vote === 'up'} onClick={() => onVote('up')}><IcUp /></button>
             <button className="icon-btn" aria-label={t('bad')} title={t('bad')} aria-pressed={m.vote === 'down'} onClick={() => onVote('down')}><IcDown /></button>
             {ttsSupported(lang) && <button className="icon-btn" aria-label={reading ? t('stopReading') : t('readAloud')} title={reading ? t('stopReading') : t('readAloud')} aria-pressed={reading} onClick={readAloud}><IcSpeaker /></button>}
