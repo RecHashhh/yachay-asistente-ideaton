@@ -70,9 +70,11 @@ ni traduce automáticamente todas las guías oficiales.
 Validación reproducible desde la raíz (frontend y API locales en 5180 y 8000):
 
 ```powershell
-npm --prefix web test
-npm --prefix web run build
-api\.venv\Scripts\python -m pytest api/tests/test_kichwa_voice_intents.py api/tests/test_procedures.py
+npm.cmd --prefix web test
+npm.cmd --prefix web run build
+Push-Location api
+.venv\Scripts\python -m pytest tests/test_kichwa_voice_intents.py tests/test_procedures.py
+Pop-Location
 $env:PLAYWRIGHT_MODULE = (Resolve-Path web/node_modules/playwright).Path
 node scripts/auditar-ciclo-voz.cjs
 api\.venv\Scripts\python api/scripts/smoke_voice_contracts.py
