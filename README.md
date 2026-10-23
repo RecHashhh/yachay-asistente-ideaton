@@ -1,5 +1,7 @@
 # Asistente institucional Yachay Tech
 
+[![CI](https://github.com/RecHashhh/yachay-asistente-ideaton/actions/workflows/ci.yml/badge.svg)](https://github.com/RecHashhh/yachay-asistente-ideaton/actions/workflows/ci.yml)
+
 Prototipo del chatbot público de la universidad. Responde con documentos fuente, cita su período de vigencia y sección, y puede marcar lugares en el mapa del campus.
 
 ```
