@@ -142,13 +142,41 @@ def strip_greeting(q: str) -> str:
 
 
 def clarify(q: str, lang: str) -> dict | None:
-    n = norm(q)
-    if len(n.split()) > 3:
-        return None
-    for pat, question, options in CLARIFY:
-        if pat.search(n):
-            k = "en" if lang == "en" else "es"
+    n = norm(strip_greeting(q))
+    k = "en" if lang == "en" else "es"
+    # A longer courtesy phrase does not make a request more specific. Only
+    # remove known conversational scaffolding; keep every unknown subject,
+    # action, date or requirement so a concrete question still reaches search.
+    if lang in {"es", "en"}:
+        filler = set('necesito quiero quisiera gustaria puedes puede podrias favor por porfavor '
+                     'ayudame ayudarme ayuda ayudar saber informacion sobre acerca con de del la el '
+                     'las los un una unos unas mi mis tengo hacer para me a en yachi '
+                     'i need want would like please could can you help information about with '
+                     'the an a my some on regarding to know university student universitarias universitarios'.split())
+        core = [word for word in n.split() if word not in filler]
+        topics = [r'(?:residencias?|housing|dorms?|residences?)',
+                  r'(?:laboratorios?|laboratories|labs?)', r'(?:matriculas?|enrollment|enrolment)']
+        topic_index = next((i for i, pattern in enumerate(topics)
+                            if core and all(re.fullmatch(pattern, word) for word in core)), None)
+        if topic_index is not None:
+            _, question, options = CLARIFY[topic_index]
             return {"question": question[k], "options": [o[k] for o in options]}
+        generic = set('solicitud solicitudes tramite tramites procedimiento procedimientos '
+                      'application applications request requests procedure procedures paperwork'.split())
+        general_help = bool(n) and (not core or set(core) <= generic)
+        # Do not turn arbitrary filler-only messages ("the", "de la") into a menu.
+        has_request = bool(set(n.split()) & (generic | {'ayuda', 'ayudame', 'ayudarme', 'help', 'necesito', 'need'}))
+        unsure = n in {'tengo una duda', 'tengo una consulta', 'no se por donde empezar',
+                       'i have a question', 'i do not know where to start'}
+        if (general_help and has_request) or unsure:
+            _, question, options = CLARIFY[3]
+            return {"question": question[k], "options": [o[k] for o in options]}
+        return None
+    # Other language work is kept separate until its translations are reviewed.
+    if len(n.split()) <= 3:
+        for pat, question, options in CLARIFY:
+            if pat.search(n):
+                return {"question": question[k], "options": [o[k] for o in options]}
     return None
 
 

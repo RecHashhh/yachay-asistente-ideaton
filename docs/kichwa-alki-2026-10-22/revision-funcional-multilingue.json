@@ -34,10 +34,11 @@
       "next": "Mantener la revisión editable por defecto y evaluar grabaciones de hablantes con ruido y micrófono reales."
     },
     {
-      "id": "UX-01", "priority": "medium", "status": "open",
+      "id": "UX-01", "priority": "medium", "status": "resolved_es_en_pending_qu",
       "case": "ambiguous",
       "observation": "Una solicitud genérica devuelve sin información en los tres idiomas, en lugar de preguntar qué trámite necesita la persona.",
-      "next": "Pedir una aclaración breve con opciones útiles sin atribuir requisitos a una solicitud desconocida."
+      "resolution": "ES/EN: las solicitudes genéricas piden aclaración sin búsqueda. Se verificó seleccionar una opción y continuar con documentos del trámite, en móvil y escritorio. 30 pruebas nuevas y suite completa de 107 pruebas aprobadas.",
+      "next": "Integrar la aclaración Kichwa en la fase final de idioma solicitada por el equipo."
     },
     {
       "id": "QU-03", "priority": "medium", "status": "open",
