@@ -168,6 +168,7 @@ class RagAgent:
                 "Classify the user's current request for a university campus assistant. "
                 "Return one schema-valid intent. A place name is not proof that the user asks for a map: "
                 "'what is SENESCYT' is DOCUMENT_SEARCH, while 'where is SENESCYT' is LOCATION_SEARCH. "
+                "The map has buildings, not classrooms: listing classrooms of a block or floor is DOCUMENT_SEARCH. "
                 "A route needs destination and, when stated, origin. Do not invent entities. "
                 "If a short reply answers a pending clarification, use FOLLOW_UP. "
                 "Use MIXED_REQUEST only when both a map action and a document question are requested.\n\n"

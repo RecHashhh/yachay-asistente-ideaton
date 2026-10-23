@@ -267,6 +267,10 @@ async def route(state: State) -> State:
     proc = procedures.resolve(q, state.get('history') or [])
     if proc:
         return {"question": q, "route": "procedure", "proc": proc}
+    # Un código de aula (A03, B101…) es inequívoco y el mapa OSM no tiene aulas: va antes del router del mapa.
+    room = rules.room_lookup(q) if rules.ROOM.search(q.upper()) else None
+    if room:
+        return {"question": q, "route": "place", "place": room[0], "room": room[1], "origin": rules.split_origin(q)[1]}
     pending = get_pending(state.get("session_id", "")) if state.get("session_id") else None
     intent_started = time.perf_counter()
     decision = classify_local(q, pending.pending_action.value if pending else None)
@@ -339,9 +343,6 @@ async def route(state: State) -> State:
         return {"question": q, "route": "clarify"}
 
     dest_q, origin = rules.split_origin(q)  # "… desde el rectorado": el origen no compite con el destino
-    room = rules.room_lookup(q)
-    if room:
-        return {"question": q, "route": "place", "place": room[0], "room": room[1], "origin": origin}
     pl = rules.place_lookup(dest_q)
     if pl:
         return {"question": q, "route": "place", "place": pl, "room": None, "origin": origin}

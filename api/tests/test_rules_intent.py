@@ -1,3 +1,6 @@
+import pytest
+
+from app import graph, procedures, rules
 from app.rules import norm, place_intent
 
 
@@ -24,3 +27,13 @@ def test_service_hours_go_to_search_not_to_the_building_opening_hours() -> None:
 
 def test_questions_without_place_intent() -> None:
     assert not intent("¿Cómo me retiro de la carrera?")
+
+
+@pytest.mark.asyncio
+async def test_classroom_code_is_answered_from_rooms_before_the_map_router(monkeypatch) -> None:
+    # El mapa OSM no tiene aulas: "¿Dónde queda el aula A03?" no debe acabar en "No encontré esos lugares en el mapa".
+    monkeypatch.setattr(procedures, "resolve", lambda *args: None)
+    monkeypatch.setattr(rules, "room_lookup", lambda q: ("zona SENESCYT", "A03"))
+    monkeypatch.setattr(graph, "classify_local", lambda *args: pytest.fail("el router del mapa no debe correr"))
+    state = await graph.route({"question": "¿Dónde queda el aula A03?", "lang": "es", "history": []})
+    assert state["route"] == "place" and state["room"] == "A03"

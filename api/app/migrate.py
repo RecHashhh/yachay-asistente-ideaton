@@ -21,8 +21,9 @@ def load_descriptions(c: psycopg.Connection) -> int:
         return 0
     n = 0
     for r in csv.DictReader(path.open(encoding="utf-8")):
-        doc_id = DESCRIPTION_ALIASES.get(r["doc_id"], r["doc_id"])
-        n += c.execute("UPDATE documents SET description = %s WHERE id = %s", (r["descripcion"].strip(), doc_id)).rowcount
+        # Según la copia del corpus, el texto de aulas/sitios vive con el id original o con el alias: se describen ambos.
+        ids = [r["doc_id"], DESCRIPTION_ALIASES.get(r["doc_id"], r["doc_id"])]
+        n += c.execute("UPDATE documents SET description = %s WHERE id = ANY(%s)", (r["descripcion"].strip(), ids)).rowcount
     return n
 
 
