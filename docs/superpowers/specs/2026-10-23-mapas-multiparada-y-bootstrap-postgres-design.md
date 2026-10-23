@@ -33,8 +33,9 @@ No se ejecuta `dropdb`, `down -v`, restauración destructiva ni renombrado autom
 
 - `api/app/maps_tool.py` y pruebas: búsqueda cercana y secuencia de paradas con resultados compactos.
 - `Mapas/app/search.py` y, si hace falta para la consulta, consultas geoespaciales de proximidad; pruebas de API/PostGIS.
-- `web/src/lib/mapConversation.ts`, `web/src/lib/mapGeoApi.ts`, `web/src/lib/googleMapsNavigation.ts` y pruebas: resolución, estado de aclaración, varias paradas y enlaces.
-- `web/src/components/GeoMap.tsx` y pruebas E2E: marcadores/tramos y exposición de alternativas.
+- `web/src/lib/mapPayload.ts`, `web/src/lib/mapConversation.ts` (tipos), `web/src/lib/googleMapsNavigation.ts` y pruebas: conversión del FeatureCollection, varias paradas y enlaces.
+- `web/src/views/Chat.tsx` y `web/src/components/GeoMap.tsx`: adaptar el contrato del mapa sin cambiar el flujo existente de chat.
+- `web/e2e/map-chat.spec.ts`: verificar el enlace de indicaciones en la UI.
 - `docker-compose.yml`, un módulo pequeño de inicialización de DB en `api/app/` y pruebas: readiness, creación idempotente y preservación de DB existente.
 
 Los nombres definitivos pueden ajustarse a los límites reales del código durante la implementación; no se hará una reestructuración general.
