@@ -1,72 +1,307 @@
-% Borrador para IEEEtran. Compilar con pdflatex dos veces o abrir en Overleaf.
-% No contiene los documentos institucionales privados.
+% Artículo en formato IEEEtran (conferencia). Compilar con pdflatex dos veces.
+% El corpus institucional no forma parte del repositorio público.
 \documentclass[conference]{IEEEtran}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage[spanish]{babel}
+\usepackage[spanish,es-noshorthands,es-tabla]{babel}
 \usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit}
 \usepackage{url}
-\usepackage{hyperref}
-\title{Yachi: diseño de un asistente institucional trazable para procedimientos universitarios}
-\author{\IEEEauthorblockN{Autores del equipo: por completar}
-\IEEEauthorblockA{Universidad Yachay Tech\\Urcuquí, Ecuador}}
+\usepackage[hidelinks]{hyperref}
+\sisetup{output-decimal-marker={,},group-separator={.},group-minimum-digits=4}
+
 \begin{document}
+
+\title{Yachi: asistente conversacional con anclaje documental verificable para la orientación en procedimientos universitarios}
+
+\author{\IEEEauthorblockN{Kevin Sánchez, Carlos Castro, Ariel Pincay y William Garzón}
+\IEEEauthorblockA{Escuela de Ciencias Matemáticas y Computacionales\\
+Universidad de Investigación de Tecnología Experimental Yachay\\
+Urcuquí, Imbabura, Ecuador}}
+
 \maketitle
+
 \begin{abstract}
-Se presenta el diseño e implementación de Yachi, un prototipo conversacional orientado a procedimientos, representación estudiantil y ubicaciones universitarias. Combina recuperación de información institucional, fuentes visibles, guías estructuradas y navegación del campus. Se distinguen el simulador de interfaz, el modo extractivo y la generación asistida por modelo. La verificación funcional incluye compilación, contratos HTTP y recorridos de navegador con API aislada. La validación factual bilingüe y el estudio con usuarios permanecen pendientes; no se reportan porcentajes de precisión ni impacto sin una medición correspondiente. Este documento es un borrador de trabajo, no una investigación concluida.
+Los estudiantes universitarios deben consultar reglamentos, instructivos y calendarios dispersos para resolver trámites que tienen requisitos, plazos y responsables específicos. Este trabajo presenta Yachi, un asistente conversacional bilingüe para la Universidad Yachay Tech que responde únicamente con información recuperada de 75 documentos institucionales vigentes y muestra la fuente de cada afirmación. La arquitectura combina un enrutamiento determinista previo al modelo de lenguaje, recuperación híbrida léxica y vectorial fusionada por rango recíproco, un agente que selecciona documentos a partir de un catálogo, generación restringida a fragmentos con citas armadas por el servidor y una verificación posterior de cifras, correos y enlaces. Un clasificador de intención dirige las consultas de ubicación a un servicio geográfico sobre PostGIS y pgRouting, y los comunicados institucionales recibidos por correo se incorporan al índice sin intervención manual. Sobre un conjunto de control de 119 preguntas en español e inglés, la configuración con generación alcanzó una exactitud de 96,6\,\% (IC 95\,\%: 91,7 a 98,7\,\%), frente a 73,1\,\% del modo puramente extractivo, sin respuestas emitidas sin fuente; la versión integrada final obtuvo 91,6\,\%. El costo de inferencia medido fue de USD 0,0047 por consulta, 15 veces superior a la estimación analítica inicial; el análisis por componente atribuyó el 87\,\% del gasto al agente de selección documental y orientó una optimización que redujo el costo a USD 0,0025 por consulta, un 47\,\% menos. Se discuten las limitaciones de la evaluación y las condiciones para su adopción institucional.
 \end{abstract}
+
 \begin{IEEEkeywords}
-asistente institucional, recuperación de información, trazabilidad, experiencia de usuario, evaluación
+asistentes conversacionales, generación aumentada por recuperación, alucinaciones, recuperación híbrida, servicios estudiantiles, costo computacional
 \end{IEEEkeywords}
-\section{Introducción y problema}
-La dispersión de reglamentos, calendarios y procedimientos dificulta que un estudiante identifique qué gestión realizar, en qué orden, con qué documentos y ante qué dependencia. El Reto 1 del ideatón solicita un prototipo o propuesta con información verificable, español e inglés y una experiencia intuitiva. Se delimita el problema a orientación informativa: no se realizan matrícula, pagos, modificación de notas ni firma electrónica.
 
-La pregunta de investigación propuesta es: ¿en qué medida una conversación con fuentes verificables y guía estructurada mejora la resolución correcta de consultas institucionales frente a buscar directamente en documentos? La hipótesis debe contrastarse con usuarios; no se considera demostrada por la existencia del prototipo.
-\section{Estado del arte}
-Pounce documenta atención por mensajería y evaluación experimental en procesos de matrícula\cite{pounce}. Genie describe acceso a servicios personales y navegación\cite{genie}. Sunny documenta orientación bilingüe para públicos específicos\cite{sunny}; LOLA se orienta a preinscripción y matrícula\cite{lola}. Estas publicaciones institucionales acreditan funciones descritas en sus fechas, no una auditoría actual de todos sus servicios.
+\section{Introducción}
+\label{sec:intro}
 
-La recuperación aumentada con generación conecta el modelo con información recuperada\cite{rag}. En un entorno institucional, recuperar y citar un documento no prueba por sí solo que la respuesta sea correcta: deben evaluarse correspondencia factual, vigencia, cobertura y rechazo adecuado. La aportación propuesta de Yachi es integrar evidencia visible, guía de procedimiento y ubicación; no se reivindica exclusividad de sus componentes.
-\section{Metodología}
-Se propone un ciclo de inventario documental, estructuración de metadatos, implementación, evaluación y corrección. El corpus oficial se administra por un canal autorizado y se excluye del repositorio público. Cada documento requiere fuente, tema, versión, fecha, acceso y vigencia. El equipo debe completar el inventario y la revisión humana, incluyendo representatividad estudiantil.
+La información que un estudiante necesita para completar un trámite académico suele estar distribuida entre reglamentos, instructivos, calendarios y páginas institucionales que se actualizan en momentos distintos. Determinar qué gestión corresponde, en qué orden deben realizarse sus pasos, qué documentos se requieren y qué dependencia la atiende exige leer varios textos normativos y reconciliar sus vigencias. Los modelos de lenguaje de gran tamaño ofrecen una interfaz natural para esta tarea, pero su tendencia a producir contenido plausible y no sustentado \cite{ji2023survey} es especialmente problemática cuando la respuesta orienta un procedimiento con efectos administrativos.
 
-La evaluación distinguirá tres configuraciones: simulador, backend extractivo y backend con generación. Las métricas de una no se atribuirán a otra. Las pruebas con respuestas HTTP simuladas verifican estados de interfaz y recuperación de errores, no calidad del modelo ni persistencia de producción.
-\section{Diseño e implementación}
-La interfaz utiliza React y TypeScript; la API, FastAPI y LangGraph, con PostgreSQL y recuperación textual/vectorial. El enrutamiento incluye consultas ambiguas, ausencia de información, restricciones de ámbito y localización. Las fuentes visibles proceden de metadatos del servidor. Las guías curadas dependen de evidencia del corpus y requieren revisión institucional.
+El Reto~1 del Ideatón Yachay Tech solicita un prototipo conversacional que oriente sobre procedimientos, representación estudiantil y ubicaciones del campus, con información verificable, en español e inglés. El alcance excluye operaciones transaccionales como matrícula, pagos, modificación de calificaciones o firma electrónica: el asistente orienta y deriva, pero no ejecuta gestiones.
 
-El chat presenta estados breves durante el procesamiento y texto progresivo. Al finalizar se elimina el historial técnico de actividad y se conservan respuesta y fuentes. La presentación progresiva puede repartir contenido ya recibido; no debe confundirse con una medición de velocidad de inferencia. Se permite detener, se respeta movimiento reducido y no se debe desplazar a quien lee mensajes anteriores.
+Este artículo describe el diseño de Yachi y su evaluación. Sus contribuciones son: (i) una arquitectura en capas que separa las respuestas deterministas de las generadas y restringe la generación a fragmentos recuperados con citas que el modelo no puede redactar; (ii) un conjunto de control bilingüe con casos de rechazo y de aclaración, junto con su protocolo de evaluación; y (iii) una comparación entre el costo estimado analíticamente y el costo medido por componente, que identifica dónde se concentra el gasto de inferencia.
 
-El portal incorpora documentos, temas, tendencias, consultas sin resolver, filtros, validación, costos y consultas registradas. Estas últimas cuentan con estados de atención y bitácora; el contacto humano es manual, sin envío automático de correos. Los adjuntos del público se deshabilitan hasta disponer de análisis real, manteniendo la carga administrativa de documentos.
-\section{Validación y resultados disponibles}
-En esta fase pasan seis pruebas aisladas de contratos HTTP, la compilación TypeScript/Vite y una regresión Playwright de menú móvil, foco, errores de feedback/evaluación, importación CSV, formulario móvil y atención de consultas. La compilación advierte sobre el tamaño de un paquete JavaScript. Estos resultados demuestran únicamente las condiciones cubiertas por cada prueba.
+\section{Trabajos relacionados}
+\label{sec:related}
 
-Se propone un conjunto interno de al menos 100 preguntas balanceadas ES/EN, con respuestas esperadas revisadas por personas, consultas ambiguas, fuera de ámbito y sin información. La cantidad no proviene de una obligación numérica del reto. Las preguntas deben separarse de las usadas para ajustar el sistema; los casos de un mismo procedimiento no deben producir una falsa independencia estadística.
+La generación aumentada por recuperación (RAG) condiciona la salida del modelo a pasajes recuperados de una colección externa \cite{lewis2020rag}. Su uso reduce, pero no elimina, las afirmaciones no sustentadas: el modelo puede combinar fragmentos de forma incorrecta o completar vacíos con conocimiento propio \cite{ji2023survey}. Por ello conviene evaluar por separado la pertinencia de la recuperación, la fidelidad de la respuesta a los pasajes y el rechazo adecuado cuando la colección no contiene la respuesta.
 
-Una comprobación adicional sobre una tabla temporal de PostgreSQL verificó el guardado del set y la reversión completa de un fallo intermedio. Esta prueba no modificó el set persistente de la aplicación ni sustituye la validación factual.
+En recuperación, la combinación de rankings léxicos y semánticos mediante fusión por rango recíproco (RRF) supera de forma consistente a sus componentes individuales sin requerir calibración de puntajes \cite{cormack2009rrf}. Los vectores densos multilingües obtenidos por destilación de conocimiento permiten comparar consultas en inglés con documentos en español \cite{reimers2020multilingual}, y los índices de grafos jerárquicos navegables (HNSW) hacen viable la búsqueda aproximada dentro de una base relacional \cite{malkov2020hnsw}.
 
-Para cada pregunta se conservarán configuración, fecha, pregunta, respuesta esperada, respuesta obtenida, documento, resultado y latencia. Se reportarán exactitud factual con rúbrica humana, coincidencia de fuente, rechazo apropiado y latencias p50/p95. La coincidencia de documento y la alerta de texto sin cita son indicadores automáticos parciales. La tabla de resultados empíricos queda pendiente: no se sustituye por valores del simulador.
+En el ámbito universitario se han documentado asistentes para reducir el abandono previo a la matrícula \cite{pounce}, para el acceso a servicios personales y la navegación del campus \cite{genie}, para la orientación bilingüe de familias \cite{sunny} y para la preinscripción \cite{lola}. En el sector público, la evaluación de GOV.UK Chat atribuyó la mayoría de sus respuestas incorrectas a consultas ambiguas y observó mejoras de precisión al introducir preguntas de aclaración y el rechazo de consultas fuera de alcance \cite{govuk2026}. Yachi incorpora ambas decisiones. Su aportación no reside en ninguno de estos componentes por separado, sino en integrar evidencia visible, guías de procedimiento verificadas y localización física en una misma conversación, con un ciclo administrativo de validación.
 
-En una prueba de tareas con estudiantes se propone medir resolución correcta, tiempo, errores y percepción de claridad, comparando el asistente con búsqueda documental. El protocolo, participantes y resultados deberán completarse con consentimiento y datos minimizados.
-\section{Costo computacional}
-Sean $S$ estudiantes, $q$ consultas por estudiante y día, $h$ fracción de aciertos de caché y $c_m$ costo por consulta sin acierto. El costo mensual estimado es:
+\section{Arquitectura del sistema}
+\label{sec:arch}
+
+La Fig.~\ref{fig:arch} resume los dos flujos del sistema: la atención de una consulta y la actualización del contenido. El servidor se implementa con FastAPI y LangGraph, el índice con PostgreSQL y las extensiones pgvector y PostGIS, y el cliente con React, TypeScript y MapLibre. El modelo de generación es Claude Haiku~5.5. Todos los servicios se despliegan con Docker Compose.
+
+\begin{figure*}[t]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  x=1cm, y=1cm,
+  every node/.style={font=\footnotesize},
+  box/.style={draw, rectangle, align=center, minimum height=8.5mm, minimum width=22mm, inner sep=2.5pt},
+  llm/.style={box, fill=black!10},
+  flow/.style={-{Latex[length=1.8mm]}, thin}
+]
+% Atención de una consulta
+\node[box] (q) at (0,0) {Consulta\\(ES, EN, kichwa)};
+\node[box] (tri) at (2.75,0) {Triaje determinista\\\textit{filtros, crisis, salud}};
+\node[llm] (cls) at (5.6,0) {Clasificador de intención\\\textit{reglas y respaldo}\\\textit{con modelo}};
+\node[box] (fx) at (8.7,1.3) {Mensaje fijo\\\textit{crisis, salud, saludo}};
+\node[box] (geo) at (8.7,0) {Mapa y lugares\\\textit{PostGIS, pgRouting,}\\\textit{tablas curadas}};
+\node[llm] (ag) at (8.7,-1.3) {Agente de selección\\\textit{catálogo}};
+\node[box] (rr) at (11.4,-1.3) {Recuperación\\híbrida (RRF)};
+\node[llm] (gen) at (14.0,-1.3) {Generación\\anclada};
+\node[box] (ver) at (16.6,-1.3) {Verificación\\posterior};
+\node[box] (out) at (16.6,0.25) {Respuesta con\\fuentes y registro};
+\draw[flow] (q) -- (tri);
+\draw[flow] (tri) -- (cls);
+\draw[flow] (cls.east) -- ++(0.3,0) |- (fx.west);
+\draw[flow] (cls) -- (geo);
+\draw[flow] (cls.east) -- ++(0.3,0) |- (ag.west);
+\draw[flow] (ag) -- (rr);
+\draw[flow] (rr) -- (gen);
+\draw[flow] (gen) -- (ver);
+\draw[flow] (ver) -- (out);
+\draw[flow] (fx.east) -| (out.north);
+\draw[flow] (geo.east) -- (out.west |- geo.east);
+% Actualización del contenido
+\node[box] (portal) at (5.6,-2.75) {Documentos\\\textit{portal administrativo}};
+\node[box] (mail) at (5.6,-3.85) {Comunicados\\\textit{correo (n8n)}};
+\node[llm] (ing) at (8.95,-3.3) {Ingesta\\\textit{extracción, clasificación}\\\textit{fragmentos y vectores}};
+\node[box] (idx) at (12.15,-3.3) {Índice\\\textit{PostgreSQL y pgvector}};
+\draw[flow] (portal.east) -- ++(0.3,0) |- (ing.west);
+\draw[flow] (mail.east) -- ++(0.3,0) |- (ing.west);
+\draw[flow] (ing) -- (idx);
+\draw[flow] (idx.north) -- (idx.north |- rr.south);
+\draw[dashed, black!45] (-1.3,-2.15) -- (17.9,-2.15);
+\node[font=\scriptsize\itshape, black!60, anchor=west] at (-1.3,1.3) {Atención de una consulta};
+\node[font=\scriptsize\itshape, black!60, anchor=west] at (-1.3,-2.6) {Actualización del contenido};
+\end{tikzpicture}}
+\caption{Arquitectura de Yachi. Arriba, el flujo de una consulta; abajo, la actualización del índice desde el portal y desde los comunicados recibidos por correo. Las etapas sombreadas pueden invocar al modelo de lenguaje; el resto es determinista.}
+\label{fig:arch}
+\end{figure*}
+
+\subsection{Corpus e indexación}
+El corpus contiene 75 documentos vigentes (reglamentos, instructivos, calendarios, guías de servicios y páginas institucionales) clasificados en nueve temas y segmentados en \num{1446} fragmentos que respetan los límites de artículos y secciones. Cada documento conserva título, versión, período de vigencia, fecha de consulta y nivel de acceso. Los vectores se calculan localmente con un modelo multilingüe de 384 dimensiones \cite{reimers2020multilingual}, de modo que la indexación no genera costo por llamada. Las ubicaciones se cargan desde tablas curadas: 16 lugares de referencia con horario y 50 aulas con coordenadas.
+
+\subsection{Triaje determinista}
+Antes de cualquier llamada al modelo, un conjunto de filtros clasifica el mensaje. Las expresiones de riesgo vital reciben un mensaje fijo con los contactos de emergencia y de Bienestar Universitario; las denuncias de acoso nunca se tratan como insulto; los síntomas de salud se derivan al centro de salud del campus con su ubicación y horario; los intentos de modificar las instrucciones del asistente se rechazan. Los datos personales (cédula, correo, teléfono) se ocultan antes de buscar o almacenar, y el texto de los mensajes sensibles no se conserva. Las listas de términos se administran desde el portal sin modificar código. El diseño sigue las categorías de riesgo de OWASP para aplicaciones con modelos de lenguaje \cite{owasp2025} y el perfil de IA generativa del NIST \cite{nist2024}.
+
+\subsection{Guías de procedimiento y localización}
+Nueve trámites frecuentes (cambio de carrera, cambio de institución, certificados, reingreso, retiros, residencia, tercera matrícula y participación estudiantil) se representan como guías estructuradas con pasos ordenados, documentos requeridos, plazos y dependencia responsable. Cada campo se respalda con una cita textual del documento fuente; en total, las guías suman 45 pasos y 153 citas. Al reemplazarse o retirarse un documento, la guía se revalida y deja de publicarse si alguna cita ya no aparece en el texto vigente.
+
+\subsection{Clasificación de intención y servicio geográfico}
+Las consultas que superan el triaje se clasifican en siete intenciones: búsqueda documental, búsqueda de un lugar, ruta entre dos puntos, marcado en el mapa, solicitud mixta (por ejemplo, ubicar una dependencia y preguntar por sus trámites), continuación de una aclaración pendiente y conversación general. Un conjunto de reglas resuelve los casos inequívocos sin costo; solo cuando ninguna regla decide, el modelo devuelve una clasificación estructurada que se acepta si su confianza supera 0,72. Las reglas distinguen expresiones que comparten forma pero no intención: «¿a qué hora sale el bus de Ibarra a la universidad?» pide un horario y «¿cómo me cambio de otra universidad a Yachay Tech?» un trámite, por lo que ambas se dirigen a la búsqueda documental y no al cálculo de una ruta.
+
+El servicio geográfico importa el mapa del campus desde OpenStreetMap a PostGIS: 102 lugares y un grafo de 676 aristas con componentes peatonales y vehiculares. Las rutas se calculan con pgRouting y se devuelven como geometría que el cliente dibuja sobre el mapa. Cuando un nombre coincide con varios lugares, el sistema pide al usuario que elija y conserva la acción pendiente para la respuesta siguiente. Si el servicio geográfico no está disponible o el lugar no figura en el mapa, como ocurre con las aulas, la respuesta se obtiene de las tablas curadas de aulas y lugares.
+
+\subsection{Recuperación y agente de selección}
+La búsqueda combina la clasificación de texto completo de PostgreSQL con la similitud de coseno sobre el índice HNSW, y fusiona ambos rankings mediante RRF \cite{cormack2009rrf}. Cuando la consulta requiere documentos, un agente recibe el catálogo de títulos y descripciones, elige hasta cinco documentos y formula la búsqueda con la terminología de esos títulos, lo que resuelve discrepancias como «otra universidad» frente a «cambio de IES». El agente puede repetir la búsqueda cuando la pregunta tiene varias partes o falta un dato, con un máximo de seis llamadas a herramientas.
+
+\subsection{Generación anclada y verificación}
+El modelo recibe exclusivamente los fragmentos recuperados, identificados como [F1] a [F$n$], y debe citar la marca correspondiente después de cada dato. Si los fragmentos no permiten responder, debe emitir el símbolo \texttt{SIN\_INFORMACION}, que el servidor convierte en una respuesta de ausencia con el contacto de la dependencia. El servidor elimina las marcas y construye las referencias visibles a partir de los metadatos del índice, de modo que el modelo no redacta títulos, fechas ni enlaces. Tras la generación se comprueba que toda cifra, correo y URL de la respuesta figure literalmente en los fragmentos; las discrepancias se señalan al usuario y se registran para revisión.
+
+\subsection{Administración y control de gasto}
+Un portal autenticado permite a las dependencias cargar y versionar documentos, revisar las preguntas sin respuesta y convertirlas en casos de control, ejecutar la validación, editar filtros y consultar tendencias, consultas derivadas, costos y una bitácora de cambios. Cada llamada al modelo registra sus tokens de entrada, salida y caché junto con su costo; al alcanzar un presupuesto configurable, el asistente continúa operando en modo extractivo.
+
+\subsection{Incorporación de comunicados por correo}
+La Dirección de Comunicación publica avisos con fechas y cambios de servicio que no siempre llegan a los documentos normativos. Para incorporarlos, los comunicados se reenvían a un buzón dedicado que un flujo de n8n revisa cada minuto; el mensaje original se envía a la API, que lo acepta solo con un token de ingesta y si el remitente y quien lo reenvía figuran en listas autorizadas. El cuerpo, los PDF adjuntos y la transcripción verificada de sus imágenes se segmentan en fragmentos de hasta 300 caracteres, ajustados a la ventana de 128 tokens del modelo de vectores, y el modelo de lenguaje clasifica el comunicado y redacta su descripción para el catálogo. Los adjuntos que ya forman parte del corpus se omiten para no duplicar fragmentos, y reingresar un correo reemplaza su versión anterior. Cada comunicado se almacena con la versión «Comunicado del DD/MM/AAAA»; al usarlo, el modelo recibe la fecha del día y debe advertir si los plazos anunciados ya vencieron.
+
+\subsection{Observabilidad}
+La API expone métricas en formato Prometheus: solicitudes, duración y concurrencia por ruta; flujos de chat por intención y resultado; tiempo hasta el primer evento de la respuesta; llamadas, tokens y costo del modelo por operación; y errores del canal de eventos. Un tablero de Grafana aprovisionado con Docker Compose resume estos indicadores para la operación del piloto. Las etiquetas de las métricas tienen cardinalidad acotada y no incluyen el texto de las consultas.
+
+\section{Metodología de evaluación}
+\label{sec:method}
+
+\subsection{Conjunto de control}
+Se construyó un conjunto de 119 preguntas con respuesta conocida: 93 en español y 26 en inglés. De ellas, 101 deben citar al menos uno de los documentos esperados, 12 deben responderse como ausencia de información porque el corpus no contiene la respuesta y 6 son ambiguas y deben provocar una pregunta de aclaración. Las respuestas esperadas se definieron a partir de los documentos fuente.
+
+\subsection{Configuraciones y métricas}
+Se evaluaron tres configuraciones sobre el mismo índice: \textit{extractiva}, que muestra el fragmento mejor clasificado sin generación; \textit{con generación}, que incluye el agente y el modelo; y la \textit{versión integrada}, que añade el clasificador de intención, el servicio geográfico, la ingesta de comunicados y las optimizaciones de costo descritas en la Sección~\ref{sec:results}. La versión integrada se ejecutó en un entorno sin el servicio geográfico disponible, de modo que sus consultas de ubicación dependieron de las tablas curadas. Una pregunta se considera correcta si la respuesta cita un documento esperado, si rechaza cuando corresponde o si solicita aclaración cuando corresponde. Se reporta además el número de respuestas emitidas sin ninguna fuente y la latencia de extremo a extremo (percentiles 50 y 95). Para las proporciones se calcula el intervalo de confianza de Wilson al 95\,\% \cite{wilson1927}, más adecuado que la aproximación normal cuando la proporción se acerca a uno.
+
+\subsection{Costo}
+El costo mensual se estimó inicialmente como
 \begin{equation}
- C = C_{infra} + 30Sq(1-h)c_m + C_{escritura}.
+C = C_{\mathrm{infra}} + 30\,S\,q\,(1-h)\,c_m + C_{\mathrm{cach\acute{e}}},
+\label{eq:cost}
 \end{equation}
-El costo $c_m$ incluye entrada, salida y clasificación según la arquitectura elegida. La calculadora utiliza precios documentados de Anthropic\cite{pricing} y un servidor de referencia de DigitalOcean\cite{infra}. El supuesto de 4 vCPU y 8 GiB a USD 48 mensuales no constituye una medición de capacidad. La caché debe verificarse en la configuración real; no se presentarán ahorros supuestos como consumo observado.
+donde $S$ es el número de estudiantes, $q$ las consultas diarias por estudiante, $h$ la fracción de consultas resueltas sin llamar al modelo, $c_m$ el costo por consulta que sí lo invoca y $C_{\mathrm{cach\acute{e}}}$ el costo de escritura de la caché de prompt. Con $S=1800$, $q=0{,}3$, $h=0{,}3$, un servidor de 4~vCPU y 8~GiB a USD 48 mensuales \cite{infra} y las tarifas publicadas del modelo \cite{pricing}, la estimación fue de USD 0,0003 por consulta y USD 54 mensuales. El costo real se midió durante la ejecución del conjunto de control, sumando el costo de cada llamada registrada y dividiéndolo entre todas las consultas procesadas, incluidas las que no invocan el modelo.
 
-Para $N$ vectores de dimensión $d$ con float32, el almacenamiento vectorial mínimo es $4Nd$ bytes, al que se añaden texto, metadatos e índices. El esquema actual usa dimensión 384. CPU, RAM, disco, concurrencia, respaldos y costos operativos requieren medición antes de una adopción institucional.
-\section{Uso de IA}
-OpenAI Codex asistió en código, correcciones, auditoría con Playwright, investigación y borradores. El usuario definió identidad, preferencias visuales y prioridades. La declaración del repositorio debe completarse con herramientas históricas confirmadas, responsables humanos y revisión de contenido. La aprobación visual no acredita revisión de cada hecho ni autoría humana de todo el código.
-\section{Conclusiones y limitaciones}
-Se dispone de un prototipo con fuentes visibles, conversación, mapas y herramientas administrativas. La viabilidad propuesta depende de documentos vigentes, responsables de atención y evaluación factual ES/EN. No se certifican ausencia universal de alucinaciones, conformidad WCAG, generación bilingüe completa ni funcionamiento de voz con hardware real. Kichwa permanece como valor agregado pendiente de validación competente.
+\section{Resultados}
+\label{sec:results}
 
-Antes de entregar: completar autores, inventario, revisión de referencias, resultados empíricos, responsable institucional, revisión del aviso y ensayo del pitch. Publicar código no equivale a desplegar un servicio de producción.
-\begin{thebibliography}{9}
-\bibitem{pounce} Georgia State University, ``Reduction of Summer Melt,'' [En línea]. Disponible: \url{https://success.gsu.edu/reduction-of-summer-melt/}. Consulta: 20 oct. 2026.
-\bibitem{genie} Deakin University, ``Deakin's Genie: a virtual digital assistant out of the bottle,'' [En línea]. Disponible: \url{https://www.deakin.edu.au/about-deakin/news-and-media-releases/articles/deakins-genie-a-virtual-digital-assistant-out-of-the-bottle}. Consulta: 20 oct. 2026.
-\bibitem{sunny} Arizona State University, ``ASU launches bilingual chatbot to reach parents who want to go to college,'' 2020. [En línea]. Disponible: \url{https://news.asu.edu/20200709-asu-launches-bilingual-chatbot-reach-parents-who-want-go-college}.
-\bibitem{lola} Universidad de Murcia, ``LOLA Chatbot (Corto),'' 2018. [En línea]. Disponible: \url{https://clutv10.um.es/pro/video?id=116011}.
-\bibitem{rag} P. Lewis et al., ``Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks,'' NeurIPS, 2020. [En línea]. Disponible: \url{https://arxiv.org/abs/2005.11401}.
-\bibitem{pricing} Anthropic, ``Pricing,'' [En línea]. Disponible: \url{https://platform.claude.com/docs/en/about-claude/pricing}. Consulta: 20 oct. 2026.
-\bibitem{infra} DigitalOcean, ``Droplet Pricing,'' [En línea]. Disponible: \url{https://www.digitalocean.com/pricing/droplets}. Consulta: 20 oct. 2026.
+\subsection{Exactitud}
+La Tabla~\ref{tab:acc} compara las configuraciones. La generación elevó la exactitud de 73,1\,\% a 96,6\,\%, con intervalos de confianza que no se superponen, sin respuestas emitidas sin fuente. La Tabla~\ref{tab:cat} desglosa esta corrida por categoría. La versión integrada obtuvo 91,6\,\%, con un intervalo que se superpone con el de la configuración con generación; su análisis se presenta al final de esta subsección.
+
+\begin{table}[t]
+\caption{Exactitud sobre el conjunto de control ($n=119$)}
+\label{tab:acc}
+\centering
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Configuración & Correctas & Exactitud (IC 95\,\%) & Latencia p50 / p95 \\
+\midrule
+Extractiva & 87 & 73,1\,\% (64,5 a 80,3) & \SI{0,2}{s} / n.\,d. \\
+Con generación & 115 & 96,6\,\% (91,7 a 98,7) & \SI{6,4}{s} / \SI{10,3}{s} \\
+Versión integrada & 109 & 91,6\,\% (85,2 a 95,4) & \SI{7,6}{s} / \SI{13,9}{s} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\caption{Resultados por categoría, configuración con generación}
+\label{tab:cat}
+\centering
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Categoría & $n$ & Correctas & IC 95\,\% \\
+\midrule
+Español & 93 & 89 & 89,5 a 98,3\,\% \\
+Inglés & 26 & 26 & 87,1 a 100\,\% \\
+Ausencia de información & 12 & 12 & 75,7 a 100\,\% \\
+Solicitud de aclaración & 6 & 6 & 61,0 a 100\,\% \\
+\midrule
+Respuestas sin fuente & 119 & 0 & n.\,d. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Los cuatro errores restantes corresponden a preguntas en las que el sistema citó un documento relacionado pero distinto del esperado (por ejemplo, la Ley Orgánica de Educación Superior en lugar del estatuto institucional para la duración del cargo de rector) o rechazó una pregunta cuya respuesta figuraba en una tabla del reglamento de residencias. Ninguno consistió en un dato inventado.
+
+En la versión integrada, los 26 casos en inglés se mantuvieron correctos y los diez errores se concentraron en español (83 de 93, IC 95\,\%: 81,3 a 94,1\,\%). Cuatro de ellos fueron preguntas que el clasificador interpretó como ubicaciones (por ejemplo, «¿hay piscina en el campus?» o la parada de un bus) y que recibieron el aviso de servicio geográfico no disponible; son las cuatro respuestas contabilizadas sin fuente, y ninguna contenía datos. Otros cuatro fueron rechazos de preguntas cuya respuesta estaba en el corpus, como el horario de visitas de las residencias o los requisitos para ser representante estudiantil. Los dos restantes citaron un documento relacionado distinto del esperado, con una respuesta correcta en uno de ellos. A partir de este análisis, las consultas que el servicio geográfico no puede resolver y que no figuran en las tablas curadas se dirigen a la búsqueda documental, y la expresión «de X a Y» solo se interpreta como ruta cuando incluye un verbo de desplazamiento. El resultado indica que cada nueva ruta del sistema debe acompañarse de una corrida del conjunto de control antes de su publicación.
+
+\subsection{Filtros de entrada}
+Los filtros se evaluaron con 113 casos etiquetados. Se obtuvieron 0 falsos positivos sobre 38 consultas legítimas que contienen términos sensibles (por ejemplo, salud sexual, identidad o un síntoma dentro de una pregunta de trámite) y 0 falsos negativos sobre 29 casos de riesgo (crisis, denuncias, insultos y manipulación). El conjunto es reducido y fue elaborado por el equipo, por lo que solo demuestra la ausencia de regresiones en los casos conocidos.
+
+\subsection{Pruebas de software y carga}
+La integración continua ejecuta en cada cambio 206 pruebas del servidor, 36 del cliente y 56 del servicio de mapas sobre una base PostGIS y pgRouting aislada, además de pruebas de extremo a extremo con Playwright para el mapa y las sugerencias. Las pruebas del servidor cubren, entre otros aspectos, el agente, el clasificador de intención, la ingesta de comunicados, la telemetría, el registro de consumo y el contrato de la API. Una prueba de carga local del flujo de rutas, con 20 sesiones concurrentes y tres repeticiones por sesión, completó 60 de 60 solicitudes sin errores, con latencia p95 de \SI{2,03}{s} y un rendimiento de 14,5 solicitudes por segundo en un único proceso. Estas consultas no invocan el modelo, de manera que la prueba caracteriza la capa geográfica y no la generación.
+
+\subsection{Costo de inferencia}
+La Tabla~\ref{tab:cost} contrasta la estimación con la medición. El costo real por consulta fue 15 veces superior al estimado. El desglose por componente mostró que el agente de selección concentraba el 87\,\% del gasto: cada uno de sus pasos reenviaba el catálogo completo de documentos, de aproximadamente \num{11000} tokens, sin aprovechar la caché. El 24\,\% de las consultas se resolvió sin invocar el modelo.
+
+A partir de este diagnóstico se aplicaron dos cambios que no alteran las fuentes consultadas: un catálogo compacto con identificador, título, descripción abreviada y vigencia (aproximadamente \num{6200} tokens) y puntos de caché de prompt en el ciclo del agente, de modo que los pasos sucesivos relean el contenido previo a una fracción del precio de entrada. La medición posterior, realizada sobre la versión integrada, se resume en la última fila de la Tabla~\ref{tab:cost}: el costo por consulta bajó a USD 0,0025, un 47\,\% menos que la línea base. El agente pasó a representar el 72\,\% del gasto, con 1,35 millones de tokens leídos desde la caché; la redacción, el 23\,\%; y el clasificador de intención, el 5\,\%.
+
+\begin{table}[t]
+\caption{Costo de inferencia por consulta y proyección mensual (USD)}
+\label{tab:cost}
+\centering
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Escenario & Por consulta & Modelo/mes & Total/mes \\
+\midrule
+Estimación analítica & 0,0003 & 6 & 54 \\
+Medido, línea base & 0,0047 & 76 & 124 \\
+Medido, optimizado & 0,0025 & 41 & 89 \\
+\bottomrule
+\multicolumn{4}{@{}p{0.95\columnwidth}@{}}{\footnotesize Proyección con 540 consultas diarias y un servidor de USD 48 mensuales.}
+\end{tabular}
+\end{table}
+
+\section{Discusión}
+\label{sec:discussion}
+
+La diferencia entre las dos configuraciones indica que la recuperación por sí sola encuentra el documento correcto en tres de cada cuatro casos, y que el agente de selección y la generación aportan la mayor parte de la mejora restante, en particular en preguntas con varias partes y en aquellas cuya formulación difiere de la terminología normativa. El rechazo y la aclaración se comportaron como se esperaba, aunque sus intervalos son amplios por el tamaño de esas categorías.
+
+La discrepancia de costo tiene una explicación estructural. El modelo analítico suponía una sola llamada por consulta con cuatro fragmentos; la arquitectura real realiza en promedio más de dos llamadas del agente y una de redacción, y el catálogo domina el volumen de entrada. La medición por componente resultó más útil que el ajuste de los supuestos de la estimación, porque identificó directamente el elemento que debía optimizarse. Incluso en el escenario medido sin optimizar, el costo mensual proyectado se mantiene en el orden del costo de un servidor pequeño.
+
+\subsection{Limitaciones}
+El conjunto de control fue construido por el equipo y no por las dependencias responsables, y su criterio de acierto verifica la cita del documento esperado, no la corrección semántica completa de cada frase. Las preguntas de un mismo trámite no son estadísticamente independientes, por lo que los intervalos reportados son optimistas. No se realizó un estudio con estudiantes que compare la resolución de tareas frente a la búsqueda documental directa. La interfaz en kichwa se ofrece como experimental hasta su revisión por hablantes competentes. La prueba de carga se ejecutó en un equipo local y no en la infraestructura de despliegue. La corrida de la versión integrada no dispuso del servicio geográfico, por lo que no evalúa el cálculo de rutas, que se verificó por separado con sus propias pruebas.
+
+\section{Viabilidad de adopción}
+\label{sec:adoption}
+
+El asistente se incorpora a cualquier página institucional mediante un único elemento \texttt{script}. Las dependencias mantienen su contenido desde el portal sin intervención de programadores, y los comunicados de la Dirección de Comunicación se incorporan automáticamente al reenviarlos al buzón de ingesta, lo que reduce el riesgo de que el índice quede desactualizado. Las métricas operativas y el registro de consumo permiten vigilar la latencia, los errores y el gasto durante el piloto. Las consultas que el sistema no puede responder se derivan a la dependencia con autorización expresa del estudiante y un código de seguimiento, y se conservan por un período limitado conforme a la Ley Orgánica de Protección de Datos Personales del Ecuador \cite{lopdp2021}. Se propone un piloto de cuatro semanas con una dependencia responsable del contenido y un grupo de estudiantes de primer año, con criterios explícitos para ampliar el alcance: exactitud igual o superior al 90\,\% en un conjunto revisado por la dependencia y ausencia de datos institucionales inventados. Antes del lanzamiento se requiere autenticación institucional en el portal con roles por dependencia, el texto de privacidad aprobado y la designación de un responsable de la infraestructura.
+
+\section{Disponibilidad y reproducibilidad}
+\label{sec:repro}
+
+El código fuente está disponible en \url{https://github.com/RecHashhh/yachay-asistente-ideaton}. El sistema completo se levanta con \texttt{docker compose up}, que crea la base de datos con sus extensiones, aplica las migraciones, importa el mapa del campus e indexa el corpus. El corpus institucional no se publica en el repositorio y se entrega por un canal autorizado; la evaluación puede repetirse desde el portal, que ejecuta el conjunto de control y exporta los resultados por pregunta, mientras que el consumo de cada corrida se consulta en el registro de uso del modelo. La integración continua ejecuta las pruebas del servidor, del cliente y del servicio geográfico en cada cambio.
+
+\section{Declaración de uso de inteligencia artificial}
+\label{sec:ai}
+
+Durante el desarrollo se emplearon asistentes de programación basados en modelos de lenguaje (Claude Code y OpenAI Codex) para generar y revisar código, redactar pruebas, ejecutar auditorías automatizadas y preparar borradores de documentación. Los integrantes del equipo definieron el problema, el alcance, la arquitectura, la identidad visual y los criterios de evaluación, revisaron los cambios antes de integrarlos y son responsables del contenido de este artículo. El asistente evaluado utiliza Claude Haiku~5.5 como modelo de generación. La declaración detallada, con cada herramienta, su propósito y la distinción de autoría, se adjunta como anexo conforme a las bases del ideatón.
+
+\section{Conclusiones}
+\label{sec:conclusions}
+
+Yachi muestra que un asistente institucional puede restringir la generación a evidencia documental verificable y mantener una exactitud elevada en un conjunto de control bilingüe sin emitir respuestas sin fuente. La separación entre respuestas deterministas y generadas permite atender sin costo de inferencia los casos sensibles y las consultas de ubicación, y garantiza un comportamiento predecible ante situaciones de riesgo. La medición del costo por componente reveló una desviación importante respecto de la estimación inicial y permitió corregirla. El trabajo futuro incluye la validación del conjunto de control por las dependencias, un estudio con estudiantes y la evaluación de la fidelidad de las respuestas frase por frase.
+
+\def\UrlBreaks{\do\/\do-\do.\do_\do=\do?}
+\begin{thebibliography}{99}
+\sloppy
+
+\bibitem{ji2023survey}
+Z.~Ji, N.~Lee, R.~Frieske, T.~Yu, D.~Su, Y.~Xu, E.~Ishii, Y.~J. Bang, A.~Madotto y P.~Fung, ``Survey of hallucination in natural language generation,'' \textit{ACM Computing Surveys}, vol.~55, no.~12, art.~248, 2023.
+
+\bibitem{lewis2020rag}
+P.~Lewis \textit{et al.}, ``Retrieval-augmented generation for knowledge-intensive NLP tasks,'' en \textit{Advances in Neural Information Processing Systems}, vol.~33, 2020, pp.~9459--9474.
+
+\bibitem{cormack2009rrf}
+G.~V. Cormack, C.~L.~A. Clarke y S.~Buettcher, ``Reciprocal rank fusion outperforms Condorcet and individual rank learning methods,'' en \textit{Proc. 32nd Int. ACM SIGIR Conf. Research and Development in Information Retrieval}, 2009, pp.~758--759.
+
+\bibitem{reimers2020multilingual}
+N.~Reimers e I.~Gurevych, ``Making monolingual sentence embeddings multilingual using knowledge distillation,'' en \textit{Proc. Conf. Empirical Methods in Natural Language Processing (EMNLP)}, 2020, pp.~4512--4525.
+
+\bibitem{malkov2020hnsw}
+Y.~A. Malkov y D.~A. Yashunin, ``Efficient and robust approximate nearest neighbor search using hierarchical navigable small world graphs,'' \textit{IEEE Trans. Pattern Anal. Mach. Intell.}, vol.~42, no.~4, pp.~824--836, 2020.
+
+\bibitem{wilson1927}
+E.~B. Wilson, ``Probable inference, the law of succession, and statistical inference,'' \textit{J. Amer. Statist. Assoc.}, vol.~22, no.~158, pp.~209--212, 1927.
+
+\bibitem{owasp2025}
+OWASP Foundation, ``OWASP Top 10 for Large Language Model Applications,'' versión 2025. [En línea]. Disponible: \url{https://genai.owasp.org/llm-top-10/}
+
+\bibitem{nist2024}
+National Institute of Standards and Technology, ``Artificial Intelligence Risk Management Framework: Generative Artificial Intelligence Profile,'' NIST AI 600-1, 2024.
+
+\bibitem{govuk2026}
+Government Digital Service, ``5 things we learned testing GOV.UK Chat, an AI assistant for government,'' \textit{Inside GOV.UK}, 16 mar. 2026. [En línea]. Disponible: \url{https://insidegovuk.blog.gov.uk/2026/03/16/5-things-we-learned-testing-gov-uk-chat-an-ai-assistant-for-government}
+
+\bibitem{pounce}
+Georgia State University, ``Reduction of summer melt.'' [En línea]. Disponible: \url{https://success.gsu.edu/reduction-of-summer-melt/}. Consultado: 20 oct. 2026.
+
+\bibitem{genie}
+Deakin University, ``Deakin's Genie: a virtual digital assistant out of the bottle.'' [En línea]. Disponible: \url{https://www.deakin.edu.au/about-deakin/news-and-media-releases/articles/deakins-genie-a-virtual-digital-assistant-out-of-the-bottle}. Consultado: 20 oct. 2026.
+
+\bibitem{sunny}
+Arizona State University, ``ASU launches bilingual chatbot to reach parents who want to go to college,'' 2020. [En línea]. Disponible: \url{https://news.asu.edu/20200709-asu-launches-bilingual-chatbot-reach-parents-who-want-go-college}
+
+\bibitem{lola}
+Universidad de Murcia, ``LOLA chatbot,'' 2018. [En línea]. Disponible: \url{https://clutv10.um.es/pro/video?id=116011}
+
+\bibitem{lopdp2021}
+Asamblea Nacional del Ecuador, ``Ley Orgánica de Protección de Datos Personales,'' \textit{Registro Oficial}, Suplemento no.~459, 26 may. 2021.
+
+\bibitem{pricing}
+Anthropic, ``Pricing.'' [En línea]. Disponible: \url{https://platform.claude.com/docs/en/about-claude/pricing}. Consultado: 20 oct. 2026.
+
+\bibitem{infra}
+DigitalOcean, ``Droplet pricing.'' [En línea]. Disponible: \url{https://www.digitalocean.com/pricing/droplets}. Consultado: 20 oct. 2026.
+
 \end{thebibliography}
+
 \end{document}
