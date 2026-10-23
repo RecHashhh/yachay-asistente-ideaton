@@ -1,0 +1,435 @@
+{
+  "scope": "Live API behavior; does not certify Kichwa grammar. Raw institutional answers remain local and Git-ignored.",
+  "results": [
+    {
+      "lang": "es",
+      "case": "greeting",
+      "events": [
+        "clarify",
+        "done"
+      ],
+      "sourceCount": 0,
+      "characters": 0,
+      "seconds": 0.05,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "es",
+      "case": "location",
+      "events": [
+        "step",
+        "tool",
+        "token",
+        "sources",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 1,
+      "characters": 109,
+      "seconds": 0.07,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "es",
+      "case": "procedure",
+      "events": [
+        "step",
+        "token",
+        "procedure",
+        "sources",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 1,
+      "characters": 130,
+      "seconds": 0.06,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "es",
+      "case": "residences",
+      "events": [
+        "status",
+        "step",
+        "token",
+        "sources",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 5,
+      "characters": 781,
+      "seconds": 13.62,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "es",
+      "case": "academic",
+      "events": [
+        "status",
+        "step",
+        "unknown",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 0,
+      "characters": 0,
+      "seconds": 9.07,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "es",
+      "case": "ambiguous",
+      "events": [
+        "status",
+        "step",
+        "unknown",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 0,
+      "characters": 0,
+      "seconds": 1.85,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "es",
+      "case": "out_of_domain",
+      "events": [
+        "status",
+        "step",
+        "unknown",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 0,
+      "characters": 0,
+      "seconds": 1.54,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "es",
+      "case": "unsupported",
+      "events": [
+        "status",
+        "step",
+        "unknown",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 0,
+      "characters": 0,
+      "seconds": 6.47,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "es",
+      "case": "future_period",
+      "events": [
+        "status",
+        "step",
+        "unknown",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 0,
+      "characters": 0,
+      "seconds": 8.27,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "en",
+      "case": "greeting",
+      "events": [
+        "clarify",
+        "done"
+      ],
+      "sourceCount": 0,
+      "characters": 0,
+      "seconds": 0.02,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "en",
+      "case": "location",
+      "events": [
+        "step",
+        "tool",
+        "token",
+        "sources",
+        "done"
+      ],
+      "sourceCount": 1,
+      "characters": 94,
+      "seconds": 0.08,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "en",
+      "case": "procedure",
+      "events": [
+        "step",
+        "token",
+        "procedure",
+        "sources",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 1,
+      "characters": 130,
+      "seconds": 0.1,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "en",
+      "case": "residences",
+      "events": [
+        "status",
+        "step",
+        "token",
+        "sources",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 6,
+      "characters": 661,
+      "seconds": 12.03,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "en",
+      "case": "academic",
+      "events": [
+        "status",
+        "step",
+        "unknown",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 0,
+      "characters": 0,
+      "seconds": 8.55,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "en",
+      "case": "ambiguous",
+      "events": [
+        "status",
+        "step",
+        "unknown",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 0,
+      "characters": 0,
+      "seconds": 1.88,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "en",
+      "case": "out_of_domain",
+      "events": [
+        "unknown",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 0,
+      "characters": 0,
+      "seconds": 0.01,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "en",
+      "case": "unsupported",
+      "events": [
+        "status",
+        "step",
+        "unknown",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 0,
+      "characters": 0,
+      "seconds": 7.3,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "en",
+      "case": "future_period",
+      "events": [
+        "status",
+        "step",
+        "unknown",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 0,
+      "characters": 0,
+      "seconds": 9.42,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "qu",
+      "case": "greeting",
+      "events": [
+        "token",
+        "done"
+      ],
+      "sourceCount": 0,
+      "characters": 60,
+      "seconds": 1.2,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "qu",
+      "case": "location",
+      "events": [
+        "step",
+        "tool",
+        "token",
+        "sources",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 1,
+      "characters": 109,
+      "seconds": 0.11,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "qu",
+      "case": "procedure",
+      "events": [
+        "step",
+        "token",
+        "procedure",
+        "sources",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 1,
+      "characters": 130,
+      "seconds": 0.24,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "qu",
+      "case": "residences",
+      "events": [
+        "status",
+        "step",
+        "token",
+        "sources",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 1,
+      "characters": 481,
+      "seconds": 13.55,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "qu",
+      "case": "academic",
+      "events": [
+        "status",
+        "step",
+        "token",
+        "sources",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 1,
+      "characters": 349,
+      "seconds": 14.43,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "qu",
+      "case": "ambiguous",
+      "events": [
+        "status",
+        "step",
+        "unknown",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 0,
+      "characters": 0,
+      "seconds": 3.84,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "qu",
+      "case": "out_of_domain",
+      "events": [
+        "status",
+        "step",
+        "unknown",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 0,
+      "characters": 0,
+      "seconds": 3.28,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "qu",
+      "case": "unsupported",
+      "events": [
+        "status",
+        "step",
+        "unknown",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 0,
+      "characters": 0,
+      "seconds": 6.36,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    },
+    {
+      "lang": "qu",
+      "case": "future_period",
+      "events": [
+        "status",
+        "step",
+        "unknown",
+        "suggestions",
+        "done"
+      ],
+      "sourceCount": 0,
+      "characters": 0,
+      "seconds": 8.42,
+      "warnings": [],
+      "contentReview": "pending_manual_review"
+    }
+  ]
+}
