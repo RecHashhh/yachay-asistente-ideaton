@@ -181,6 +181,8 @@ class RagAgent:
             )
             if isinstance(response, dict) and "parsed" in response:
                 usage = getattr(response.get("raw"), "usage_metadata", {}) or {}
+                if self.usage_hook:
+                    self.usage_hook(usage, "intencion")
                 logger.info(
                     "anthropic_intent_usage input_tokens=%d output_tokens=%d",
                     int(usage.get("input_tokens", 0)), int(usage.get("output_tokens", 0)),
@@ -217,12 +219,16 @@ class RagAgent:
 
         @tool("list_documents")
         async def list_documents() -> str:
-            """Return document IDs, titles, descriptions, validity periods, and source URLs."""
+            """Return document IDs, titles, short descriptions and validity periods."""
             if not catalog:
                 catalog.extend(await self.retriever.list_documents(session))
                 if notify:
                     notify("catalog", {"n": len(catalog)})
-            return json.dumps(catalog, ensure_ascii=False)
+            return json.dumps([
+                {"doc_id": d["doc_id"], "title": d.get("title"), "description": (d.get("description") or "")[:200],
+                 "validity_period": d.get("validity_period")}
+                for d in catalog
+            ], ensure_ascii=False)
 
         @tool("search_rag", args_schema=RagSearchInput)
         async def search_rag(query: str, document_ids: list[str] | None = None) -> str:

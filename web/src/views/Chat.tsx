@@ -11,6 +11,7 @@ import { ProcedureCard, UnknownCard } from '../components/ProcedureCard';
 import { IcSpeaker, IcExternal, IcSpark, IcCheck, IcClose, IcCopy, IcDown, IcArrowDown, IcExpand, IcGlobe, IcInfo, IcLock, IcShield, IcMenu, IcMoon, IcPlus, IcRetry, IcSun, IcTrend, IcUp } from '../components/icons';
 import { CHAT_MOCK, docHref, getTopics, getTrends, sendFeedback, streamChat } from '../lib/api';
 import { displayStream } from '../lib/displayStream';
+import { freshSuggestions } from '../lib/suggestions';
 import { LANGS, detectLang, locatorLabel, topicLabel, useT, type Lang } from '../lib/i18n';
 import { placeById, placeName } from '../lib/campus';
 import { ChatList } from '../components/ChatList';
@@ -348,14 +349,16 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
 
   // Sugerencias personalizadas: lo que el asistente propuso seguir en tus últimas conversaciones y aún no preguntaste.
   const forYou = useMemo(() => {
-    const asked = new Set(chats.flatMap((c) => c.msgs.filter((m) => m.role === 'user').map((m) => m.text)));
+    const asked = chats.flatMap((c) => c.msgs.filter((m) => m.role === 'user').map((m) => m.text));
     const out: string[] = [];
     for (const c of chats.slice(0, 5)) {
-      const last = [...c.msgs].reverse().find((m) => m.role === 'assistant' && m.suggestions?.length);
-      for (const q of last?.suggestions ?? []) if (!asked.has(q) && !out.includes(q)) out.push(q);
+      const last = [...c.msgs].reverse().find((m) => m.role === 'assistant' && (m.lang ?? 'es') === lang && m.suggestions?.length);
+      out.push(...last?.suggestions ?? []);
     }
-    return out.slice(0, 3);
-  }, [chats]);
+    return freshSuggestions(out, asked);
+  }, [chats, lang]);
+
+  const followups = freshSuggestions(lastAi?.suggestions ?? [], msgs.filter((m) => m.role === 'user').map((m) => m.text));
 
   const composer = (
     <motion.div layoutId={composerId} layout="position" transition={{ layout: { duration: reducedMotion ? 0 : 0.3, ease: [0.2, 0.8, 0.2, 1] } }}>
@@ -475,7 +478,7 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
                         {m.text}
                       </motion.div>
                     )
-                    : <AssistantMsg key={m.id} m={m} theme={theme} mapConfig={mapConfig}
+                    : <AssistantMsg key={m.id} m={{ ...m, suggestions: m.id === lastAi?.id && !busy && (m.lang ?? 'es') === lang ? followups : [] }} theme={theme} mapConfig={mapConfig}
                         onVote={(v) => { patch(m.id, () => ({ vote: v })); if (v === 'up' && m.serverId) void sendFeedback(m.serverId, v).catch(() => { patch(m.id, () => ({ vote: undefined })); setToastMsg(lang === 'en' ? 'Your feedback was not saved. Try again.' : 'No se guardó tu valoración. Intenta de nuevo.'); }); }}
                         onReason={async (r) => { if (!m.serverId) throw new Error('Respuesta sin identificador'); await sendFeedback(m.serverId, 'down', { question: msgs[i - 1]?.text ?? '', lang, reason: r ?? undefined }); }}
                         question={msgs[i - 1]?.text}

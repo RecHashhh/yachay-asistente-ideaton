@@ -1,6 +1,7 @@
 import asyncio
+import json
 
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 import pytest
 
 from app.agent import RagAgent
@@ -150,6 +151,12 @@ async def test_agent_searches_selected_documents_and_streams_answer(monkeypatch)
     assert model.answer_calls == 1
     assert model.bound_tools[0][1]["tool_choice"] == "auto"
     assert all(sum(isinstance(message, SystemMessage) for message in messages) == 1 for messages in model.decision_messages)
+    catalog_message = next(m for messages in model.decision_messages for m in messages if isinstance(m, ToolMessage))
+    catalog = json.loads(catalog_message.content)
+    assert len(catalog) == 6
+    assert set(catalog[0]) == {'doc_id', 'title', 'description', 'validity_period'}
+    assert catalog[0]['doc_id'] == 'd1'
+    assert catalog[0]['validity_period'] == '2026'
 
 
 @pytest.mark.asyncio

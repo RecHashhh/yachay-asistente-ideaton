@@ -9,11 +9,8 @@ import re
 
 from .config import settings
 from .kichwa import load_memory, lookup
-
-try:
-    from . import usage
-except ImportError:  # Compatibility with the pre-budget local backend checkout.
-    usage = None
+from . import usage
+from .telemetry import measure_anthropic_call
 
 _cache: OrderedDict[str, dict] = OrderedDict()
 _gate = asyncio.Semaphore(1)
@@ -26,15 +23,15 @@ async def translate_fields(fields: dict[str, str], client) -> dict[str, str] | N
     if key in _cache:
         _cache.move_to_end(key)
         return dict(_cache[key])
-    if client is None or not settings.has_anthropic_key or (usage is not None and not usage.budget_ok()):
+    if client is None or not settings.has_anthropic_key or not usage.budget_ok():
         return None
     async with _gate:
         if key in _cache:
             return dict(_cache[key])
-        if usage is not None and not usage.budget_ok():
+        if not usage.budget_ok():
             return None
         try:
-            response = await asyncio.wait_for(client.messages.create(
+            response = await measure_anthropic_call(settings.anthropic_model, 'kichwa_presentation', asyncio.wait_for(client.messages.create(
                 model=settings.anthropic_model, max_tokens=6000,
                 system=('Translate the JSON string values from Spanish into Ecuadorian Kichwa. '
                         'Return ONLY a JSON object with exactly the same keys and string values. '
@@ -47,9 +44,8 @@ async def translate_fields(fields: dict[str, str], client) -> dict[str, str] | N
                         + json.dumps(lookup(' '.join(fields.values())[:1600]), ensure_ascii=False)
                         + '\nGrammar reference data: ' + json.dumps(load_memory()['grammar'], ensure_ascii=False)),
                 messages=[{'role': 'user', 'content': json.dumps(fields, ensure_ascii=False)}],
-            ), timeout=35)
-            if usage is not None:
-                usage.record_anthropic('traduccion_presentacion_kichwa', response.usage)
+            ), timeout=35))
+            usage.record_anthropic('traduccion_presentacion_kichwa', response.usage)
             text = ''.join(getattr(part, 'text', '') for part in response.content).strip()
             if text.startswith('```'):
                 text = re.sub(r'^```(?:json)?\s*|\s*```$', '', text)

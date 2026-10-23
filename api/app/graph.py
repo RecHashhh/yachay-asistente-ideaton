@@ -270,7 +270,7 @@ async def route(state: State) -> State:
             "intent_router source=local intent=%s confidence=%.2f latency_ms=%d",
             decision.intent.value, decision.confidence, int((time.perf_counter() - intent_started) * 1000),
         )
-    if decision is None and settings.agent_enabled:
+    if decision is None and settings.agent_enabled and usage.budget_ok():
         try:
             decision = await _agent().classify_intent(
                 q,
@@ -471,11 +471,12 @@ async def place_answer(state: State) -> State:
             text += _t(lang, f" Horario de apertura: **{p.horario}**.", f" Opening hours: **{p.horario}**.")
         doc = p.fuente
         locator = _t(lang, f"fila {p.name}", f"row {p.name}")
+    source_text = text
     if lang == 'qu':
         text = await kichwa_presentation.translated_text(text, client)
     for part in re.findall(r"\S+\s*", text):
         w({"type": "token", "text": part})
-    src = _doc_source(doc, locator, text.replace("**", ""))
+    src = _doc_source(doc, locator, source_text.replace("**", ""))
     if src:
         w({"type": "sources", "items": [{**src, "url": None, "origin": "interno"}]})
     return {"kind": "lugar", "doc_ids": [doc]}
@@ -597,7 +598,7 @@ def _agent():
         from .yachi_retriever import YachiRetriever
 
         _agent_instance = RagAgent(settings, YachiRetriever(settings))
-        _agent_instance.usage_hook = lambda md: usage.record_langchain("agente", md)  # tokens reales de cada decisión
+        _agent_instance.usage_hook = lambda md, source="agente": usage.record_langchain(source, md)
     return _agent_instance
 
 

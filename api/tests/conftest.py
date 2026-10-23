@@ -23,6 +23,10 @@ def _usage_sin_base(monkeypatch):
 
 def pytest_asyncio_loop_factories(config, item):
     """Use Uvicorn's uvloop; the sandbox selector loop hangs on executor shutdown."""
-    import uvloop
+    try:
+        import uvloop
+    except ImportError:
+        import asyncio
+        return {"asyncio": asyncio.new_event_loop}
 
     return {"uvloop": uvloop.new_event_loop}
