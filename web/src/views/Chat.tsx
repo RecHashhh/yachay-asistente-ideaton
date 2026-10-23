@@ -442,7 +442,7 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
             )}
             {(trends.length > 0 || trendsError) && (
               <div className="suggest">
-                <h2><IcTrend width={15} height={15} />{t('trending')}</h2>
+                <h2><IcTrend width={15} height={15} />{t(CHAT_MOCK ? 'exampleQuestions' : 'trending')}</h2>
                 {trendsError && <div className="row" role="status">
                   <p className="small muted">{lang === 'en' ? 'Could not load popular questions.' : 'No se pudieron cargar las consultas más frecuentes.'}</p>
                   <button className="btn sm" onClick={() => setTrendsRetry((n) => n + 1)}>{lang === 'en' ? 'Retry' : 'Reintentar'}</button>
@@ -452,7 +452,7 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
                     <motion.button key={x.query} className="suggest-card" onClick={() => void send(x.query)}
                       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 + i * 0.06 }}>
                       {x.query}
-                      <small>{topicName[x.topicId] ?? x.topicId}</small>
+                      <small>{topicName[x.topicId] ?? x.topicId}{!CHAT_MOCK && x.count === 0 ? (lang === 'en' ? ' · Suggested' : ' · Sugerencia') : ''}</small>
                     </motion.button>
                   ))}
                 </div>
