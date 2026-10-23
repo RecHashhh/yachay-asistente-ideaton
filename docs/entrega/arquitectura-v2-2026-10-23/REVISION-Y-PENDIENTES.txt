@@ -1,0 +1,67 @@
+YACHI — REVISIÓN DE ARQUITECTURA Y COBERTURA DEL RETO
+Fecha: 23/10/2026, Ecuador. Sustituye las indicaciones de la primera arquitectura sobre la ausencia de ingesta por correo.
+
+1. VERSIÓN Y ALCANCE DE LA REVISIÓN
+Se comparó la carpeta principal (afb86bf) con origin/main (789f2be, merge de KevJoss), y se leyó la copia de integración ci-adopcion sin modificarla. Esta última sigue teniendo cambios en curso en graph.py, intent_router.py, paper.tex y el panel de costo. Las láminas describen el código remoto y señalan los elementos cuya activación o validación aún no se ha comprobado.
+No equivalen a una certificación de cumplimiento de toda la rúbrica. Se revisaron los siete criterios del PDF y los objetivos, alcance, requisitos y entregables del reto.
+
+2. CAMBIOS QUE AHORA FORMAN PARTE DE LA ARQUITECTURA
+A. Comunicados por correo: correo original reenviado como .eml → buzón robot Gmail / IMAP → n8n → POST /ingest/email → procesamiento → documents y chunks compartidos con el Portal. El código incluye alternativa CLI para archivos .eml locales. El flujo exportado de n8n necesita credenciales y publicación; su existencia en Git no demuestra una ingesta real exitosa.
+B. Endpoint: INGEST_TOKEN en X-Ingest-Token; sin token configurado se deshabilita. Lista de remitentes y reenviadores permitidos. Se conserva el correo original y se rechazan los reenvíos inline que pierden sus cabeceras. Esto no incorpora por sí solo una validación criptográfica del remitente: el código delega la protección anti-suplantación al buzón y menciona Authentication-Results como mejora.
+C. Metadatos: asunto, categoría del asunto, fecha en Ecuador, Message-ID, remitente, reenviador, tipo documental, tema y descripción. El cuerpo usa ID derivado de Message-ID; los PDF usan hash de contenido. La reingesta reemplaza fragmentos. Los documentos retirados no pasan otra vez a estado indexado por esa reingesta. La comparación de títulos también evita algunas copias de PDF ya presentes en el corpus.
+D. Contenido: cuerpo text/plain y PDF extraíble; limpieza de pie de correo preservando enlaces exactos. PDF sin texto se omite. No afirmar OCR automático: la transcripción de imágenes verificada por el equipo es una vía manual opcional de CLI.
+E. Recuperación de correo: trozos cortos para el embedding y contexto de vecinos para lectura. El Portal y los PDF conservan su segmentación estructurada; no afirmar que TODOS los fragmentos del nuevo correo son de 800 tokens ni confundir caracteres con tokens.
+F. Clasificación de ingesta: tipo, tema y descripción mediante el modelo; fallback si está desactivado, se agota el presupuesto o falla. Registra el uso con fuente ingesta_correo en el libro de consumo. Su costo es por actualización documental y debe distinguirse del costo de contestar preguntas.
+G. Horarios: una pregunta sobre buses no se convierte en una ruta peatonal por contener «de X a Y». El horario de atención de médico, enfermería u oficina se recupera de documentos; no se deduce del horario de apertura del edificio.
+H. Tiempo: el prompt incorpora HOY en UTC−5 y pide fechar el comunicado y advertir si el evento o plazo ya pasó. Esto no agrega fecha_vencimiento / expires_at a cada documento ni excluye automáticamente los comunicados antiguos del índice. Requiere pruebas de fechas pasadas, futuras, relativas y ambiguas.
+I. Se mantienen React/TypeScript, FastAPI/LangGraph, guías curadas, PostgreSQL/pgvector, RRF, PostGIS/pgRouting, controles de dominio y datos, verificación de cifras/enlaces, fuentes del servidor, voz experimental, panel, presupuesto y observabilidad.
+
+3. ESTADO REAL OBSERVADO
+El servicio del panel en 127.0.0.1:8001 devuelve 75 documentos y 1.446 fragmentos, con agente activo, pero su OpenAPI NO registra /ingest/email en el momento de la revisión. Por tanto, la lámina distingue código remoto de función activada en ese proceso. No se enviaron correos ni se configuraron cuentas externas durante esta revisión.
+Pasaron 43 pruebas focalizadas de la copia de integración: test_email_ingest.py, test_rules_intent.py y test_intent_router.py. Prueban las condiciones cubiertas por esos casos; no acreditan Gmail/n8n/endpoint/base de extremo a extremo.
+La copia de integración también trabaja en un fallback a aulas/lugares curados cuando el servicio de mapas no responde y en evitar que trámites como cambio de universidad se interpreten como rutas. Son cambios en curso, no resultados de una nueva corrida completa validada aquí.
+
+4. MÉTRICAS: RESULTADOS QUE SE PUEDEN CITAR
+El snapshot métrico se conserva en metricas-verificadas.json, con hora de captura y sin credenciales.
+- Índice: 75 documentos, 1.446 fragmentos con embedding, 384 dimensiones y 9 guías publicadas.
+- Almacenamiento consultado mediante SQL de solo lectura: chunks con índices 15.400.960 bytes (14,69 MiB); documents con índices 106.496 bytes; base completa 26.326.719 bytes (25,11 MiB). La base completa incluye tablas ajenas al índice. No incluye PDF originales, pesos ASR/TTS, archivos de modelos, backups ni discos de contenedores. No presentarlo como almacenamiento total de producción.
+- Corrida histórica del 22/10 a las 19:54: 115/119 = 96,64 %, mostrado como 97 %. ES 96 %, EN 100 %, rechazo 100 %, aclaración 100 %, 0 alertas automáticas sin fuente, p50 6,384 s y p95 10,309 s.
+- Corrida más reciente al consultar, del 23/10 a las 09:26: 99/119 = 83,19 %. ES 83 %, EN 85 %, rechazo 92 %, aclaración 100 %, p50 8,051 s y p95 17,218 s; 13 alertas de texto sin documento citado.
+- Se inspeccionaron las 13 alertas: todas son «El servicio de mapas no está disponible ahora» o «The map service is unavailable right now». La bandera llamada hallucination se activa porque hay texto y faltan documentos/tipo de rechazo reconocido. No demuestra 13 hechos inventados. Sí revela degradación del flujo / enrutamiento y una limitación del evaluador que debe corregirse o interpretarse explícitamente.
+- El evaluador determina acierto por documento esperado, rechazo o aclaración. No es una revisión humana frase por frase de la verdad ni de la traducción. El 97 % no acredita kichwa ni puede venderse como el estado más reciente. No se conoce con certeza el commit/configuración de cada corrida guardada; deben añadirse a futuras mediciones.
+- Carga geográfica documentada anteriormente: 20 sesiones × 3 solicitudes = 60/60 correctas; p95 2,027 s; 14,48 solicitudes/s; 0 errores SSE y 0 llamadas al modelo. Es una prueba de rutas, no una prueba de generación RAG ni capacidad máxima, y el reporte no captura CPU/RAM.
+- Línea base de costo reportada por la revisión previa: USD 0,0047 por consulta, sobre 109 consultas. Con 540 al día, 30 días y USD 48 de servidor supuesto: 0,0047 × 540 × 30 + 48 = USD 124,14/mes. A pico ×4 y tarifa constante: USD 352,56/mes; esta aritmética utiliza la tarifa redondeada y puede diferir de las proyecciones del registro sin redondear.
+- Snapshot acumulado actual del Portal: USD 0,003369 por consulta sobre 246, y USD 0,004934 por respuesta con modelo sobre 168. Incluye tráfico mezclado y ventanas/configuraciones distintas: NO prueba una reducción atribuible al catálogo compacto.
+- El borrador de costos de la copia de integración conserva placeholders OPT_*; no son resultados y no deben llegar al pitch.
+
+5. COBERTURA DE TODOS LOS CRITERIOS DEL PDF
+1) Rigor científico y metodológico. Exige paper IEEE completo, estado del arte crítico, problema delimitado, método y decisiones justificadas. Hay paper y revisión en curso. Falta cerrar autores/responsables, eliminar placeholders, incorporar las nuevas fuentes, separar histórico/actual y asegurar coherencia entre resultados, discusión, costo y referencias. No se acredita su calidad final sin revisión del documento cerrado.
+2) Calidad técnica. Exige cobertura de procedimientos, representatividad y ubicaciones; guías con qué/cómo/orden/documentos; repositorio público legible y viabilidad de adopción. La arquitectura contiene esos caminos y Portal. Hay que demostrar con ejemplos de cambio de carrera, FEYT/cogobierno y aula/laboratorio/residencia. Verificar nuevo correo completo y plan con responsables institucionales, actualización y soporte.
+3) Mitigación y veracidad. Exige anclaje, citas internas, restricción de dominio, «no sé», control amplio y métricas de precisión trazables. Conservar rechazos y aclaraciones; reportar resultados por documento, idioma y tipo de consulta, y revisar la fidelidad de la respuesta. Cerrar la regresión reciente, probar avisos vencidos y no confundir una alerta automática con alucinación factual.
+4) UX y bilingüismo. Exige primer uso sin instrucciones, accesibilidad, español/inglés fluidos y respuesta percibida inmediata. La voz y el kichwa aportan valor extra, no sustituyen ES/EN. Demostrar selección/detección, teclado, foco, lector de pantalla y primer uso. Medir tiempo hasta feedback útil / primer token de respuesta, además de latencia total; el primer evento SSE puede ser solo un estado. Una evaluación automática de accesibilidad no acredita por sí sola WCAG completa. Validar kichwa con una persona competente y audio real.
+5) Costo computacional. Exige cómputo, RAM, almacenamiento, inferencia, supuestos, escenarios y decisiones ligados a la arquitectura. Separar la consulta de los costos de ingesta de correos/PDF y de ASR/TTS local. Registrar CPU/RAM en reposo y bajo carga, disco completo incluyendo modelos y documentos, tokens por operación, costo por consulta/documento, volumen normal/pico y ventana de retención. 4 vCPU y 8 GB son una hipótesis de servidor, no consumo medido ni dimensionamiento demostrado. Embeddings locales no tienen tarifa por llamada, pero sí consumen recursos.
+6) Uso documentado de IA, obligatorio. Herramientas, propósito de cada una, qué generó o asistió la IA, qué decidió/revisó el equipo y responsables humanos. Incluir diagramas y borradores asistidos, no solo el código. La clasificación/generación en tiempo de ejecución también debe quedar explicada como parte del sistema.
+7) Calidad del pitch. Problema, solución, validación, costo e impacto; estructura sintética, tiempo asignado y respuestas sólidas al jurado. Usar el diagrama como síntesis, una lámina de evidencia y las capturas como demo. Impacto esperado no equivale a ahorro de tiempo o satisfacción ya medidos: faltan pruebas con estudiantes y plan de adopción.
+
+El reto también solicita confidencialidad de los recursos, repositorio público, paper IEEE y prototipo/demo. Mantener fuera del repo público corpus, correos originales y datos personales. No afirmar integración con matrícula, notas, pagos o firma electrónica: están fuera de alcance. Las normas ISO/LOPDP usadas como referencias no equivalen a certificaciones.
+
+6. ORDEN PARA CERRAR LA EVIDENCIA DE ESTA SECCIÓN
+P0. Terminar la integración en curso, registrar commit y configuración, activar el endpoint en el servicio destinado a la demo.
+P0. Verificar ingesta autorizada y rechazos: token ausente/incorrecto, remitente y reenviador no permitidos, reenvío inline, reingesta, PDF repetido, PDF sin texto y documento retirado. Realizar un correo de prueba completo solo con cuenta y contenido autorizados.
+P0. Verificar horario de bus frente a ruta, servicio frente a edificio; fechas pasada/futura/relativa; cita y fecha del comunicado. La fecha del envío no implica que todo su contenido ya venció.
+P0. Repetir los 119 casos tras los ajustes, registrar fallos y revisar fidelidad con responsables; no arrastrar 97 % como resultado nuevo.
+P1. Medir costo por operación y CPU/RAM/disco bajo una carga representativa, con y sin voz/correo; escenarios normal/pico y mismo conjunto para comparar optimizaciones.
+P1. Cerrar paper IEEE, declaración de IA, responsables/plan de adopción y prueba de UX ES/EN; ensayar demo y tiempo de pitch. Validación lingüística del kichwa como valor agregado.
+
+7. ARCHIVOS PARA LAS SLIDES
+01-arquitectura-actualizada.png / .svg: reemplazo del diagrama anterior; incorpora fuentes de correo, seguridad, metadatos, horarios, fecha, voz y observabilidad.
+02-metricas-y-pendientes.png / .svg: evidencia para revisión del equipo; muestra resultados recientes e históricos sin ocultar regresiones. Actualizar antes de la entrega si se obtiene otra corrida.
+03-cobertura-rubrica.png / .svg: guía de cobertura de los siete criterios; sirve para repartir la evidencia entre slides y paper.
+PNG en 3840×2160; SVG editable. El material fue preparado con asistencia de Codex a partir del código, registros y PDFs; debe reflejarse en la declaración de IA.
+
+FUENTES LOCALES
+Rubrica_Reto_Chatbot_Institucional.pdf, p. 1.
+Reto1 chatbot Yachaytech.pdf, pp. 2–6, especialmente 4, 8.1/8.2, 9, 10 y 13.
+origin/main 789f2be: n8n/README.md, n8n/flujo-correos.json, api/app/email_ingest.py, main.py, config.py, graph.py, rules.py e intent_router.py, y sus pruebas.
+docs/reports/pilot-load-2026-10-23.md; docs/operational-pilot.md.
+metricas-verificadas.json: servicio /admin/summary, /health, /openapi.json y consultas SQL de solo lectura.

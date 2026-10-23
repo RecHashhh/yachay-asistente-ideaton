@@ -1,0 +1,110 @@
+{
+  "capturedAt": "2026-10-23T14:34:44.298Z",
+  "architectureReference": "origin/main 789f2be plus explicitly labelled integration work",
+  "runtime": {
+    "api": "http://127.0.0.1:8001",
+    "health": {
+      "status": "ok",
+      "documents": 75,
+      "chunks": 1446,
+      "agent": true
+    },
+    "emailEndpointRegistered": false
+  },
+  "storage": {
+    "databaseBytes": 26326719,
+    "tablesIncludingIndexesBytes": {
+      "documents": 106496,
+      "chunks": 15400960
+    },
+    "embeddingDimensions": 384,
+    "chunks": 1446,
+    "embeddedChunks": 1446,
+    "embeddingModel": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+  },
+  "summary": {
+    "week": {
+      "total": 83,
+      "today": 41,
+      "sessions": 54,
+      "answered": 59,
+      "unanswered": 11,
+      "ood": 2,
+      "care": 0,
+      "conversation": 11,
+      "p50": 57,
+      "p95": 2475
+    },
+    "langs": {
+      "en": 10,
+      "es": 59,
+      "qu": 14
+    },
+    "feedback": {
+      "up": 1,
+      "down": 0
+    },
+    "pending": {
+      "inbox": 43,
+      "inquiries": 0,
+      "docs": 75,
+      "doc_errors": 0
+    },
+    "guides": 9,
+    "usage": {
+      "llmOn": true,
+      "hasKey": true,
+      "active": true,
+      "model": "claude-haiku-5-5",
+      "budgetUsd": 5,
+      "spentUsd": 0.828855,
+      "calls": 806,
+      "answeredWithModel": 360,
+      "real": {
+        "since": "2026-10-22T19:59:40.022914-05:00",
+        "queries": 246,
+        "modelQueries": 168,
+        "perQueryUsd": 0.003369,
+        "perModelAnswerUsd": 0.004934
+      },
+      "bySource": [
+        {
+          "source": "agente",
+          "calls": 539,
+          "inputTokens": 6062717,
+          "outputTokens": 109956,
+          "usd": 0.675767
+        },
+        {
+          "source": "intencion",
+          "calls": 93,
+          "inputTokens": 92192,
+          "outputTokens": 10470,
+          "usd": 0.014456
+        },
+        {
+          "source": "redaccion",
+          "calls": 174,
+          "inputTokens": 1027699,
+          "outputTokens": 20362,
+          "usd": 0.138632
+        }
+      ]
+    },
+    "lastValidation": {
+      "at": "2026-10-23T09:26:28.005712-05:00",
+      "model": "claude-haiku-5-5",
+      "total": 119,
+      "ok": 99,
+      "accuracy": 83,
+      "es": 83,
+      "en": 85,
+      "refusal": 92,
+      "clarify": 100,
+      "hallucinations": 13,
+      "p50": 8051,
+      "p95": 17218
+    }
+  },
+  "caveat": "Saved validation predates email changes; local mixed traffic cost is not an optimized benchmark. Endpoint presence does not establish a configured mailbox or a successful n8n run."
+}

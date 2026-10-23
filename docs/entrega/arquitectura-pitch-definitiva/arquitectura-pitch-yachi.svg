@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080"><defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7Z" fill="#27618e"/></marker></defs><rect width="1920" height="1080" fill="#fcfcfa"/><g font-family="Arial,Helvetica,sans-serif">
+<text x="90" y="73" font-size="23" fill="#27618e" font-weight="700" letter-spacing="2">07 · LA MAGIA DETRÁS DE YACHI · 1/3</text>
+<text x="90" y="174" font-size="75" fill="#1d2b36" font-weight="700" >Cómo</text><rect x="318" y="98" width="388" height="94" fill="#27618e"/><text x="335" y="174" font-family="Georgia,serif" font-size="75" font-weight="700" fill="white">funciona</text>
+<rect x="90" y="215" width="76" height="9" fill="#ef4035"/><rect x="166" y="215" width="76" height="9" fill="#f68735"/><rect x="242" y="215" width="76" height="9" fill="#f9c82b"/><rect x="318" y="215" width="76" height="9" fill="#64ae42"/><rect x="394" y="215" width="76" height="9" fill="#299dce"/><rect x="470" y="215" width="76" height="9" fill="#00b7aa"/><rect x="546" y="215" width="76" height="9" fill="#35c3d4"/>
+
+<rect x="90" y="288" width="470" height="210" rx="22" fill="#edf3f7"/><path d="M99 288H551" stroke="#ef4035" stroke-width="6"/><text x="117" y="328" font-size="22" fill="#ef4035" font-weight="700" >01</text><text x="117" y="375" font-size="32" fill="#20303d" font-weight="700" >Fuentes</text><text x="117" y="425" font-size="26" fill="#526172" font-weight="400" >Documentos oficiales</text><text x="117" y="460" font-size="26" fill="#526172" font-weight="400" >y comunicados · Portal + n8n</text>
+<rect x="655" y="288" width="500" height="210" rx="22" fill="#edf3f7"/><path d="M664 288H1146" stroke="#f68735" stroke-width="6"/><text x="682" y="328" font-size="22" fill="#f68735" font-weight="700" >02</text><text x="682" y="375" font-size="32" fill="#20303d" font-weight="700" >Indexado</text><text x="682" y="425" font-size="26" fill="#526172" font-weight="400" >Fragmentos + embeddings MiniLM</text><text x="682" y="460" font-size="26" fill="#526172" font-weight="400" >PostgreSQL / pgvector</text>
+<path d="M575 393L635 393" stroke="#27618e" stroke-width="3" fill="none" marker-end="url(#a)"/>
+<path d="M1170 393H1300" stroke="#27618e" stroke-width="3" marker-end="url(#a)"/>
+<text x="1340" y="382" font-size="22" fill="#27618e" font-weight="700" letter-spacing="1">BASE DE CONOCIMIENTO</text>
+<text x="1340" y="422" font-size="25" fill="#526172" font-weight="400" >Fuentes organizadas y consultables</text>
+
+<text x="90" y="530" font-size="17" fill="#27618e" font-weight="700" letter-spacing="1">AL RECIBIR UNA CONSULTA</text>
+<rect x="90" y="545" width="1740" height="73" rx="15" fill="#e8eff4"/>
+<text x="115" y="589" font-size="21" fill="#27618e" font-weight="700" >FILTROS DE ENTRADA</text><text x="365" y="589" font-size="24" fill="#526172" font-weight="400" >Datos personales · seguridad · dominio</text>
+<path d="M845 562V601" stroke="#c5d4df" stroke-width="2"/>
+<text x="875" y="589" font-size="21" fill="#27618e" font-weight="700" >ENRUTAMIENTO</text><text x="1070" y="589" font-size="24" fill="#526172" font-weight="400" >Trámites · documentos · ubicaciones</text>
+<path d="M1580 454H1855V640H590V650" stroke="#27618e" stroke-width="2.5" stroke-dasharray="7 6" fill="none" marker-end="url(#a)"/>
+<path d="M350 625L350 650" stroke="#27618e" stroke-width="3" fill="none" marker-end="url(#a)"/>
+
+<rect x="90" y="660" width="520" height="224" rx="22" fill="#edf3f7"/><path d="M99 660H601" stroke="#64ae42" stroke-width="6"/><text x="117" y="700" font-size="22" fill="#64ae42" font-weight="700" >03</text><text x="117" y="747" font-size="32" fill="#20303d" font-weight="700" >Agente y búsqueda</text><text x="117" y="797" font-size="26" fill="#526172" font-weight="400" >LangGraph · búsqueda híbrida</text><text x="117" y="832" font-size="26" fill="#526172" font-weight="400" >Guías y mapas</text>
+<rect x="700" y="660" width="500" height="224" rx="22" fill="#edf3f7"/><path d="M709 660H1191" stroke="#299dce" stroke-width="6"/><text x="727" y="700" font-size="22" fill="#299dce" font-weight="700" >04</text><text x="727" y="747" font-size="32" fill="#20303d" font-weight="700" >Generación</text><text x="727" y="797" font-size="26" fill="#526172" font-weight="400" >Claude · respuesta basada</text><text x="727" y="832" font-size="26" fill="#526172" font-weight="400" >en evidencia</text>
+<rect x="1290" y="660" width="540" height="224" rx="22" fill="#edf3f7"/><path d="M1299 660H1821" stroke="#00b7aa" stroke-width="6"/><text x="1317" y="700" font-size="22" fill="#00b7aa" font-weight="700" >05</text><text x="1317" y="747" font-size="32" fill="#20303d" font-weight="700" >Verificación y respuesta</text><text x="1317" y="797" font-size="26" fill="#526172" font-weight="400" >Cifras, enlaces y citas</text><text x="1317" y="832" font-size="26" fill="#526172" font-weight="400" >Sin respaldo: «no sé»</text>
+<path d="M625 772L680 772" stroke="#27618e" stroke-width="3" fill="none" marker-end="url(#a)"/><path d="M1215 772L1270 772" stroke="#27618e" stroke-width="3" fill="none" marker-end="url(#a)"/>
+
+<path d="M90 931H1774Q1830 931 1830 986V1010H145Q90 1010 90 955Z" fill="#27618e"/>
+<text x="120" y="981" font-size="23" fill="#d2e4f0" font-weight="700" letter-spacing="1">INTERACCIÓN</text>
+<text x="375" y="981" font-size="27" fill="white" font-weight="600" >React + TypeScript</text>
+<path d="M665 953V991" stroke="#7aa1bd" stroke-width="2"/>
+<text x="705" y="981" font-size="27" fill="white" font-weight="600" >Texto y voz · ES / EN / kichwa experimental</text>
+<text x="90" y="1056" font-size="21" fill="#7a8998" font-weight="400" >Yachi · Ideatón Yachay Open Science Week 2026</text><text x="1798" y="1056" font-size="21" fill="#7a8998" font-weight="400" >12</text>
+</g></svg>
