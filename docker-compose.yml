@@ -17,7 +17,7 @@ services:
       - postgres_unified_data:/var/lib/postgresql
       - ./api/sql/docker:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d postgres"]
       interval: 5s
       timeout: 3s
       retries: 12
@@ -39,8 +39,11 @@ services:
       MAPS_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-yachay}:${POSTGRES_PASSWORD:-local-dev-only-change-me}@db:5432/${POSTGRES_DB:-yachi}
       DATABASE_SCHEMA: maps
       RAG_DIR: /app/rag
+      RAG_OPTIONAL: ${RAG_OPTIONAL:-true}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-haiku-5-5}
+      ANTHROPIC_PRICING_USD_PER_MTOK_JSON: ${ANTHROPIC_PRICING_USD_PER_MTOK_JSON:-}
+      GEO_LOCK_POOL_SIZE: ${GEO_LOCK_POOL_SIZE:-32}
       YACHI_AGENT: ${YACHI_AGENT:-auto}
       RAG_MIN_SIMILARITY: ${RAG_MIN_SIMILARITY:-0.30}
       RAG_CONTEXT_CHUNKS: ${RAG_CONTEXT_CHUNKS:-8}
@@ -66,6 +69,24 @@ services:
       - ./rag:/app/rag:ro
       - ./Mapa:/data:ro
       - model_cache:/app/.cache
+    depends_on:
+      db-bootstrap:
+        condition: service_completed_successfully
+    restart: "no"
+    logging: *default-logging
+
+  # Crea la base configurada si falta en un volumen PostgreSQL ya existente.
+  db-bootstrap:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    command: ["python", "-m", "app.bootstrap_db"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-yachi}
+      POSTGRES_USER: ${POSTGRES_USER:-yachay}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-only-change-me}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
     depends_on:
       db:
         condition: service_healthy
@@ -117,6 +138,45 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  prometheus:
+    profiles: ["pilot"]
+    image: prom/prometheus:v3.15.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *default-logging
+
+  grafana:
+    profiles: ["pilot"]
+    image: grafana/grafana:13.2.2
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-this-pilot-password}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    logging: *default-logging
+
   # ---------------------------------------------------------------- perfil opcional: capa original con Ollama
   ollama:
     profiles: ["ollama"]
@@ -165,8 +225,8 @@ services:
       - ./rag:/app/rag:ro
       - ./Mapa:/data:ro
     depends_on:
-      db:
-        condition: service_healthy
+      db-bootstrap:
+        condition: service_completed_successfully
       ollama-model:
         condition: service_completed_successfully
     restart: "no"
@@ -180,3 +240,5 @@ volumes:
   model_cache:
   uploads:
   n8n_data:
+  prometheus_data:
+  grafana_data:

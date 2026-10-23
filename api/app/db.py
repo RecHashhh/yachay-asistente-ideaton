@@ -18,15 +18,38 @@ settings = get_settings()
 
 # ------------------------------------------------------------------ Yachi (psycopg)
 pool = ConnectionPool(settings.database_url, min_size=1, max_size=8, kwargs={"row_factory": dict_row}, open=False)
+geo_lock_pool = ConnectionPool(
+    settings.database_url,
+    min_size=1,
+    max_size=settings.geo_lock_pool_size,
+    kwargs={"row_factory": dict_row},
+    open=False,
+)
 
 
 def open_pool() -> None:
     pool.open(wait=True, timeout=10)
 
 
+def open_geo_lock_pool() -> None:
+    geo_lock_pool.open(wait=True, timeout=10)
+
+
+def close_pools() -> None:
+    geo_lock_pool.close()
+    pool.close()
+
+
 @contextmanager
 def conn():
     with pool.connection() as c:
+        yield c
+
+
+@contextmanager
+def geo_lock_conn():
+    """Use a separate pool so long lived advisory locks cannot exhaust the query pool."""
+    with geo_lock_pool.connection() as c:
         yield c
 
 

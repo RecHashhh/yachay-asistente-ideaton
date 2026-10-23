@@ -183,6 +183,9 @@ export function GeoMap({ view, theme, basemap, config }: Props) {
     }
 
     mapRef.current = map;
+    if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('mapDebug')) {
+      (window as Window & { __yachayMapDebug?: MapLibreMap }).__yachayMapDebug = map;
+    }
     loadedRef.current = false;
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
     const markers: Marker[] = [];

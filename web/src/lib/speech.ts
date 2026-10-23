@@ -1,8 +1,10 @@
-import { PLACES, placeById, placeName } from './campus';
+import { placeById, placeName } from './campus';
 import type { Lang } from './i18n';
 import { kichwaRecordingSupported, listenKichwa } from './kichwaSpeech';
 import { serverSpeechSupported, speakKichwa, stopKichwaSpeech } from './kichwaTts';
 import type { MapAction, Procedure, Source, Unknown } from './types';
+import type { MapView } from './mapConversation';
+import { publicVoiceUrl, voiceActionText, voiceMapLink } from './voiceActions';
 
 /**
  * Motor de voz del modo conversación: reconocimiento (Web Speech API), síntesis con la mejor voz disponible,
@@ -13,9 +15,9 @@ import type { MapAction, Procedure, Source, Unknown } from './types';
 const SPEECH_LANG: Record<Lang, string> = { es: 'es-EC', en: 'en-US', qu: 'qu-EC' };
 const PREF_KEY = 'yt-voice';
 
-export interface VoicePrefs { rate: number; voiceURI?: string; autoListen: boolean }
+export interface VoicePrefs { rate: number; voiceURI?: string; autoListen: boolean; reviewKichwa?: boolean }
 export const loadPrefs = (): VoicePrefs => {
-  try { return { rate: 1, autoListen: true, ...(JSON.parse(localStorage.getItem(PREF_KEY) ?? '{}') as Partial<VoicePrefs>) }; } catch { return { rate: 1, autoListen: true }; }
+  try { return { rate: 1, autoListen: true, reviewKichwa: true, ...(JSON.parse(localStorage.getItem(PREF_KEY) ?? '{}') as Partial<VoicePrefs>) }; } catch { return { rate: 1, autoListen: true, reviewKichwa: true }; }
 };
 export const savePrefs = (p: VoicePrefs) => { try { localStorage.setItem(PREF_KEY, JSON.stringify(p)); } catch { /* sin almacenamiento */ } };
 
@@ -40,6 +42,8 @@ export function whenVoicesReady(): Promise<void> {
   return new Promise((r) => { speechSynthesis.addEventListener('voiceschanged', () => r(), { once: true }); setTimeout(r, 1500); });
 }
 
+let cancelNative = () => undefined as void;
+
 /** Habla el texto por oraciones (evita el corte de Chrome en textos largos) y resuelve al terminar o al cancelarse. */
 export function speak(text: string, lang: Lang, prefs: VoicePrefs, onBoundary?: (i: number) => void): Promise<void> {
   if (!text.trim()) return Promise.resolve();
@@ -48,27 +52,32 @@ export function speak(text: string, lang: Lang, prefs: VoicePrefs, onBoundary?: 
   if (lang === 'qu' && !voice) return speakKichwa(text, prefs.rate, onBoundary);
   if (!ttsSupported()) return Promise.resolve();
   const parts = text.match(/[^.!?¿¡:\n]+[.!?:]?|\n/g)?.map((s) => s.trim()).filter(Boolean) ?? [text];
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     let i = 0;
+    let finished = false;
+    let guard: ReturnType<typeof setTimeout> | undefined;
+    const finish = (error?: Error) => { if (finished) return; finished = true; clearTimeout(guard); if (cancelNative === finish) cancelNative = () => undefined; if (error) reject(error); else resolve(); };
+    cancelNative = finish;
     const next = () => {
-      if (i >= parts.length) return resolve();
+      if (finished) return;
+      if (i >= parts.length) return finish();
       const u = new SpeechSynthesisUtterance(parts[i]!);
       u.lang = voice?.lang ?? SPEECH_LANG[lang];
       if (voice) u.voice = voice;
       u.rate = prefs.rate;
-      // Si el sistema no tiene voces, algunos navegadores nunca emiten "end": se avanza por tiempo estimado.
+      // Si el navegador no emite "end", informa del fallo sin iniciar otra oración.
       let advanced = false;
-      const go = () => { if (advanced) return; advanced = true; clearTimeout(guard); i++; next(); };
-      const guard = setTimeout(go, 2000 + (parts[i]!.length * 90) / prefs.rate);
+      const go = () => { if (advanced || finished) return; advanced = true; clearTimeout(guard); i++; next(); };
+      guard = setTimeout(() => finish(new Error('speech-timeout')), 2000 + (parts[i]!.length * 90) / prefs.rate);
       u.onend = go;
-      u.onerror = (e) => { if (e.error === 'interrupted' || e.error === 'canceled') { advanced = true; clearTimeout(guard); resolve(); } else go(); };
+      u.onerror = (e) => { if (e.error === 'interrupted' || e.error === 'canceled') finish(); else finish(new Error(e.error)); };
       onBoundary?.(i);
       speechSynthesis.speak(u);
     };
     next();
   });
 }
-export const stopSpeaking = () => { stopKichwaSpeech(); if (ttsSupported()) speechSynthesis.cancel(); };
+export const stopSpeaking = () => { cancelNative(); stopKichwaSpeech(); if (ttsSupported()) speechSynthesis.cancel(); };
 
 // ---------------- Reconocimiento ----------------
 
@@ -91,8 +100,12 @@ export function listenOnce(lang: Lang, onInterim: (t: string) => void): { done: 
   const r = new C();
   r.lang = SPEECH_LANG[lang]; r.interimResults = true; r.continuous = false; r.maxAlternatives = 1;
   let final = '';
+  let aborted = false;
+  let settle: (text: string) => void = () => undefined;
   const done = new Promise<string>((resolve, reject) => {
+    settle = resolve;
     r.onresult = (ev) => {
+      if (aborted) return;
       let interim = '';
       for (let k = ev.resultIndex; k < ev.results.length; k++) {
         const res = ev.results[k]!;
@@ -101,10 +114,10 @@ export function listenOnce(lang: Lang, onInterim: (t: string) => void): { done: 
       onInterim((final + interim).trim());
     };
     r.onerror = (ev) => (ev.error === 'no-speech' || ev.error === 'aborted' ? resolve('') : reject(new Error(ev.error)));
-    r.onend = () => resolve(final.trim());
+    r.onend = () => resolve(aborted ? '' : final.trim());
   });
   r.start();
-  return { done, stop: () => r.stop(), abort: () => r.abort() };
+  return { done, stop: () => { try { r.stop(); } catch { settle(final.trim()); } }, abort: () => { aborted = true; settle(''); try { r.abort(); } catch { /* already ended */ } } };
 }
 
 // ---------------- Sonidos de estado ----------------
@@ -124,36 +137,28 @@ export function earcon(kind: 'listen' | 'done' | 'error') {
 
 // ---------------- Respuesta → voz ----------------
 
-const plain = (md: string) => md.replaceAll('**', '').replace(/^\s*[-*]\s+/gm, '').replace(/^\s*\d+\.\s+/gm, '').replace(/\n{2,}/g, '. ').replace(/\n/g, '. ').replace(/\.\s*\./g, '.');
+const plain = (md: string) => md.replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, '$1').replace(/\[(?:F|S)\d+\]/g, '').replace(/https?:\/\/\S+/g, '').replaceAll('**', '').replace(/^#+\s*/gm, '').replace(/^\s*[-*]\s+/gm, '').replace(/^\s*\d+\.\s+/gm, '').replace(/\n{2,}/g, '. ').replace(/\n/g, '. ').replace(/\.\s*\./g, '.');
 
-const COMPASS = { es: ['el este', 'el noreste', 'el norte', 'el noroeste', 'el oeste', 'el suroeste', 'el sur', 'el sureste'], en: ['east', 'northeast', 'north', 'northwest', 'west', 'southwest', 'south', 'southeast'] };
-
-/** Indicaciones en palabras para quien no ve el mapa: dirección desde el origen y una referencia cercana. Aproximado (plano esquemático). */
+/** Lee el nombre y la nota disponibles, sin inferir recorridos de un plano esquemático. */
 export function describeRoute(a: MapAction, lang: Lang): string {
-  const to = placeById(a.destino); if (!to) return '';
-  const from = a.origen ? placeById(a.origen) : undefined;
-  const en = lang === 'en';
-  const near = PLACES.filter((p) => p.id !== to.id && p.id !== from?.id).map((p) => ({ p, d: Math.hypot(p.x - to.x, p.y - to.y) })).sort((x, y) => x.d - y.d)[0]?.p;
-  let dir = '';
-  if (from) {
-    const ang = (Math.atan2(-(to.y - from.y), to.x - from.x) * 180) / Math.PI;
-    dir = COMPASS[en ? 'en' : 'es'][Math.round(((ang + 360) % 360) / 45) % 8]!;
-  }
-  const n = (p: typeof to) => placeName(p, lang);
-  if (en) return `${from ? `From the ${n(from)}, head ${dir}. ` : ''}${n(to)} is next to ${near ? n(near) : 'the main path'}.`;
-  return `${from ? `Desde la ${n(from).toLowerCase()}, camina hacia ${dir}. ` : ''}${n(to)} queda junto a ${near ? n(near) : 'el camino principal'}.`;
+  const to = placeById(a.destino);
+  const name = a.nombre ?? (to ? placeName(to, lang) : '');
+  // SVG coordinates are schematic: never turn them into walking directions.
+  return [name, a.nota, a.lat === undefined ? voiceActionText(lang).unverifiedRoute : ''].filter(Boolean).join('. ');
 }
 
 export interface Spoken { intro: string; steps: string[]; outro: string }
 
 /** Convierte una respuesta del asistente en partes habladas. Los pasos de un trámite se leen de uno en uno. */
-export function toSpeech(m: { text?: string; procedure?: Procedure; unknown?: Unknown; clarify?: { question: string; options: string[] }; map?: MapAction; sources?: Source[] }, lang: Lang, unknownTitle: string, unknownBody: string): Spoken {
+export function toSpeech(m: { text?: string; procedure?: Procedure; unknown?: Unknown; clarify?: { question: string; options: string[] }; map?: MapAction; geoMap?: MapView; sources?: Source[] }, lang: Lang, unknownTitle: string, unknownBody: string): Spoken {
   const en = lang === 'en';
+  const qu = lang === 'qu';
+  const a = voiceActionText(lang);
   const parts: string[] = [];
   if (m.clarify) {
     parts.push(m.clarify.question);
-    m.clarify.options.forEach((o, i) => parts.push(`${en ? 'Option' : 'Opción'} ${i + 1}: ${o.replace(/[¿?]/g, '')}.`));
-    parts.push(en ? 'Say the number of the option.' : 'Di el número de la opción.');
+    m.clarify.options.forEach((o, i) => parts.push(`${a.option} ${i + 1}: ${o.replace(/[¿?]/g, '')}.`));
+    parts.push(a.optionHint);
     return { intro: parts.join(' '), steps: [], outro: '' };
   }
   if (m.unknown) {
@@ -161,30 +166,42 @@ export function toSpeech(m: { text?: string; procedure?: Procedure; unknown?: Un
     if (m.unknown.contact) parts.push(`${unknownBody} ${m.unknown.contact.office}${m.unknown.contact.email ? `, ${en ? 'email' : 'correo'} ${m.unknown.contact.email.replace('@', en ? ' at ' : ' arroba ').replaceAll('.', en ? ' dot ' : ' punto ')}` : ''}.`);
     return { intro: parts.join(' '), steps: [], outro: '' };
   }
-  if (m.text) parts.push(plain(m.text));
+  if (m.procedure) parts.push(plain(`${m.procedure.title}. ${m.procedure.summary}`));
+  else if (m.text) parts.push(plain(m.text));
   if (m.map) parts.push(describeRoute(m.map, lang));
+  if (m.geoMap?.route) {
+    const route = m.geoMap.route;
+    parts.push(`${Math.round(route.distance_m)} ${en ? 'meters' : qu ? 'metrokuna' : 'metros'}, ${Math.max(1, Math.ceil(route.duration_s / 60))} ${en ? 'minutes' : qu ? 'minutokuna' : 'minutos'}. ${a.unverifiedRoute}`);
+  }
+  if (voiceMapLink(m)) parts.push(a.mapHint);
+  else if (m.map || m.geoMap) parts.push(a.internalMapHint);
   let steps: string[] = [];
   if (m.procedure) {
     const p = m.procedure;
-    parts.push(en ? `Office in charge: ${p.office}.` : `Lo atiende ${p.office}.`);
-    if (p.documents.length) parts.push(`${en ? 'You need' : 'Necesitas'}: ${p.documents.join('; ')}.`);
-    parts.push(en ? `It has ${p.steps.length} steps. Say "next" to hear each one, or "all steps".` : `Son ${p.steps.length} pasos. Di "siguiente" para escucharlos uno por uno, o "todos los pasos".`);
-    steps = p.steps.map((s, i) => `${en ? 'Step' : 'Paso'} ${i + 1} ${en ? 'of' : 'de'} ${p.steps.length}: ${s.title}. ${s.detail ?? ''}`.trim());
+    parts.push(`${a.office}: ${p.office}.`);
+    if (p.documents.length) parts.push(`${a.documents}: ${p.documents.join('; ')}.`);
+    if (p.steps.length) parts.push(a.stepsHint);
+    steps = p.steps.map((s, i) => `${a.step} ${i + 1}/${p.steps.length}: ${s.title}. ${s.detail ?? ''}`.trim());
   }
-  const src = m.sources?.[0];
-  const outro = src ? (en ? `Source: ${src.title}, version ${src.version}.` : `Fuente: ${src.title}, versión ${src.version}.`) : '';
+  const src = m.sources?.[0] ?? m.procedure?.source;
+  if (publicVoiceUrl(src?.url)) parts.push(a.sourceHint);
+  const outro = src ? `${a.sourceLabel}: ${src.title}, ${a.version} ${src.version}.` : '';
   return { intro: parts.join(' '), steps, outro };
 }
 
 // ---------------- Comandos de voz ----------------
 
-export type VoiceCommand = 'next' | 'prev' | 'repeat' | 'all' | 'help' | 'exit' | 'slower' | 'faster' | 'stop' | { option: number };
+export type VoiceCommand = 'next' | 'prev' | 'repeat' | 'all' | 'help' | 'exit' | 'slower' | 'faster' | 'stop' | 'map' | 'source' | { option: number };
 
 const NUM: Record<string, number> = { uno: 1, una: 1, one: 1, primera: 1, primero: 1, first: 1, dos: 2, two: 2, segunda: 2, segundo: 2, second: 2, tres: 3, three: 3, tercera: 3, third: 3, cuatro: 4, four: 4, cuarta: 4, fourth: 4 };
 
 /** Frases cortas que controlan el modo voz en vez de enviarse como pregunta. */
 export function parseCommand(t: string, optionCount: number): VoiceCommand | null {
   const s = t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[.,!?¿¡]/g, '').trim();
+  if (/^(mapa|map|abrir mapa|open map)$/.test(s)) return 'map';
+  if (/^(fuente|source|documento|killka)$/.test(s)) return 'source';
+  const kichwa: Record<string, VoiceCommand> = { katina: 'next', 'nawpa ruray': 'prev', 'kutin uyana': 'repeat', kutin: 'repeat', tukuy: 'all', yanapay: 'help', llukshina: 'exit', harkana: 'stop' };
+  if (kichwa[s]) return kichwa[s]!;
   if (optionCount) {
     const m = s.match(/^(?:la |el |option |opcion )?(\d|uno|una|dos|tres|cuatro|one|two|three|four|primera|primero|segunda|segundo|tercera|cuarta|first|second|third|fourth)$/);
     if (m) { const n = Number(m[1]) || NUM[m[1]!]!; if (n >= 1 && n <= optionCount) return { option: n }; }

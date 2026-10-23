@@ -24,6 +24,7 @@ from langchain_anthropic import ChatAnthropic
 from psycopg import errors
 from pydantic import BaseModel, Field
 
+from . import usage
 from .config import Settings, get_settings
 from .db import conn, open_pool
 from .processing import extract, make_chunks, tipo_for
@@ -284,7 +285,8 @@ def classify(
         description=f"{document.title}. {document.text[:300]}",
     )
     no_usage = {"input_tokens": 0, "output_tokens": 0}
-    if not settings.has_anthropic_key:
+    # Mismo interruptor (YACHI_LLM) y tope de gasto (ANTHROPIC_BUDGET_USD) que el chat.
+    if not settings.has_anthropic_key or not usage.budget_ok():
         return fallback, no_usage
     # 400 tokens cortaron la respuesta de un correo largo y la clasificación cayó al plan B.
     llm = ChatAnthropic(
@@ -301,8 +303,9 @@ def classify(
     except Exception:
         logger.exception("No se pudo clasificar %s; se usa el plan B", document.doc_id)
         return fallback, no_usage
-    usage = getattr(result["raw"], "usage_metadata", None) or {}
-    tokens = {key: int(usage.get(key, 0)) for key in no_usage}
+    metadata = getattr(result["raw"], "usage_metadata", None) or {}
+    usage.record_langchain("ingesta_correo", metadata)  # aparece en el registro de uso del Portal y cuenta para el tope
+    tokens = {key: int(metadata.get(key, 0)) for key in no_usage}
     return result["parsed"] or fallback, tokens
 
 

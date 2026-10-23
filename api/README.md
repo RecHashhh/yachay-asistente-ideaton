@@ -9,7 +9,9 @@ en `api/models/` (fuera de Git). La primera transcripción carga el modelo en RA
 en CPU puede tardar. Consulta `/speech/capabilities` para comprobar la instalación.
 
 El micrófono en Kichwa captura hasta 15 segundos y llama a `/speech/transcribe`
-con WAV PCM16 mono a 16 kHz. Devuelve un borrador editable antes de enviar la consulta.
+con WAV PCM16 mono a 16 kHz. Por defecto devuelve un borrador editable antes de enviar la consulta.
+En ajustes se puede desactivar «Revisar transcripción antes de enviar» para mantener
+una conversación continua; la escucha automática se puede desactivar por separado.
 El servidor no guarda audio ni entrena con él. ES/EN conservan el reconocimiento del navegador.
 La transcripción no traduce ni acredita la exactitud de la respuesta institucional.
 El dictado Kichwa cierra el turno tras aproximadamente 1,3 segundos de silencio después
@@ -48,6 +50,43 @@ Es una voz sintética experimental: su pronunciación debe revisarse con hablant
 puede diferir del Kichwa de Imbabura. No usarla como prueba de corrección de la traducción.
 
 FastAPI + LangGraph + PostgreSQL + Claude Haiku 5.5. Usa el corpus que preparó el equipo (`docs/rag/rag/`, **confidencial, fuera del repositorio**).
+
+## Interacción y verificación del modo voz
+
+El botón distingue terminar pregunta, interrumpir y hablar, y cancelar respuesta.
+Cada turno invalida la captura y reproducción anteriores: una respuesta o evento
+tardío no debe reactivar el micrófono. Al salir se liberan las pistas de audio.
+El diálogo bloquea los controles del chat que quedan detrás; «Ver respuesta en el chat»
+devuelve el foco a la respuesta para navegar con teclado o lector de pantalla.
+
+Las ubicaciones anuncian un enlace accionable a Google Maps cuando hay coordenadas
+reales o un enlace permitido. Los planos esquemáticos no se convierten en indicaciones
+para caminar ni se presentan como rutas accesibles verificadas. Los trámites estructurados
+leen requisitos y primer paso, con controles de siguiente, anterior, repetir y todos los
+pasos, además del documento fuente cuando está disponible. Las consultas Kichwa con
+«maypi» y «imashina» reconocen algunas intenciones básicas; esto no valida la gramática
+ni traduce automáticamente todas las guías oficiales.
+
+Validación reproducible desde la raíz (frontend y API locales en 5180 y 8000):
+
+```powershell
+npm.cmd --prefix web test
+npm.cmd --prefix web run build
+Push-Location api
+.venv\Scripts\python -m pytest tests/test_kichwa_voice_intents.py tests/test_procedures.py
+Pop-Location
+$env:PLAYWRIGHT_MODULE = (Resolve-Path web/node_modules/playwright).Path
+node scripts/auditar-ciclo-voz.cjs
+api\.venv\Scripts\python api/scripts/smoke_voice_contracts.py
+```
+
+La auditoría del navegador simula reconocimiento, síntesis y respuestas del modelo;
+Kichwa usa captura real del navegador con un dispositivo de micrófono ficticio. Comprueba
+interrupciones, cancelaciones, errores recuperables, enlaces, pasos y liberación del micrófono
+en ES/EN/QU. El segundo script consulta la API real para seis casos de lugares y trámites.
+Los resultados se guardan en `docs/kichwa-alki-2026-10-22/auditoria-*-voz*.json`.
+Estas pruebas no sustituyen una prueba de micrófono físico, pronunciación y comprensión
+con hablantes de Kichwa en el lugar de la presentación.
 
 ## Puesta en marcha (Windows, PostgreSQL 18 local)
 

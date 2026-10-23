@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
-import { MOCK, addControlCase, listControlCases, listInbox, replaceControlSet, runControl, updateInbox, type ControlResult, type InboxItem } from '../lib/api';
+import { MOCK, getUsage, type LlmUsage, addControlCase, listControlCases, listInbox, replaceControlSet, runControl, updateInbox, type ControlResult, type InboxItem } from '../lib/api';
 import type { DocMeta } from '../lib/types';
 
 // ---------------------------------------------------------------------------
@@ -205,6 +205,8 @@ const usd = (n: number, d = 2) => `$${n.toLocaleString('en-US', { minimumFractio
 
 export function Cost() {
   const [a, setA] = useState<Assumptions>(DEFAULTS);
+  const [use, setUse] = useState<LlmUsage | null>(null);
+  useEffect(() => { void getUsage().then(setUse).catch(() => setUse(null)); }, []);
   const r = compute(a);
   const set = <K extends keyof Assumptions>(k: K, v: Assumptions[K]) => setA((x) => ({ ...x, [k]: v }));
   const num = (k: keyof Assumptions, label: string, step = 1) => (
@@ -222,6 +224,7 @@ export function Cost() {
   return (
     <>
       <header><div><h2>Costo computacional</h2><p>Estimación por consulta y por mes. Cambia cualquier supuesto y el cálculo se actualiza.</p></div></header>
+      {use && <UsageCard u={use} />}
       <div className="kpis">
         <div className="kpi"><b>{usd(r.perQuery, 5)}</b><span>costo de modelo por consulta</span></div>
         <div className="kpi"><b>{usd(r.per1000)}</b><span>por cada 1.000 consultas</span></div>
@@ -365,5 +368,28 @@ export function Inbox({ docs, onUpload, onValidate }: { docs: DocMeta[]; onUploa
         </table>
       </div>
     </>
+  );
+}
+
+/** Gasto real del modelo (tabla llm_usage) frente al tope; el interruptor YACHI_LLM y el tope se configuran en api/.env. */
+function UsageCard({ u }: { u: LlmUsage }) {
+  const usd = (n: number) => `$${n.toFixed(n < 1 ? 4 : 2)}`;
+  const pct = u.budgetUsd > 0 ? Math.min(100, (u.spentUsd / u.budgetUsd) * 100) : 0;
+  const state = !u.hasKey ? 'Sin clave de Anthropic: el chat responde en modo sin modelo.'
+    : !u.llmOn ? 'Clave cargada, pero el modelo está apagado (YACHI_LLM=off): no se gastan tokens.'
+      : u.active ? `Modelo activo (${u.model}).` : 'Tope de gasto alcanzado: el chat pasó a modo sin modelo.';
+  return (
+    <section className="card" aria-labelledby="uso-real">
+      <h3 id="uso-real">Uso real del modelo</h3>
+      <p className="small" role="status">{state}</p>
+      <div className="kpis">
+        <div className="kpi"><b>{usd(u.spentUsd)}</b><span>gastado{u.budgetUsd > 0 ? ` de ${usd(u.budgetUsd)} (tope)` : ' (sin tope)'}</span></div>
+        <div className="kpi"><b>{u.calls}</b><span>llamadas al modelo</span></div>
+        <div className="kpi"><b>{u.answeredWithModel}</b><span>respuestas redactadas por el modelo</span></div>
+        <div className="kpi"><b>{u.answeredWithModel ? usd(u.spentUsd / u.answeredWithModel) : '—'}</b><span>costo real por respuesta</span></div>
+      </div>
+      {u.budgetUsd > 0 && <div className="progress" role="progressbar" aria-label="Gasto frente al tope" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}><i style={{ transform: `scaleX(${pct / 100})` }} /></div>}
+      {u.bySource.length > 0 && <p className="small muted">{u.bySource.map((s) => `${s.source === 'agente' ? 'Agente (elegir documentos)' : 'Redacción'}: ${s.calls} llamadas · ${s.inputTokens.toLocaleString('es-EC')} tokens de entrada · ${s.outputTokens.toLocaleString('es-EC')} de salida · ${usd(s.usd)}`).join(' — ')}</p>}
+    </section>
   );
 }
