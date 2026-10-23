@@ -1,6 +1,6 @@
 -- Filtros del chat editables desde el Portal (ver app/filters.py). Se siembran con DEFAULT_TERMS al migrar.
 CREATE TABLE IF NOT EXISTS filter_terms (
-  category    text NOT NULL CHECK (category IN ('crisis', 'denuncia', 'manipulacion', 'profanidad', 'fuera_de_dominio', 'permitido')),
+  category    text NOT NULL CHECK (category IN ('crisis', 'denuncia', 'manipulacion', 'salud', 'profanidad', 'fuera_de_dominio', 'permitido')),
   term        text NOT NULL,
   active      boolean NOT NULL DEFAULT true,
   note        text,

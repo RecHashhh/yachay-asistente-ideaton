@@ -27,6 +27,8 @@ class MapActionInput(BaseModel):
     radius_m: int = Field(default=800, ge=1, le=10000, description="Radio máximo de nearby en metros.")
     origin: str | None = Field(default=None, description="Origen de route; conserva el texto original del usuario.")
     destination: str | None = Field(default=None, description="Destino de route; conserva el texto original del usuario.")
+    origin_id: str | None = Field(default=None, description="ID de origen devuelto por map_action en un turno anterior; úsalo solo para continuar una selección.")
+    destination_id: str | None = Field(default=None, description="ID de destino devuelto por map_action en un turno anterior; úsalo solo para continuar una selección.")
     mode: Literal["walking", "driving"] = Field(default="walking", description="Modo de ruta.")
 
 
@@ -121,16 +123,34 @@ def execute_map_action(**args: Any) -> tuple[dict[str, Any], dict[str, Any] | No
 
         origin_query = (args.get("origin") or "").strip()
         destination_query = (args.get("destination") or "").strip()
-        origin, origin_ambiguous = _resolve(session, origin_query)
-        destination, destination_ambiguous = _resolve(session, destination_query)
+        origin_id = args.get("origin_id")
+        destination_id = args.get("destination_id")
+        origin = _resolve_id(session, origin_id) if origin_id else None
+        destination = _resolve_id(session, destination_id) if destination_id else None
+        origin_ambiguous = []
+        destination_ambiguous = []
+        if not origin and not origin_id:
+            origin, origin_ambiguous = _resolve(session, origin_query)
+        if not destination and not destination_id:
+            destination, destination_ambiguous = _resolve(session, destination_query)
         if origin_ambiguous or destination_ambiguous:
             return {
                 "status": "ambiguous",
+                "origin": _compact_place(origin) if origin else None,
+                "destination": _compact_place(destination) if destination else None,
                 "origin_candidates": [_compact_place(item) for item in origin_ambiguous],
                 "destination_candidates": [_compact_place(item) for item in destination_ambiguous],
             }, None
         if not origin or not destination:
-            return {"status": "not_found", "origin": origin_query, "destination": destination_query}, None
+            missing = []
+            if not origin:
+                missing.append("origin")
+            if not destination:
+                missing.append("destination")
+            return {
+                "status": "not_found", "origin": origin_query, "destination": destination_query,
+                "origin_found": bool(origin), "destination_found": bool(destination), "missing": missing,
+            }, None
         route = route_places(session, origin["id"], destination["id"], args.get("mode", "walking"))
         features = [
             feature for feature in (
@@ -164,3 +184,10 @@ def execute_map_action(**args: Any) -> tuple[dict[str, Any], dict[str, Any] | No
 
 def compact_map_result(result: dict[str, Any]) -> str:
     return json.dumps(result, ensure_ascii=False, separators=(",", ":"))
+
+
+def _resolve_id(session: Any, place_id: str) -> dict[str, Any] | None:
+    place = get_place(session, place_id)
+    if place is None:
+        return None
+    return {**place, "match": "stable_id", "score": 1.0}

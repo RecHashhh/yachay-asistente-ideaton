@@ -16,6 +16,7 @@ Filtros de entrada (crisis, denuncias, groserías, manipulación, datos personal
 """
 
 import json
+import logging
 import re
 import time
 import uuid
@@ -25,11 +26,17 @@ import anthropic
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
 
-from . import contacts, filters, procedures, rules
+from . import contacts, filters, maps_tool, procedures, rules
 from .config import settings
 from .db import conn
+from .geo_conversation import clear_pending, conversation_lock, get_pending
+from .geo_orchestration import handle_geo_decision
+from .intent_router import GeoIntent, IntentDecision, classify_local
 from .kichwa import language_context
 from .search import Hit, expand, hits_by_ids, hybrid
+from .telemetry import measure_anthropic_call, record_anthropic_call, record_chat_completion, request_telemetry, set_chat_result
+
+logger = logging.getLogger(__name__)
 
 client = anthropic.AsyncAnthropic() if settings.has_anthropic_key else None
 
@@ -109,6 +116,12 @@ class State(TypedDict, total=False):
     hits: list[Hit]
     map_results: list[dict]
     map_found: bool
+    map_result: dict[str, Any]
+    map_payload: dict[str, Any] | None
+    map_clarification: str | None
+    map_options: list[str]
+    intent_decision: dict[str, Any]
+    intent_classification_attempted: bool
     kind: str
     doc_ids: list[str]
     tokens_in: int
@@ -134,6 +147,31 @@ def _source(h: Hit) -> dict:
 
 def _contact(topic: str | None, lang: str, question: str = "") -> dict:
     return contacts.for_question(question, topic, lang)
+
+
+def _map_location_query(question: str, history: list[dict] | None = None) -> str | None:
+    """Extract the place phrase from a direct location question for deterministic PostGIS search."""
+    query = rules.norm(question)
+    if not rules.WHERE.search(query):
+        previous_question = next(
+            (turn.get("content", "") for turn in reversed(history or []) if turn.get("role") == "user"),
+            "",
+        )
+        if not rules.WHERE.search(rules.norm(previous_question)):
+            return None
+        query = re.sub(r"^(?:el|la|los|las|a|al|de|del)\s+", "", query)
+        return query.strip() or None
+    query = re.sub(r"^(?:(?:me puedes decir|dime|me dices) )?", "", query)
+    query = re.sub(
+        r"^(?:en )?(?:donde(?:\s+(?:queda|esta|se encuentra))?|where(?:\s+(?:is|are))?|"
+        r"(?:como )?(?:llego|llegar)(?:\s+(?:a|al|la|el|los|las|hasta))?|"
+        r"(?:ubica(?:me)?|encuentra|busca|muestra))(?:\s+|$)",
+        "",
+        query,
+    )
+    query = re.sub(r"^(?:el|la|los|las|a|al|de|del)\s+", "", query)
+    query = re.sub(r"\s+(?:en el campus|en la universidad|en yachay tech)$", "", query)
+    return query.strip() or None
 
 
 # ---------------------------------------------------------------- nodos
@@ -220,8 +258,77 @@ async def route(state: State) -> State:
     proc = procedures.resolve(q, state.get('history') or [])
     if proc:
         return {"question": q, "route": "procedure", "proc": proc}
+    pending = get_pending(state.get("session_id", "")) if state.get("session_id") else None
+    intent_started = time.perf_counter()
+    decision = classify_local(q, pending.pending_action.value if pending else None)
+    if decision:
+        logger.info(
+            "intent_router source=local intent=%s confidence=%.2f latency_ms=%d",
+            decision.intent.value, decision.confidence, int((time.perf_counter() - intent_started) * 1000),
+        )
+    if decision is None and settings.agent_enabled:
+        try:
+            decision = await _agent().classify_intent(
+                q,
+                state.get("history") or [],
+                pending.pending_action.value if pending else None,
+            )
+        except Exception as exc:
+            print("Clasificación de intención falló:", repr(exc))
+    if pending and (decision is None or decision.intent != GeoIntent.FOLLOW_UP):
+        clear_pending(state.get("session_id", ""))
+    if decision and decision.intent == GeoIntent.DOCUMENT_SEARCH:
+        return {**base, "route": "retrieve", "intent_decision": decision.model_dump(mode="json")}
+    if decision and decision.intent in {
+        GeoIntent.LOCATION_SEARCH, GeoIntent.ROUTE_REQUEST, GeoIntent.MAP_MARKER, GeoIntent.FOLLOW_UP,
+    }:
+        operation = await handle_geo_decision(
+            decision,
+            q,
+            state.get("session_id", "") or uuid.uuid4().hex,
+            maps_tool.execute_map_action,
+        )
+        logger.info("geo_dispatch intent=%s status=%s", decision.intent.value, operation.result.get("status"))
+        return {
+            **base,
+            "route": "map_search",
+            "map_result": operation.result,
+            "map_payload": operation.geometry,
+            "map_clarification": operation.clarification,
+            "map_options": operation.options,
+            "map_intent": decision.intent.value,
+        }
+    if decision and decision.intent == GeoIntent.MIXED_REQUEST:
+        map_decision = IntentDecision(
+            intent=GeoIntent.ROUTE_REQUEST if decision.destination else GeoIntent.MAP_MARKER,
+            origin=decision.origin,
+            destination=decision.destination,
+            place=decision.place or decision.destination,
+            confidence=decision.confidence,
+            needs_clarification=decision.needs_clarification,
+        )
+        operation = await handle_geo_decision(
+            map_decision,
+            q,
+            state.get("session_id", "") or uuid.uuid4().hex,
+            maps_tool.execute_map_action,
+        )
+        logger.info("geo_dispatch intent=%s status=%s", map_decision.intent.value, operation.result.get("status"))
+        return {
+            **base,
+            "route": "retrieve",
+            "intent_decision": decision.model_dump(mode="json"),
+            "map_results": [operation.result],
+            "map_found": operation.result.get("status") in {"ok", "ambiguous"},
+            "map_result": operation.result,
+            "map_payload": operation.geometry,
+            "map_clarification": operation.clarification,
+            "map_options": operation.options,
+            "map_intent": map_decision.intent.value,
+        }
     if rules.clarify(q, state["lang"]):
         return {"question": q, "route": "clarify"}
+
     dest_q, origin = rules.split_origin(q)  # "… desde el rectorado": el origen no compite con el destino
     room = rules.room_lookup(q)
     if room:
@@ -229,6 +336,22 @@ async def route(state: State) -> State:
     pl = rules.place_lookup(dest_q)
     if pl:
         return {"question": q, "route": "place", "place": pl, "room": None, "origin": origin}
+    if settings.agent_enabled:
+        return {**base, "route": "retrieve", "intent_classification_attempted": True}
+    map_query = _map_location_query(q, state.get("history"))
+    if map_query:
+        try:
+            map_result, map_payload = maps_tool.execute_map_action(intent="search", query=map_query)
+        except Exception as exc:
+            print("Búsqueda geográfica directa falló:", repr(exc))
+        else:
+            if map_result.get("status") in {"ok", "ambiguous"}:
+                return {
+                    "question": q,
+                    "route": "map_search",
+                    "map_result": map_result,
+                    "map_payload": map_payload,
+                }
     return {"question": q, "route": "retrieve"}
 
 
@@ -288,12 +411,12 @@ async def out_of_domain(state: State) -> State:
 
 async def smalltalk(state: State) -> State:
     if state['lang'] == 'qu' and client is not None and state.get('triage') in {'saludo', 'cierre'}:
-        response = await client.messages.create(
+        response = await measure_anthropic_call(settings.anthropic_model, "smalltalk", client.messages.create(
             model=settings.anthropic_model, max_tokens=250,
             system='You are Yachi. Respond briefly to this greeting or farewell only. Do not add institutional facts. '
                    + language_context(state['question'], 'qu'),
             messages=[{'role': 'user', 'content': state['question']}],
-        )
+        ))
         text = ''.join(getattr(part, 'text', '') for part in response.content).strip()
         if text:
             _say(text)
@@ -345,6 +468,111 @@ async def place_answer(state: State) -> State:
     return {"kind": "lugar", "doc_ids": [doc]}
 
 
+async def map_search_answer(state: State) -> State:
+    """Answer location searches from PostGIS so they do not require an LLM or a document corpus."""
+    writer = get_stream_writer()
+    result = state["map_result"]
+    candidates = result.get("results") or []
+    route_candidates = result.get("origin_candidates") or result.get("destination_candidates") or []
+    if state.get("map_payload"):
+        writer({"type": "map", "payload": state["map_payload"]})
+        intent = state.get("map_intent")
+        route_payload = any(
+            (feature.get("properties") or {}).get("kind") == "route"
+            for feature in state["map_payload"].get("features", [])
+        )
+        writer({
+            "type": "map.route" if route_payload else "map.marker",
+            "payload": state["map_payload"],
+        })
+
+    options = state.get("map_options") or []
+    if state.get("map_clarification") or result.get("status") == "ambiguous" or len(candidates) > 1:
+        names = options or list(dict.fromkeys(
+            item.get("display_name") or item.get("name") for item in (candidates or route_candidates)
+        ))
+        names = [name for name in names if name]
+        _step("place", _t(state["lang"], "Encontré varias coincidencias en el mapa", "Found several map matches"), "warn")
+        writer({"type": "map.ambiguity", "options": names[:5]})
+        writer({
+            "type": "clarify",
+            "question": state.get("map_clarification") or _t(state["lang"], "¿Cuál de estos lugares buscas?", "Which of these places do you mean?"),
+            "options": names[:5],
+        })
+        return {"kind": "aclaracion", "doc_ids": []}
+
+    if result.get("status") == "needs_input":
+        question = state.get("map_clarification") or _t(state["lang"], "¿Desde dónde partes?", "Where are you starting from?")
+        writer({"type": "clarify", "question": question, "options": []})
+        return {"kind": "aclaracion", "doc_ids": []}
+
+    if result.get("status") in {"error", "unavailable", "route_unavailable", "not_found"}:
+        reason = result.get("reason") or result.get("status")
+        writer({"type": "map.error", "reason": reason})
+        if result.get("status") == "route_unavailable":
+            text = _t(state["lang"], "No encontré una ruta disponible entre esos lugares en la red del campus.",
+                      "No route is available between those places on the campus network.")
+        elif result.get("status") == "not_found":
+            text = _t(state["lang"], "No encontré esos lugares en el mapa del campus.",
+                      "I couldn't find those places on the campus map.")
+        else:
+            text = _t(state["lang"], "El servicio de mapas no está disponible ahora.",
+                      "The map service is unavailable right now.")
+        _say(text)
+        return {"kind": "lugar", "doc_ids": []}
+
+    if result.get("origin") and result.get("destination") and result.get("status") == "ok":
+        origin = result.get("origin", {}).get("display_name", "")
+        destination = result.get("destination", {}).get("display_name", "")
+        distance = result.get("distance_m")
+        duration = result.get("duration_s")
+        details = []
+        if isinstance(distance, (int, float)):
+            details.append(f"{distance / 1000:.1f} km" if distance >= 1000 else f"{round(distance)} m")
+        if isinstance(duration, (int, float)):
+            details.append(f"{max(1, round(duration / 60))} min")
+        suffix = f" ({' · '.join(details)})" if details else ""
+        _say(_t(state["lang"], f"Ruta de **{origin}** a **{destination}**{suffix}.",
+                f"Route from **{origin}** to **{destination}**{suffix}."))
+        return {"kind": "lugar", "doc_ids": []}
+
+    if not candidates:
+        writer({"type": "unknown", "item": {"reason": "sin_fuente"}})
+        return {"kind": "sin_fuente", "doc_ids": []}
+
+    place = candidates[0]
+    name = place.get("display_name") or place.get("name") or state["question"]
+    _step("place", _t(state["lang"], f"Encontré {name} en el mapa del campus", f"Found {name} on the campus map"))
+    _say(_t(state["lang"], f"**{name}** está marcado en el mapa del campus.", f"**{name}** is marked on the campus map."))
+    return {"kind": "lugar", "doc_ids": []}
+
+
+def _emit_map_followup(writer: Any, state: State) -> None:
+    results = state.get("map_results") or []
+    if not results:
+        return
+    result = results[-1]
+    lang = state.get("lang", "es")
+    if result.get("status") == "ambiguous":
+        candidates = result.get("results") or result.get("origin_candidates") or result.get("destination_candidates") or []
+        options = list(dict.fromkeys(item.get("display_name") or item.get("name") for item in candidates))
+        options = [name for name in options if name][:5]
+        writer({"type": "map.ambiguity", "options": options})
+        writer({
+            "type": "clarify",
+            "question": _t(lang, "¿Cuál de estos lugares buscas?", "Which of these places do you mean?"),
+            "options": options,
+        })
+    elif result.get("status") == "needs_input":
+        writer({
+            "type": "clarify",
+            "question": state.get("map_clarification") or _t(lang, "¿Desde dónde partes?", "Where are you starting from?"),
+            "options": [],
+        })
+    elif result.get("status") in {"error", "unavailable", "route_unavailable", "not_found"}:
+        writer({"type": "map.error", "reason": result.get("reason") or result.get("status")})
+
+
 _agent_instance = None
 
 
@@ -380,9 +608,17 @@ async def _agent_retrieve(state: State, q: str, lang: str, where_es: str, where_
         elif kind == "reuse":
             _step("reuse", _t(lang, "Revalidé las fuentes de una respuesta anterior", "Re-validated the sources of a previous answer"))
 
-    result = await _agent().gather({"message": q, "lang": lang, "history": state.get("history") or []}, None, notify)
-    map_results = result.get("map_results") or []
-    map_found = bool(result.get("map_found"))
+    result = await _agent().gather({
+        "message": q,
+        "lang": lang,
+        "history": state.get("history") or [],
+        "session_id": state.get("session_id", ""),
+        "intent_decision": state.get("intent_decision"),
+        "intent_classification_attempted": state.get("intent_classification_attempted", False),
+        "map_prehandled": bool(state.get("map_results")),
+    }, None, notify)
+    map_results = [*(state.get("map_results") or []), *(result.get("map_results") or [])]
+    map_found = bool(state.get("map_found") or result.get("map_found"))
     retrieved = result.get("retrieved") or []
     ids = [r["chunk_id"] for r in retrieved][: settings.rag_context_chunks]
     if not ids:
@@ -392,7 +628,29 @@ async def _agent_retrieve(state: State, q: str, lang: str, where_es: str, where_
           ms=int((time.time() - t0) * 1000))
     if not hits:
         if map_results:
-            return {"hits": [], "map_results": map_results, "map_found": map_found}
+            map_result = map_results[-1]
+            decision = state.get("intent_decision") or {}
+            map_intent = state.get("map_intent") or (
+                GeoIntent.ROUTE_REQUEST.value if map_result.get("origin_candidates") or map_result.get("destination_candidates")
+                else GeoIntent.MAP_MARKER.value
+            )
+            candidates = map_result.get("results") or map_result.get("origin_candidates") or map_result.get("destination_candidates") or []
+            map_outcome = await map_search_answer({
+                **state, "map_result": map_result, "map_payload": state.get("map_payload"),
+                "map_intent": map_intent,
+                "map_clarification": state.get("map_clarification"),
+                "map_options": state.get("map_options") or [
+                    item.get("display_name") or item.get("name") for item in candidates
+                ],
+            })
+            if decision.get("intent") == GeoIntent.MIXED_REQUEST.value:
+                w({"type": "unknown", "item": {"reason": "sin_fuente", "contact": _contact(None, lang, state["question"])}})
+                return {"hits": [], "map_results": map_results, "map_found": map_found,
+                    "kind": "sin_fuente", "doc_ids": [], "map_payload": state.get("map_payload"),
+                    "map_clarification": state.get("map_clarification"), "map_options": state.get("map_options")}
+            return {"hits": [], "map_results": map_results, "map_found": map_found,
+                    "kind": map_outcome.get("kind", "lugar"), "doc_ids": [], "map_payload": state.get("map_payload"),
+                    "map_clarification": state.get("map_clarification"), "map_options": state.get("map_options")}
         topic = "bienestar" if state.get("triage") == "denuncia" else None
         _step("found", _t(lang, "No encontré un fragmento con relevancia suficiente", "Found no sufficiently relevant excerpt"), "warn",
               detail=_t(lang, "Prefiero no responder antes que adivinar.", "I'd rather not answer than guess."))
@@ -402,7 +660,9 @@ async def _agent_retrieve(state: State, q: str, lang: str, where_es: str, where_
     _step("found", _t(lang, f"Reuní {len(hits)} fragmentos de {len(docs)} {'documento' if len(docs) == 1 else 'documentos'}",
                       f"Gathered {len(hits)} excerpts from {len(docs)} {'document' if len(docs) == 1 else 'documents'}"), docs=docs)
     w({"type": "status", "label": f"{_t(lang, 'Consultando', 'Consulting')} {hits[0].title}"})
-    return {"hits": hits, "map_results": map_results, "map_found": map_found}
+    return {"hits": hits, "map_results": map_results, "map_found": map_found,
+            "map_payload": state.get("map_payload"), "map_intent": state.get("map_intent"),
+            "map_clarification": state.get("map_clarification"), "map_options": state.get("map_options")}
 
 
 async def retrieve(state: State) -> State:
@@ -438,6 +698,19 @@ async def retrieve(state: State) -> State:
     if client is None:  # modo extractivo: una palabra suelta en común ("me duele el pie" → formulario médico) no basta
         weak = best_cos < EXTRACTIVE_MIN_COS or (best_cos < MIN_COS and best_fts < EXTRACTIVE_MIN_FTS)
     if not hits or weak:
+        if state.get("map_results"):
+            map_result = state["map_results"][-1]
+            map_outcome = await map_search_answer({
+                **state,
+                "map_result": map_result,
+                "map_intent": state.get("map_intent", GeoIntent.MAP_MARKER.value),
+            })
+            if state.get("intent_decision", {}).get("intent") == GeoIntent.MIXED_REQUEST.value:
+                w({"type": "unknown", "item": {"reason": "sin_fuente", "contact": _contact(None, lang, q)}})
+                return {"hits": [], "kind": "sin_fuente", "doc_ids": [], "map_results": state["map_results"]}
+            return {"hits": [], "kind": map_outcome.get("kind", "lugar"), "doc_ids": [],
+                    "map_results": state["map_results"], "map_payload": state.get("map_payload"),
+                    "map_clarification": state.get("map_clarification"), "map_options": state.get("map_options")}
         topic = "bienestar" if state.get("triage") == "denuncia" else (hits[0].topic_id if hits else None)
         _step("found", _t(lang, "No encontré un fragmento con relevancia suficiente", "Found no sufficiently relevant excerpt"), "warn",
               detail=_t(lang, "Prefiero no responder antes que adivinar.", "I'd rather not answer than guess."))
@@ -447,13 +720,29 @@ async def retrieve(state: State) -> State:
     _step("found", _t(lang, f"Encontré {len(hits)} fragmentos en {len(docs)} {'documento' if len(docs) == 1 else 'documentos'}",
                       f"Found {len(hits)} excerpts in {len(docs)} {'document' if len(docs) == 1 else 'documents'}"), docs=docs)
     w({"type": "status", "label": f"{_t(lang, 'Consultando', 'Consulting')} {hits[0].title}"})
-    return {"hits": hits}
+    return {
+        "hits": hits,
+        "map_results": state.get("map_results") or [],
+        "map_found": bool(state.get("map_found")),
+        "map_payload": state.get("map_payload"),
+        "map_intent": state.get("map_intent"),
+        "map_clarification": state.get("map_clarification"),
+        "map_options": state.get("map_options") or [],
+        "intent_decision": state.get("intent_decision"),
+    }
 
 
 async def generate(state: State) -> State:
     w = get_stream_writer()
     lang = state["lang"]
     hits = state["hits"]
+    if state.get("map_payload"):
+        w({"type": "map", "payload": state["map_payload"]})
+        is_route = any(
+            (feature.get("properties") or {}).get("kind") == "route"
+            for feature in state["map_payload"].get("features", [])
+        )
+        w({"type": "map.route" if is_route else "map.marker", "payload": state["map_payload"]})
     if client is None:
         # Sin clave de API: modo extractivo (muestra el fragmento más relevante, sin redactar). Útil para probar la búsqueda.
         h = hits[0]
@@ -470,6 +759,7 @@ async def generate(state: State) -> State:
         w({"type": "status", "label": _t(lang, "Mostrando fragmento del documento", "Showing document excerpt")})
         _say(body)
         w({"type": "sources", "items": _with_wellbeing([_source(h)], state)})
+        _emit_map_followup(w, state)
         return {"kind": "respuesta", "doc_ids": [h.doc_id], "tokens_in": 0, "tokens_out": 0}
 
     frags = "\n\n".join(
@@ -499,31 +789,38 @@ async def generate(state: State) -> State:
     head_checked = False
     w({"type": "status", "label": _t(lang, "Redactando respuesta", "Writing response")})
     _step("write", _t(lang, "Redactando solo con esos fragmentos", "Writing only from those excerpts"), "running")
-    async with client.messages.stream(
-        model=settings.anthropic_model, max_tokens=1400 if lang == 'qu' else 900,
-        system=SYSTEM + language_context(state['question'], lang), messages=msgs,
-        thinking={"type": "disabled"}, cache_control={"type": "ephemeral"},
-    ) as stream:
-        async for text in stream.text_stream:
-            buf += text
-            if not head_checked:
-                if len(buf.strip()) < 16 and "SIN_INFORMACION".startswith(buf.strip()[:15]):
-                    continue
-                head_checked = True
-                if buf.strip().startswith("SIN_INFORMACION"):
-                    break
-            cited.update(int(n) for m in re.findall(r"\[F([\d,\sF]+)\]", buf) for n in re.findall(r"\d+", m))
-            clean = MARK.sub("", buf)
-            # No enviar una marca a medio escribir ("[F" al final).
-            cut = clean.rfind("[")
-            safe = clean if cut == -1 or "]" in clean[cut:] else clean[:cut]
-            # El espacio final se retiene: si sigue una marca, MARK lo borra y el texto ya enviado se correría (se perdían saltos de línea).
-            safe = safe.rstrip()
-            if len(safe) > sent:
-                w({"type": "token", "text": safe[sent:]})
-                sent = len(safe)
-        final = await stream.get_final_message()
+    anthropic_started = time.perf_counter()
+    try:
+        async with client.messages.stream(
+            model=settings.anthropic_model, max_tokens=1400 if lang == 'qu' else 900,
+            system=SYSTEM + language_context(state['question'], lang), messages=msgs,
+            thinking={"type": "disabled"}, cache_control={"type": "ephemeral"},
+        ) as stream:
+            async for text in stream.text_stream:
+                buf += text
+                if not head_checked:
+                    if len(buf.strip()) < 16 and "SIN_INFORMACION".startswith(buf.strip()[:15]):
+                        continue
+                    head_checked = True
+                    if buf.strip().startswith("SIN_INFORMACION"):
+                        break
+                cited.update(int(n) for m in re.findall(r"\[F([\d,\sF]+)\]", buf) for n in re.findall(r"\d+", m))
+                clean = MARK.sub("", buf)
+                # No enviar una marca a medio escribir ("[F" al final).
+                cut = clean.rfind("[")
+                safe = clean if cut == -1 or "]" in clean[cut:] else clean[:cut]
+                # El espacio final se retiene: si sigue una marca, MARK lo borra y el texto ya enviado se correría (se perdían saltos de línea).
+                safe = safe.rstrip()
+                if len(safe) > sent:
+                    w({"type": "token", "text": safe[sent:]})
+                    sent = len(safe)
+            final = await stream.get_final_message()
+    except Exception:
+        record_anthropic_call(settings.anthropic_model, "answer_generation", time.perf_counter() - anthropic_started, outcome="error")
+        raise
     usage = final.usage
+    record_anthropic_call(settings.anthropic_model, "answer_generation", time.perf_counter() - anthropic_started, usage)
+    logger.info("anthropic_generation input_tokens=%d output_tokens=%d", usage.input_tokens, usage.output_tokens)
     if buf.strip().startswith("SIN_INFORMACION"):
         _step("write", _t(lang, "Los fragmentos no responden tu pregunta", "The excerpts don't answer your question"), "warn",
               detail=_t(lang, "Prefiero no responder antes que adivinar.", "I'd rather not answer than guess."))
@@ -541,6 +838,7 @@ async def generate(state: State) -> State:
             seen.add(h.chunk_id)
             sources.append(_source(h))
     w({"type": "sources", "items": _with_wellbeing(sources, state)})
+    _emit_map_followup(w, state)
     # Verificación: cifras, correos y enlaces que no están en los fragmentos se avisan y van a la bandeja para revisión.
     bad = filters.unsupported_facts(clean, evidence + (SUPPORT["es"] if state.get("triage") == "denuncia" else ""))
     _step("write", _t(lang, f"Redacté la respuesta citando {len(sources)} {'fuente' if len(sources) == 1 else 'fuentes'}",
@@ -561,6 +859,9 @@ async def finish(state: State) -> State:
     w = get_stream_writer()
     lang = state["lang"]
     kind = state.get("kind", "error")
+    decision = state.get("intent_decision") or {}
+    intent = state.get("map_intent") or decision.get("intent") or state.get("route")
+    outcome = (state.get("map_result") or {}).get("status") or kind
     with conn() as c:
         sug = c.execute(
             # Solo preguntas hechas por varias personas y sin datos ocultos: una pregunta de una sola persona no se muestra a otras.
@@ -583,6 +884,7 @@ async def finish(state: State) -> State:
             record_unanswered(c, state["question"], lang, "no_verificada")
     if sug and kind not in QUIET:
         w({"type": "suggestions", "items": [s["question"] for s in sug]})
+    set_chat_result(intent, outcome)
     w({"type": "done", "messageId": state["message_id"], "latencyMs": latency})
     return {}
 
@@ -617,14 +919,15 @@ def build():
     g.add_node("crisis", crisis)
     g.add_node("clarify", ask_clarify)
     g.add_node("place", place_answer)
+    g.add_node("map_search", map_search_answer)
     g.add_node("procedure", procedure_answer)
     g.add_node("retrieve", retrieve)
     g.add_node("generate", generate)
     g.add_node("finish", finish)
     g.add_edge(START, "route")
-    g.add_conditional_edges("route", _next, {"ood": "ood", "smalltalk": "smalltalk", "health": "health", "crisis": "crisis", "clarify": "clarify", "place": "place", "procedure": "procedure", "retrieve": "retrieve"})
-    g.add_conditional_edges("retrieve", lambda s: "generate" if s.get("hits") or s.get("map_results") else "finish", {"generate": "generate", "finish": "finish"})
-    for n in ("ood", "smalltalk", "health", "crisis", "clarify", "place", "procedure", "generate"):
+    g.add_conditional_edges("route", _next, {"ood": "ood", "smalltalk": "smalltalk", "health": "health", "crisis": "crisis", "clarify": "clarify", "place": "place", "map_search": "map_search", "procedure": "procedure", "retrieve": "retrieve"})
+    g.add_conditional_edges("retrieve", lambda s: "finish" if s.get("kind") else "generate" if s.get("hits") or s.get("map_results") else "finish", {"generate": "generate", "finish": "finish"})
+    for n in ("ood", "smalltalk", "health", "crisis", "clarify", "place", "map_search", "procedure", "generate"):
         g.add_edge(n, "finish")
     g.add_edge("finish", END)
     return g.compile()
@@ -637,5 +940,21 @@ async def run(question: str, lang: str, history: list[dict], session_id: str):
     """Ejecuta el grafo y produce los eventos SSE en orden."""
     state: State = {"question": question, "lang": lang, "history": history, "session_id": session_id,
                     "message_id": uuid.uuid4().hex, "t0": time.time()}
-    async for ev in graph.astream(state, stream_mode="custom"):
-        yield ev
+    started = time.perf_counter()
+    async with conversation_lock(session_id):
+        with request_telemetry() as usage:
+            try:
+                async for ev in graph.astream(state, stream_mode="custom"):
+                    if usage.first_event_seconds is None:
+                        usage.first_event_seconds = time.perf_counter() - started
+                    yield ev
+            except Exception:
+                record_chat_completion(
+                    "unknown", "error", time.perf_counter() - started,
+                    first_event_seconds=usage.first_event_seconds,
+                )
+                raise
+            record_chat_completion(
+                usage.intent, usage.outcome, time.perf_counter() - started,
+                first_event_seconds=usage.first_event_seconds,
+            )

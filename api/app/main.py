@@ -13,14 +13,15 @@ from pathlib import Path
 
 from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from . import filters, graph, procedures, processing, rules
 from .config import API_DIR, settings
-from .db import conn, open_pool
+from .db import close_pools, conn, open_geo_lock_pool, open_pool
 from .search import vectors
 from .schemas import TranslationReportRequest, TranslationReportResponse
+from .telemetry import MetricsMiddleware, metrics_content, record_sse_error
 from .kichwa_speech import router as speech_router
 
 # Mapas necesita PostGIS y geoalchemy2 (los trae Docker). Sin ellos la API arranca igual, sin las rutas /maps ni la herramienta de mapas.
@@ -37,6 +38,7 @@ def purge() -> None:
     with conn() as c:
         c.execute("DELETE FROM feedback WHERE created_at < now() - make_interval(days => %s)", (settings.retention_days,))
         c.execute("DELETE FROM messages WHERE created_at < now() - make_interval(days => %s)", (settings.retention_days,))
+        c.execute("DELETE FROM geo_pending_actions WHERE expires_at <= now()")
         c.execute("DELETE FROM unanswered WHERE last_at < now() - make_interval(days => %s) AND status <> 'convertida'", (settings.retention_days,))
         c.execute("DELETE FROM inquiries WHERE delete_after < now()")
         c.execute("DELETE FROM admin_sessions WHERE expires_at < now()")
@@ -55,19 +57,30 @@ async def _purge_loop() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     open_pool()
-    vectors.load()
+    open_geo_lock_pool()
+    with conn() as c:
+        has_embeddings = c.execute(
+            "SELECT EXISTS (SELECT 1 FROM chunks WHERE embedding IS NOT NULL) AS present"
+        ).fetchone()["present"]
+    if has_embeddings:
+        vectors.load()
     for doc_id in processing.pending():  # subidas que quedaron a medias si el servidor se reinició
         asyncio.get_running_loop().run_in_executor(None, processing.process, doc_id)
     task = asyncio.create_task(_purge_loop())
-    yield
-    task.cancel()
-    if maps_engine is not None:
-        await asyncio.to_thread(maps_engine.dispose)
+    try:
+        yield
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        if maps_engine is not None:
+            await asyncio.to_thread(maps_engine.dispose)
+        await asyncio.to_thread(close_pools)
 
 
 app = FastAPI(title="Yachi API", version="0.1.0", lifespan=lifespan)
 app.include_router(speech_router)
 app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(MetricsMiddleware)
 if maps_router is not None:
     app.include_router(maps_router)
 
@@ -120,6 +133,7 @@ async def chat(req: ChatRequest, request: Request):
                 yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
         except Exception as e:  # el cliente ve un error legible; el detalle queda en el log del servidor
             print("Error en /chat:", repr(e))
+            record_sse_error("chat")
             msg = "No pude responder en este momento. Intenta de nuevo en unos segundos." if lang != "en" else "I could not answer right now. Please try again in a few seconds."
             yield f"data: {json.dumps({'type': 'error', 'message': msg})}\n\n"
 
@@ -127,6 +141,12 @@ async def chat(req: ChatRequest, request: Request):
 
 
 # ------------------------------------------------------------------ público
+
+@app.get("/metrics", include_in_schema=False)
+def prometheus_metrics():
+    body, content_type = metrics_content()
+    return Response(content=body, headers={"Content-Type": content_type})
+
 
 @app.post('/translation-reports', response_model=TranslationReportResponse, status_code=201)
 def translation_report(request: TranslationReportRequest):
@@ -143,16 +163,20 @@ def translation_report(request: TranslationReportRequest):
 
 @app.get("/health")
 def health():
-    """Estado del índice (para el balanceador o docker-compose): 503 si la base no responde o no hay fragmentos."""
+    """Estado de la API y del índice RAG para el balanceador o Docker Compose."""
     try:
         with conn() as c:
             r = c.execute("SELECT (SELECT count(*) FROM documents WHERE is_current AND status = 'indexado') AS d, "
                           "(SELECT count(*) FROM chunks WHERE embedding IS NOT NULL) AS c").fetchone()
     except Exception as exc:
         raise HTTPException(503, "database_unavailable") from exc
-    if not r["c"]:
-        raise HTTPException(503, "rag_index_empty")
-    return {"status": "ok", "documents": r["d"], "chunks": r["c"], "agent": settings.agent_enabled}
+    return {
+        "status": "ok",
+        "documents": r["d"],
+        "chunks": r["c"],
+        "rag_index": "ready" if r["c"] else "empty",
+        "agent": settings.agent_enabled,
+    }
 
 
 @app.get('/procedures')

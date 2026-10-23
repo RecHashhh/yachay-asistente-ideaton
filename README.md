@@ -21,6 +21,8 @@ cp .env.example .env
 docker compose up --build
 ```
 
+Si aún no tienes el corpus autorizado, Compose inicia el API sin indexar documentos RAG; chat y búsqueda documental quedan sin fuentes. Para exigir el corpus y detener el arranque si falta, configura `RAG_OPTIONAL=false` en `.env`.
+
 Sin Docker: ver `api/README.md` (PostgreSQL 18 + pgvector local, `python -m app.migrate`, `python -m app.ingest`, `uvicorn app.main:app`).
 
 En otra terminal:

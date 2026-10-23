@@ -139,6 +139,9 @@ export type StreamEvent =
   | { type: 'answer_mode'; mode: 'extractive' }
   | { type: 'token'; text: string }
   | { type: 'map'; payload: FeatureCollection<Geometry, Record<string, unknown>> }
+  | { type: 'map.marker' | 'map.route'; payload: FeatureCollection<Geometry, Record<string, unknown>> }
+  | { type: 'map.ambiguity'; options: string[] }
+  | { type: 'map.error'; reason: string }
   | { type: 'tool'; name: 'mostrar_en_mapa'; input: MapAction }
   | { type: 'procedure'; item: Procedure }
   | { type: 'unknown'; item: Unknown }

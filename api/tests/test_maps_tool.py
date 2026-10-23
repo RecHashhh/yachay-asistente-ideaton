@@ -126,3 +126,56 @@ def test_nearby_excludes_reference_place(monkeypatch) -> None:
 
     assert [item["id"] for item in result["results"]] == ["restaurant"]
     assert [item["id"] for item in geometry["features"]] == ["restaurant"]
+
+
+def test_route_can_resume_with_stable_place_ids(monkeypatch) -> None:
+    class FakeSession:
+        def close(self):
+            pass
+
+    route_calls = []
+    places = {
+        "plaza-id": {"id": "plaza-id", "display_name": "Plaza Las Manuelas", "name": "Plaza Las Manuelas"},
+        "building-id": {"id": "building-id", "display_name": "Edificio SENESCYT", "name": "Edificio SENESCYT"},
+    }
+    monkeypatch.setattr(maps_tool, "SessionLocal", FakeSession)
+    monkeypatch.setattr(maps_tool, "get_place", lambda _session, place_id: places.get(place_id))
+    monkeypatch.setattr(maps_tool, "route_places", lambda _session, origin, destination, mode: route_calls.append((origin, destination, mode)) or {
+        "status": "ok", "mode": mode, "distance_m": 240, "duration_s": 180,
+        "geometry": {"type": "LineString", "coordinates": [[-78, 0], [-78.1, 0.1]]},
+    })
+    monkeypatch.setattr(maps_tool, "_place_feature", lambda _session, place_id, role="candidate": {
+        "type": "Feature", "id": place_id, "properties": {"role": role}, "geometry": {"type": "Point", "coordinates": [0, 0]},
+    })
+
+    result, _geometry = maps_tool.execute_map_action(
+        intent="route", origin_id="plaza-id", destination_id="building-id",
+    )
+
+    assert result["status"] == "ok"
+    assert result["origin"]["id"] == "plaza-id"
+    assert result["destination"]["id"] == "building-id"
+    assert route_calls == [("plaza-id", "building-id", "walking")]
+
+
+def test_route_ambiguity_preserves_the_resolved_endpoint(monkeypatch) -> None:
+    class FakeSession:
+        def close(self):
+            pass
+
+    origin = {"id": "plaza-id", "display_name": "Plaza Las Manuelas", "match": "exact_name"}
+    destinations = [
+        {"id": "building-id", "display_name": "Edificio SENESCYT", "match": "contains_name"},
+        {"id": "stop-id", "display_name": "Parada SENESCYT", "match": "contains_name"},
+    ]
+    monkeypatch.setattr(maps_tool, "SessionLocal", FakeSession)
+    monkeypatch.setattr(maps_tool, "_resolve", lambda _session, query: (origin, []) if query == "Plaza Las Manuelas" else (None, destinations))
+
+    result, geometry = maps_tool.execute_map_action(
+        intent="route", origin="Plaza Las Manuelas", destination="SENESCYT",
+    )
+
+    assert result["status"] == "ambiguous"
+    assert result["origin"]["id"] == "plaza-id"
+    assert [item["id"] for item in result["destination_candidates"]] == ["building-id", "stop-id"]
+    assert geometry is None

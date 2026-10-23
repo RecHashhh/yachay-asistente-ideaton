@@ -16,6 +16,10 @@ from sqlalchemy.engine import URL
 
 API_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(API_DIR / ".env")
+DEFAULT_ANTHROPIC_PRICING_JSON = (
+    '{"claude-haiku-5-5":{"base":{"input":0.10,"output":0.50,"cache_write":0.125,"cache_read":0.01},'
+    '"over_100k":{"input":0.50,"output":2.50,"cache_write":0.625,"cache_read":0.05}}}'
+)
 
 
 class Settings(BaseSettings):
@@ -25,6 +29,10 @@ class Settings(BaseSettings):
     database_url: str = ""
     anthropic_api_key: SecretStr = SecretStr("")
     anthropic_model: str = "claude-haiku-5-5"
+    anthropic_pricing_json: str = Field(
+        default=DEFAULT_ANTHROPIC_PRICING_JSON,
+        validation_alias=AliasChoices("ANTHROPIC_PRICING_USD_PER_MTOK_JSON", "anthropic_pricing_json"),
+    )
     rag_dir: Path = Path("../docs/rag/rag")
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     admin_emails_raw: str = Field(default="", validation_alias=AliasChoices("ADMIN_EMAILS", "admin_emails_raw"))
@@ -34,6 +42,7 @@ class Settings(BaseSettings):
     rate_session_min: int = Field(default=12, validation_alias=AliasChoices("RATE_SESSION_PER_MIN", "rate_session_min"))
     rate_session_day: int = Field(default=300, validation_alias=AliasChoices("RATE_SESSION_PER_DAY", "rate_session_day"))
     rate_ip_min: int = Field(default=120, validation_alias=AliasChoices("RATE_IP_PER_MIN", "rate_ip_min"))
+    geo_lock_pool_size: int = Field(default=32, ge=1, le=128, validation_alias=AliasChoices("GEO_LOCK_POOL_SIZE", "geo_lock_pool_size"))
     # Detrás de App Service o un proxy: tomar la IP del último X-Forwarded-For (lo agrega el proxy, no el cliente).
     trust_proxy: bool = False
     # Conservación (LOPDP): preguntas anónimas y votos; debe coincidir con el aviso de datos (web/src/config.ts).
@@ -46,6 +55,7 @@ class Settings(BaseSettings):
     rag_vector_candidates: int = 20
     rag_context_chunks: int = 8
     rag_max_tool_calls: int = 6
+    geo_intent_min_confidence: float = Field(default=0.72, ge=0.5, le=0.99)
 
     # ------------------------------------------------------------- capa SQLAlchemy/Ollama (docker-compose del agente)
     postgres_db: str = "yachay_rag"
@@ -56,6 +66,11 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_embedding_model: str = "bge-m3"
     cors_origins: str = "http://localhost:5180,http://127.0.0.1:5180"
+
+    @field_validator("anthropic_pricing_json", mode="before")
+    @classmethod
+    def _default_empty_price_table(cls, value: str) -> str:
+        return value if isinstance(value, str) and value.strip() else DEFAULT_ANTHROPIC_PRICING_JSON
 
     @field_validator("rag_dir")
     @classmethod
