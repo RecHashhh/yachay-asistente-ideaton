@@ -1,5 +1,6 @@
 {
   "catalog": "web/src/lib/voiceKichwa.ts",
+  "additionalCatalogs": ["web/src/lib/voiceActions.ts"],
   "scope": "Interfaz del modo voz: estados, botones, ajustes, información, ayuda y errores. Incluye el aviso breve al pie y las propuestas de texto del formulario de reporte en TranslationReport.tsx.",
   "source": "Propuestas contextuales de Codex solicitadas por el usuario; reutilizan vocabulario del trabajo anterior",
   "literalAlkiTranslations": false,
