@@ -6,13 +6,15 @@ import { earcon, listenOnce, loadPrefs, parseCommand, savePrefs, speak, stopSpea
 import type { MapAction, Procedure, Source, Unknown } from '../lib/types';
 import { kichwaVoiceAvailable } from '../lib/kichwaTts';
 import { kichwaVoice, voiceLabels } from '../lib/voiceKichwa';
+import { publicVoiceUrl, voiceActionText, voiceMapLink } from '../lib/voiceActions';
+import type { MapView } from '../lib/mapConversation';
 import { trapFocus } from './ConsentDialog';
 import { IcClose, IcInfo, IcMic, IcStop } from './icons';
 import { Mascot } from './Mascot';
 
-export interface VoiceAnswer { id: string; text: string; streaming?: boolean; procedure?: Procedure; unknown?: Unknown; clarify?: { question: string; options: string[] }; map?: MapAction; sources?: Source[]; error?: string }
+export interface VoiceAnswer { id: string; text: string; streaming?: boolean; procedure?: Procedure; unknown?: Unknown; clarify?: { question: string; options: string[] }; map?: MapAction; geoMap?: MapView; sources?: Source[]; error?: string }
 
-type State = 'start' | 'idle' | 'listening' | 'transcribing' | 'thinking' | 'speaking';
+type State = 'start' | 'idle' | 'preparing' | 'listening' | 'transcribing' | 'thinking' | 'speaking';
 
 const TEXT = {
   es: {
@@ -53,17 +55,27 @@ const HAS_PII = /\b\d{10}\b|[\w.+-]+@[\w-]+\.[\w.]+/;
  * Conversación por voz, manos libres: pensada para personas ciegas o con baja visión (también funciona junto a un lector de
  * pantalla) y para cualquiera que prefiera hablar. Se abre con el enlace #/voz o con el botón "Modo voz".
  */
-export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
+export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose, onShowAnswer }: {
   answer: VoiceAnswer | undefined;
   busy: boolean;
   onSend: (text: string) => void;
   onStopAnswer: () => void;
   onClose: () => void;
+  onShowAnswer?: () => void;
 }) {
   const { t, lang } = useT();
   const x = lang === 'qu' ? kichwaVoice : TEXT[lang];
   const ui = voiceLabels[lang];
+  const a = voiceActionText(lang);
   const [state, setState] = useState<State>('start');
+  const stateRef = useRef<State>('start');
+  const setVoiceState = (next: State) => { stateRef.current = next; setState(next); };
+  const epoch = useRef(0);
+  const mounted = useRef(true);
+  const [visibleStep, setVisibleStep] = useState(-1);
+  const [showTyped, setShowTyped] = useState(false);
+  const mapAnchor = useRef<HTMLAnchorElement>(null);
+  const sourceAnchor = useRef<HTMLAnchorElement>(null);
   const [interim, setInterim] = useState('');
   const [heard, setHeard] = useState('');
   const [said, setSaid] = useState('');
@@ -90,8 +102,8 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
   const startBtn = useRef<HTMLButtonElement>(null);
   const lang2: Lang = lang;
   // El ciclo de escucha es asíncrono: siempre lee la respuesta y las acciones actuales, nunca una copia vieja.
-  const live = useRef({ answer, onSend, onClose, onStopAnswer });
-  live.current = { answer, onSend, onClose, onStopAnswer };
+  const live = useRef({ answer, onSend, onClose, onStopAnswer, busy });
+  live.current = { answer, onSend, onClose, onStopAnswer, busy };
   const listenRef = useRef<() => Promise<void>>(async () => undefined);
 
   useEffect(() => {
@@ -108,38 +120,66 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
     return () => { active = false; };
   }, [lang]);
   useEffect(() => { startBtn.current?.focus(); }, []);
-  useEffect(() => () => { listener.current?.abort(); stopSpeaking(); }, []);
+  const invalidate = () => {
+    epoch.current++;
+    const oldListener = listener.current;
+    listener.current = null;
+    oldListener?.abort();
+    stopSpeaking();
+  };
+  const closeVoice = () => { invalidate(); pending.current = false; live.current.onClose(); };
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; invalidate(); }; }, []);
+  useEffect(() => {
+    invalidate(); pending.current = false;
+    setVoiceState('start'); setSaid(''); setHeard(''); setTyped(''); setVisibleStep(-1);
+    spoken.current = { intro: '', steps: [], outro: '' }; step.current = -1;
+  }, [lang]);
 
   const setPrefs = (p: Partial<VoicePrefs>) => { const n = { ...prefsRef.current, ...p }; setPrefsState(n); savePrefs(n); };
 
   const say = useCallback(async (text: string, thenListen = true) => {
     if (!text) return;
+    invalidate();
+    const turn = epoch.current;
     last.current = text;
     setSaid(text);
-    setState('speaking');
+    setSpeechError('');
+    setVoiceState('speaking');
+    let failed = false;
     try { await speak(text, lang2, prefsRef.current); }
-    catch (error) { setSpeechError(lang2 === 'qu' ? voiceLabels.qu.voiceError : (error as Error).message); }
-    setState((s) => (s === 'speaking' ? 'idle' : s));
-    if (thenListen && prefsRef.current.autoListen && stt && lang2 !== 'qu') void listenRef.current();
+    catch { failed = true; if (mounted.current && turn === epoch.current) setSpeechError(voiceLabels[lang2].voiceError); }
+    if (!mounted.current || turn !== epoch.current) return;
+    setVoiceState('idle');
+    if (!failed && thenListen && prefsRef.current.autoListen && stt && (lang2 !== 'qu' || prefsRef.current.reviewKichwa === false) && !panelRef.current) void listenRef.current();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang2, stt]);
 
   const handle = (text: string) => {
     const answer = live.current.answer;
     const cmd = parseCommand(text, answer?.clarify?.options.length ?? 0);
+    if ((live.current.busy || pending.current) && cmd !== 'exit') {
+      if (cmd === 'stop') { invalidate(); pending.current = false; live.current.onStopAnswer(); setVoiceState('idle'); }
+      return;
+    }
     const steps = spoken.current.steps;
     if (cmd === 'help') return void say(x.help);
-    if (cmd === 'exit') { stopSpeaking(); void speak(x.bye, lang2, prefsRef.current); return live.current.onClose(); }
+    if (cmd === 'exit') return closeVoice();
     if (cmd === 'repeat') return void say(last.current || x.help);
-    if (cmd === 'stop') { stopSpeaking(); return setState('idle'); }
+    if (cmd === 'stop') { invalidate(); return setVoiceState('idle'); }
+    if (cmd === 'map' || cmd === 'source') {
+      const anchor = cmd === 'map' ? mapAnchor.current : sourceAnchor.current;
+      anchor?.focus();
+      return void say(cmd === 'map' ? (anchor ? a.mapHint : a.internalMapHint) : anchor ? a.sourceHint : a.showAnswer, false);
+    }
     if (cmd === 'slower') { setPrefs({ rate: Math.max(0.6, +(prefsRef.current.rate - 0.15).toFixed(2)) }); return void say(x.slower); }
     if (cmd === 'faster') { setPrefs({ rate: Math.min(1.8, +(prefsRef.current.rate + 0.15).toFixed(2)) }); return void say(x.faster); }
     if (cmd === 'next' || cmd === 'prev' || cmd === 'all') {
       if (!steps.length) return void say(x.noSteps);
-      if (cmd === 'all') { step.current = steps.length - 1; return void say([...steps, spoken.current.outro].join(' ')); }
+      if (cmd === 'all') { step.current = steps.length - 1; setVisibleStep(step.current); return void say([...steps, spoken.current.outro].join(' ')); }
       if (cmd === 'next' && step.current >= steps.length - 1) return void say(`${x.lastStep} ${spoken.current.outro}`);
       if (cmd === 'prev' && step.current <= 0) return void say(x.firstStep);
       step.current += cmd === 'next' ? 1 : -1;
+      setVisibleStep(step.current);
       return void say(steps[step.current]! + (step.current === steps.length - 1 ? ` ${spoken.current.outro}` : ''));
     }
     if (cmd && typeof cmd === 'object' && answer?.clarify) return ask(answer.clarify.options[cmd.option - 1]!);
@@ -147,38 +187,44 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
   };
 
   const ask = (text: string) => {
+    if (!text.trim() || live.current.busy || pending.current) return;
+    invalidate();
     pending.current = true;
     setHeard(text.replace(new RegExp(HAS_PII.source, 'g'), ui.omittedData));
-    setState('thinking');
+    setVoiceState('thinking');
+    setTyped(''); setShowTyped(false);
     earcon('done');
     live.current.onSend(text);
-    if (HAS_PII.test(text)) void speak(x.pii, lang2, prefsRef.current);
   };
 
   async function listen() {
-    stopSpeaking();
-    listener.current?.abort();
+    if (live.current.busy || pending.current) return;
+    invalidate();
+    const turn = epoch.current;
     setInterim('');
     setSpeechError('');
-    setState('listening');
+    setVoiceState(lang2 === 'qu' ? 'preparing' : 'listening');
     earcon('listen');
-    const l = listenOnce(lang2, (text) => {
-      if (lang2 === 'qu') { if (text === voiceLabels.qu.transcribing) setState('transcribing'); }
-      else setInterim(text);
-    });
-    listener.current = l;
     try {
+      const l = listenOnce(lang2, (text) => {
+        if (!mounted.current || turn !== epoch.current) return;
+        if (lang2 === 'qu') setVoiceState(text === voiceLabels.qu.transcribing ? 'transcribing' : 'listening');
+        else setInterim(text);
+      });
+      listener.current = l;
       const text = await l.done;
+      if (!mounted.current || turn !== epoch.current) return;
       listener.current = null;
-      if (!text) { setState('idle'); earcon('error'); return; }
-      if (lang2 === 'qu') { setTyped(text); setState('idle'); }
+      if (!text) { setVoiceState('idle'); return; }
+      if (lang2 === 'qu' && prefsRef.current.reviewKichwa !== false) { setTyped(text); setShowTyped(true); setVoiceState('idle'); }
       else handle(text);
     } catch (e) {
+      if (!mounted.current || turn !== epoch.current) return;
       listener.current = null;
-      setState('idle');
+      setVoiceState('idle');
       earcon('error');
       if (lang2 === 'qu') { if ((e as Error).name !== 'AbortError') setSpeechError((e as Error).name === 'NotAllowedError' ? x.micDenied : x.notHeard); }
-      else void say((e as Error).message === 'not-allowed' ? x.micDenied : x.notHeard, false);
+      else setSpeechError((e as Error).message === 'not-allowed' ? x.micDenied : x.notHeard);
     }
   }
 
@@ -186,38 +232,44 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
 
   // Cuando llega la respuesta a una pregunta hecha en este modo, se lee.
   useEffect(() => {
-    if (!answer || answer.streaming || !pending.current || answer.id === spokenId.current) return;
-    pending.current = false;
-    spokenId.current = answer.id;
+    if (!answer || answer.streaming) return;
     const s = toSpeech(answer, lang2, t('unknownTitle'), t('unknownBody'));
     spoken.current = s;
-    step.current = -1;
-    void say(answer.error ? answer.error : [s.intro, s.steps.length ? '' : s.outro].filter(Boolean).join(' '));
+    step.current = s.steps.length ? 0 : -1;
+    setVisibleStep(step.current);
+    last.current = [s.intro, s.steps[0] ?? s.outro].filter(Boolean).join(' ');
+    if (!pending.current || answer.id === spokenId.current) return;
+    pending.current = false;
+    spokenId.current = answer.id;
+    void say(answer.error ? answer.error : [s.intro, s.steps[0] ?? s.outro].filter(Boolean).join(' '));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [answer?.id, answer?.streaming]);
+  }, [answer?.id, answer?.streaming, lang2]);
 
-  const begin = async () => { if (lang2 === 'qu' && stt) return listen(); earcon('done'); await say(x.welcome, true); if (!stt) setState('idle'); };
+  const begin = () => { if (stt) void listen(); else { setShowTyped(true); setVoiceState('idle'); } };
 
   const main = () => {
-    if (state === 'start') return void begin();
-    if (state === 'speaking') { stopSpeaking(); return void listen(); }
-    if (state === 'listening') { listener.current?.stop(); return; }
-    if (state === 'transcribing') { listener.current?.abort(); return setState('idle'); }
-    if (state === 'thinking') { live.current.onStopAnswer(); pending.current = false; return setState('idle'); }
+    const current = stateRef.current;
+    if (current === 'start') return begin();
+    if (current === 'preparing' || current === 'transcribing') { invalidate(); return setVoiceState('idle'); }
+    if (current === 'speaking') { invalidate(); setVoiceState('idle'); return void listen(); }
+    if (current === 'listening') { setVoiceState('transcribing'); listener.current?.stop(); return; }
+    if (current === 'thinking' || live.current.busy) { invalidate(); live.current.onStopAnswer(); pending.current = false; return setVoiceState('idle'); }
     if (stt) void listen();
   };
 
   const onKey = (e: KeyboardEvent<HTMLElement>) => {
     trapFocus(e);
     const tag = (e.target as HTMLElement).tagName;
-    if (e.key === 'Escape') { e.preventDefault(); if (panel) { closePanel(); return; } stopSpeaking(); onClose(); return; }
-    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || panel) return;
+    if (e.key === 'Escape') { e.preventDefault(); if (panel) { closePanel(); return; } closeVoice(); return; }
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || panel || (tag === 'BUTTON' && e.key === ' ')) return;
     if (e.key === ' ' && state !== 'start') { e.preventDefault(); main(); }
     else if (e.key.toLowerCase() === 'r') handle('repetir');
     else if (e.key.toLowerCase() === 'n') handle('siguiente');
   };
 
-  const status = state === 'start' ? x.startHint : state === 'listening' ? x.listening : state === 'transcribing' ? ui.transcribing : state === 'thinking' || busy ? x.thinking : state === 'speaking' ? x.speaking : x.idle;
+  const status = state === 'start' ? x.startHint : state === 'preparing' ? a.preparing : state === 'listening' ? x.listening : state === 'transcribing' ? ui.transcribing : state === 'thinking' || busy ? x.thinking : state === 'speaking' ? x.speaking : x.idle;
+  const mapUrl = answer ? voiceMapLink(answer) : undefined;
+  const sourceUrl = publicVoiceUrl(answer?.sources?.[0]?.url ?? answer?.procedure?.source.url);
   const mood = state === 'listening' ? 'happy' : state === 'thinking' ? 'thinking' : state === 'speaking' ? 'talking' : 'idle';
 
   return (
@@ -227,7 +279,7 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
         <span className="sp" />
         <button className="icon-btn" aria-label={ui.info} title={ui.info} aria-expanded={panel === 'info'} aria-controls="voice-options" onClick={(event) => { panelTrigger.current = event.currentTarget; setPanel(panel === 'info' ? null : 'info'); }}><IcInfo /></button>
         <button className="icon-btn" aria-label={ui.settings} title={ui.settings} aria-expanded={panel === 'settings'} aria-controls="voice-options" onClick={(event) => { panelTrigger.current = event.currentTarget; setPanel(panel === 'settings' ? null : 'settings'); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="m9 3-1 3-3 1-2 3 2 2-1 3 3 2 3-1 2 3 3-1 1-3 3-1 1-3-2-2 1-3-3-2-3 1-2-2Z"/></svg></button>
-        <button className="icon-btn" aria-label={x.exit} title={x.exit} onClick={() => { stopSpeaking(); onClose(); }}><IcClose /></button>
+        <button className="icon-btn" aria-label={x.exit} title={x.exit} onClick={closeVoice}><IcClose /></button>
       </header>
 
       <div className="voice-stage">
@@ -245,17 +297,31 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
           <button ref={startBtn} className="voice-main" onClick={main}><IcMic />{x.start}</button>
         ) : (
           <button className={`voice-main ${state}`} onClick={main} aria-pressed={state === 'listening'} disabled={!stt && state === 'idle'}>
-            {state === 'listening' || state === 'transcribing' || state === 'thinking' || state === 'speaking' ? <IcStop /> : <IcMic />}
-            {state === 'listening' || state === 'transcribing' ? x.stop : state === 'speaking' ? x.talk : state === 'thinking' ? x.stop : x.talk}
+            {state === 'listening' || state === 'preparing' || state === 'transcribing' || state === 'thinking' ? <IcStop /> : <IcMic />}
+            {state === 'listening' ? a.stopListening : state === 'speaking' ? a.interrupt : state === 'preparing' || state === 'transcribing' ? x.stop : state === 'thinking' ? a.cancel : x.talk}
           </button>
         )}
+        {answer && !answer.streaming && !busy && <div className="voice-answer-actions" aria-label={a.showAnswer}>
+          {mapUrl && <a ref={mapAnchor} className="chip" href={mapUrl} target="_blank" rel="noreferrer" onClick={() => { invalidate(); setVoiceState('idle'); }}>{a.map}<span className="sr">{lang === 'en' ? ' (new tab)' : lang === 'qu' ? ' (mushuk panka)' : ' (nueva pestaña)'}</span></a>}
+          {sourceUrl && <a ref={sourceAnchor} className="chip" href={sourceUrl} target="_blank" rel="noreferrer" onClick={() => { invalidate(); setVoiceState('idle'); }}>{a.source}</a>}
+          <button type="button" className="chip" onClick={() => { invalidate(); pending.current = false; (onShowAnswer ?? onClose)(); }}>{a.showAnswer}</button>
+          {answer.clarify?.options.map((option, index) => <button type="button" className="chip" key={option} onClick={() => ask(option)}>{index + 1}. {option}</button>)}
+          {!!answer.procedure?.steps.length && <div className="voice-step-controls">
+            <p>{a.step} {Math.max(0, visibleStep) + 1}/{answer.procedure.steps.length}: {answer.procedure.steps[Math.max(0, visibleStep)]?.title}</p>
+            <button type="button" className="chip" disabled={visibleStep <= 0} onClick={() => handle('previous')}>{a.previous}</button>
+            <button type="button" className="chip" disabled={visibleStep >= answer.procedure.steps.length - 1} onClick={() => handle('next')}>{a.next}</button>
+            <button type="button" className="chip" onClick={() => handle('repeat')}>{a.repeat}</button>
+            <button type="button" className="chip" onClick={() => handle('all steps')}>{a.all}</button>
+          </div>}
+        </div>}
+        {stt && state !== 'start' && <button type="button" className="voice-type-toggle" onClick={() => { invalidate(); setVoiceState('idle'); setShowTyped(!showTyped); }}>{showTyped ? a.hideText : a.text}</button>}
 
-        {(!stt || lang === 'qu') && state !== 'start' && (
+        {(!stt || showTyped) && state !== 'start' && (
           <form className="voice-typed" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) { handle(typed.trim()); setTyped(''); } }}>
             <p className="small">{lang === 'qu' ? ui.editTranscript : x.noStt}</p>
             <label className="sr" htmlFor="voice-q">{x.typed}</label>
-            <input id="voice-q" className="inp" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={x.typed} />
-            <button className="btn primary">{x.send}</button>
+            <input id="voice-q" className="inp" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={x.typed} disabled={busy || state === 'thinking'} />
+            <button className="btn primary" disabled={!typed.trim() || busy || state === 'thinking'}>{x.send}</button>
           </form>
         )}
       </div>
@@ -280,8 +346,9 @@ export function VoiceMode({ answer, busy, onSend, onStopAnswer, onClose }: {
             </select>
           </label>
         )}
-        {lang === 'qu' && serverVoice && <button type="button" className="chip" disabled={state === 'speaking' || state === 'listening' || busy} onClick={() => void say('Imanalla. Ñuka shutika Yachi.', false)}>{ui.tryVoice}</button>}
-        {lang !== 'qu' && <label className="check"><input type="checkbox" checked={prefs.autoListen} onChange={(e) => setPrefs({ autoListen: e.target.checked })} />{x.auto}</label>}
+        {lang === 'qu' && serverVoice && <button type="button" className="chip" disabled={state === 'speaking' || state === 'listening' || state === 'preparing' || state === 'transcribing' || busy} onClick={() => void say('Imanalla. Ñuka shutika Yachi.', false)}>{ui.tryVoice}</button>}
+        {lang === 'qu' && <label className="check"><input type="checkbox" checked={prefs.reviewKichwa !== false} onChange={(e) => setPrefs({ reviewKichwa: e.target.checked })} />{a.reviewTranscript}</label>}
+        <label className="check"><input type="checkbox" checked={prefs.autoListen} disabled={lang === 'qu' && prefs.reviewKichwa !== false} onChange={(e) => setPrefs({ autoListen: e.target.checked })} />{x.auto}</label>
         {!ttsSupported(lang) && <p className="err">{ui.ttsUnavailable}</p>}
       </div>}
       </aside>}

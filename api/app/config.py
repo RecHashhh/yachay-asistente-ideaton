@@ -48,6 +48,15 @@ class Settings(BaseSettings):
     # Conservación (LOPDP): preguntas anónimas y votos; debe coincidir con el aviso de datos (web/src/config.ts).
     retention_days: int = 365
 
+    # ------------------------------------------------------------- uso del modelo (Claude) y tope de gasto
+    # Interruptor general: con YACHI_LLM=off la clave queda cargada pero no se llama al modelo (modo sin modelo).
+    llm_switch: str = Field(default="on", validation_alias=AliasChoices("YACHI_LLM", "llm_switch"))
+    # Tope de gasto acumulado en USD (tabla llm_usage). Al alcanzarlo, el chat pasa solo al modo sin modelo. 0 = sin tope.
+    anthropic_budget_usd: float = Field(default=5.0, validation_alias=AliasChoices("ANTHROPIC_BUDGET_USD", "anthropic_budget_usd"))
+    # Precio por millón de tokens del modelo de respuesta (Claude Haiku 5.5, consultado el 20-10-2026).
+    price_in_per_m: float = 0.10
+    price_out_per_m: float = 0.50
+
     # ------------------------------------------------------------- agente (búsqueda guiada por catálogo)
     # auto: se usa si hay clave de Anthropic; off: siempre la búsqueda híbrida directa.
     agent_mode: str = Field(default="auto", validation_alias=AliasChoices("YACHI_AGENT", "agent_mode"))
@@ -78,8 +87,13 @@ class Settings(BaseSettings):
         return v if v.is_absolute() else (API_DIR / v).resolve()
 
     @property
+    def llm_on(self) -> bool:
+        return self.llm_switch.strip().lower() not in ("off", "0", "false", "no")
+
+    @property
     def has_anthropic_key(self) -> bool:
-        return bool(self.anthropic_api_key.get_secret_value().strip())
+        """Hay clave Y el interruptor está encendido: solo entonces se crea el cliente del modelo."""
+        return self.llm_on and bool(self.anthropic_api_key.get_secret_value().strip())
 
     @property
     def agent_enabled(self) -> bool:

@@ -1,0 +1,10 @@
+{
+  "scope": "Synthetic voice round trip; no microphone or native-speaker validation.",
+  "input": "Imanalla. Ñuka shutika Yachi.",
+  "transcript": "Ima na alli a ñukta shutita uyachiy.",
+  "exactMatch": false,
+  "ttsBytes": 76844,
+  "contentType": "audio/wav",
+  "ttsSeconds": 1.12,
+  "asrSeconds": 0.86
+}

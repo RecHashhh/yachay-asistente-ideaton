@@ -387,7 +387,7 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
 
   return (
     <>
-    <div className={`app${embed ? ' embed' : ''}${railOpen ? '' : ' rail-closed'}${mobileRail ? ' rail-open-mobile' : ''}`} inert={modalOpen || undefined}>
+    <div className={`app${embed ? ' embed' : ''}${railOpen ? '' : ' rail-closed'}${mobileRail ? ' rail-open-mobile' : ''}`} inert={modalOpen || voiceOpen || undefined} aria-hidden={modalOpen || voiceOpen || undefined}>
       <div className="sr" role="status" aria-live="polite">{announce}</div>
       {!embed && (
         <aside id="chat-sidebar" className="rail" aria-label={t('recent')} role={mobileRail ? 'dialog' : undefined} aria-modal={mobileRail || undefined} onKeyDown={(e) => { if (mobileRail) trapFocus(e); if (e.key === 'Escape') setMobileRail(false); }}>
@@ -508,6 +508,14 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
         {voiceOpen && consent && (
           <VoiceMode answer={[...msgs].reverse().find((m) => m.role === 'assistant')} busy={busy}
             onSend={(q) => void send(q, msgs, [], 'skip')} onStopAnswer={stop}
+            onShowAnswer={() => {
+              setVoiceOpen(false);
+              if (location.hash.startsWith('#/voz')) history.replaceState(null, '', `${location.pathname}${location.search}#/`);
+              setTimeout(() => {
+                const last = [...document.querySelectorAll<HTMLElement>('.msg-ai')].pop();
+                if (last) { last.tabIndex = -1; last.focus(); last.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+              }, 100);
+            }}
             onClose={() => { setVoiceOpen(false); if (location.hash.startsWith('#/voz')) history.replaceState(null, '', `${location.pathname}${location.search}#/`); setTimeout(() => document.getElementById('ask')?.focus(), 50); }} />
         )}
       </AnimatePresence>

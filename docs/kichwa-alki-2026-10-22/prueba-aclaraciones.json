@@ -1,0 +1,21 @@
+{
+  "scope": "Live local frontend and API; no generated answer text stored.",
+  "results": [
+    {
+      "lang": "es",
+      "directClarification": true,
+      "noSearch": true,
+      "optionOpensProcedure": true,
+      "followupNotReplacedByMenu": true,
+      "pageErrors": []
+    },
+    {
+      "lang": "en",
+      "directClarification": true,
+      "noSearch": true,
+      "optionOpensProcedure": true,
+      "followupNotReplacedByMenu": true,
+      "pageErrors": []
+    }
+  ]
+}

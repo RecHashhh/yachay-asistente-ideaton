@@ -1,0 +1,101 @@
+{
+  "scope": "Live frontend and API, no simulated chat answers. Checks rendering, not linguistic approval.",
+  "results": [
+    {
+      "lang": "es",
+      "case": "location",
+      "visibleCharacters": 532,
+      "map": true,
+      "procedure": false,
+      "seconds": 2.1,
+      "horizontalOverflow": false
+    },
+    {
+      "lang": "es",
+      "case": "procedure",
+      "visibleCharacters": 2358,
+      "map": false,
+      "procedure": true,
+      "seconds": 1,
+      "horizontalOverflow": false
+    },
+    {
+      "lang": "es",
+      "case": "followup",
+      "visibleCharacters": 411,
+      "map": false,
+      "procedure": false,
+      "seconds": 1.2,
+      "horizontalOverflow": false
+    },
+    {
+      "lang": "es",
+      "pageErrors": [],
+      "failedLocalRequests": []
+    },
+    {
+      "lang": "en",
+      "case": "location",
+      "visibleCharacters": 353,
+      "map": true,
+      "procedure": false,
+      "seconds": 0.9,
+      "horizontalOverflow": false
+    },
+    {
+      "lang": "en",
+      "case": "procedure",
+      "visibleCharacters": 2105,
+      "map": false,
+      "procedure": true,
+      "seconds": 1,
+      "horizontalOverflow": false
+    },
+    {
+      "lang": "en",
+      "case": "followup",
+      "visibleCharacters": 296,
+      "map": false,
+      "procedure": false,
+      "seconds": 1.1,
+      "horizontalOverflow": false
+    },
+    {
+      "lang": "en",
+      "pageErrors": [],
+      "failedLocalRequests": []
+    },
+    {
+      "lang": "qu",
+      "case": "location",
+      "visibleCharacters": 490,
+      "map": true,
+      "procedure": false,
+      "seconds": 1.4,
+      "horizontalOverflow": false
+    },
+    {
+      "lang": "qu",
+      "case": "procedure",
+      "visibleCharacters": 2584,
+      "map": false,
+      "procedure": true,
+      "seconds": 1.1,
+      "horizontalOverflow": false
+    },
+    {
+      "lang": "qu",
+      "case": "followup",
+      "visibleCharacters": 1189,
+      "map": false,
+      "procedure": false,
+      "seconds": 14.8,
+      "horizontalOverflow": false
+    },
+    {
+      "lang": "qu",
+      "pageErrors": [],
+      "failedLocalRequests": []
+    }
+  ]
+}

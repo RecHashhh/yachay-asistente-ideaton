@@ -13,7 +13,8 @@ export default defineConfig({
     launchOptions: { args: ['--use-gl=swiftshader', '--enable-webgl'] },
   },
   webServer: {
-    command: 'VITE_API_URL=http://127.0.0.1:8000 VITE_MAP_API_URL=/__maps_api npm run dev -- --host 127.0.0.1 --port 5181',
+    command: 'npm run dev -- --host 127.0.0.1 --port 5181 --strictPort',
+    env: { VITE_API_URL: 'http://127.0.0.1:8000', VITE_MAP_API_URL: '/__maps_api' },
     url: 'http://127.0.0.1:5181',
     reuseExistingServer: false,
     timeout: 120_000,

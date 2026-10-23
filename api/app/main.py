@@ -205,9 +205,9 @@ def trends(lang: str = "es"):
     lang = "en" if lang == "en" else "es"
     with conn() as c:
         rows = c.execute(
-            """SELECT m.question, count(*) AS n, (SELECT d.topic_id FROM documents d WHERE d.id = (array_agg(m.doc_ids[1]))[1]) AS topic
+            f"""SELECT m.question, count(*) AS n, (SELECT d.topic_id FROM documents d WHERE d.id = (array_agg(m.doc_ids[1]))[1]) AS topic
                FROM messages m WHERE m.kind IN ('respuesta','lugar') AND m.lang = %s AND m.created_at > now() - interval '7 days'
-                 AND m.question NOT LIKE '%%omitid%%'
+                 AND m.question NOT LIKE '%%omitid%%' AND {graph.REAL_SESSIONS}
                GROUP BY m.question HAVING count(DISTINCT m.session_id) >= 3 ORDER BY n DESC LIMIT 6""",
             (lang,),
         ).fetchall()
@@ -330,6 +330,13 @@ def admin_logout(authorization: str = Header(default="")):
     if r:
         audit(r["email"], "logout")
     return {"ok": True}
+
+
+@app.get("/admin/usage")
+def admin_usage(_: str = Depends(admin)):
+    """Gasto real del modelo (tokens y USD) frente al tope, y estado del interruptor YACHI_LLM."""
+    from . import usage
+    return usage.summary()
 
 
 @app.get("/admin/audit")

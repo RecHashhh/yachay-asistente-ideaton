@@ -26,7 +26,7 @@ import anthropic
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
 
-from . import contacts, filters, maps_tool, procedures, rules
+from . import contacts, filters, maps_tool, procedures, rules, usage
 from .config import settings
 from .db import conn
 from .geo_conversation import clear_pending, conversation_lock, get_pending
@@ -38,7 +38,8 @@ from .telemetry import measure_anthropic_call, record_anthropic_call, record_cha
 
 logger = logging.getLogger(__name__)
 
-client = anthropic.AsyncAnthropic() if settings.has_anthropic_key else None
+# Cliente del modelo solo con clave y con YACHI_LLM encendido; además, cada uso pasa por usage.budget_ok() (tope de gasto).
+client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key.get_secret_value()) if settings.has_anthropic_key else None
 
 MARK = re.compile(r"\s?\[F\d+(?:\s*,\s*F?\d+)*\]")
 MIN_COS = 0.42  # por debajo, y sin coincidencias de texto, no hay fuente suficiente (calibrar con el set de control)
@@ -96,6 +97,8 @@ EXTRACTIVE_MIN_FTS = 0.10
 # Lo que se guarda en vez del texto cuando el mensaje es sensible (LOPDP: datos de salud o de terceros).
 PLACEHOLDER = {"crisis": "[mensaje de crisis: texto no guardado]", "denuncia": "[consulta sobre acoso o violencia: texto no guardado]",
                "respeto": "[mensaje ofensivo: texto no guardado]", "salud": "[consulta de salud: texto no guardado]"}
+# Sesiones de prueba (set de control del Portal, scripts de verificación): no cuentan como personas para tendencias ni sugerencias.
+REAL_SESSIONS = "session_id NOT LIKE 'validacion-%%' AND session_id NOT LIKE 'verif-%%' AND session_id NOT LIKE 'prueba-%%'"
 QUIET = ("aclaracion", "saludo", "cierre", "respeto", "vacio", "manipulacion", "confesionario", "crisis", "salud")
 
 
@@ -410,13 +413,14 @@ async def out_of_domain(state: State) -> State:
 
 
 async def smalltalk(state: State) -> State:
-    if state['lang'] == 'qu' and client is not None and state.get('triage') in {'saludo', 'cierre'}:
+    if state['lang'] == 'qu' and client is not None and usage.budget_ok() and state.get('triage') in {'saludo', 'cierre'}:
         response = await measure_anthropic_call(settings.anthropic_model, "smalltalk", client.messages.create(
             model=settings.anthropic_model, max_tokens=250,
             system='You are Yachi. Respond briefly to this greeting or farewell only. Do not add institutional facts. '
                    + language_context(state['question'], 'qu'),
             messages=[{'role': 'user', 'content': state['question']}],
         ))
+        usage.record_anthropic("saludo_kichwa", response.usage)
         text = ''.join(getattr(part, 'text', '') for part in response.content).strip()
         if text:
             _say(text)
@@ -584,6 +588,7 @@ def _agent():
         from .yachi_retriever import YachiRetriever
 
         _agent_instance = RagAgent(settings, YachiRetriever(settings))
+        _agent_instance.usage_hook = lambda md: usage.record_langchain("agente", md)  # tokens reales de cada decisión
     return _agent_instance
 
 
@@ -678,7 +683,7 @@ async def retrieve(state: State) -> State:
         q = f"{q} violencia consejería de derechos"
     prev = next((h["content"] for h in reversed(state.get("history") or []) if h.get("role") == "user"), "")
     query = f"{prev} {q}" if prev and len(q.split()) < 6 else q  # preguntas de seguimiento cortas ("¿y los requisitos?")
-    if settings.agent_enabled:
+    if settings.agent_enabled and usage.budget_ok():
         return await _agent_retrieve(state, q, lang, where_es, where_en)
     t_search = time.time()
     hits = hybrid(query, k=5)
@@ -695,7 +700,7 @@ async def retrieve(state: State) -> State:
         return {'hits': [], 'kind': 'sin_fuente', 'doc_ids': []}
     best_cos, best_fts = (max(h.cos for h in hits), max(h.fts for h in hits)) if hits else (0.0, 0.0)
     weak = best_cos < MIN_COS and best_fts == 0
-    if client is None:  # modo extractivo: una palabra suelta en común ("me duele el pie" → formulario médico) no basta
+    if client is None or not usage.budget_ok():  # modo extractivo: una palabra suelta en común ("me duele el pie" → formulario médico) no basta
         weak = best_cos < EXTRACTIVE_MIN_COS or (best_cos < MIN_COS and best_fts < EXTRACTIVE_MIN_FTS)
     if not hits or weak:
         if state.get("map_results"):
@@ -743,7 +748,7 @@ async def generate(state: State) -> State:
             for feature in state["map_payload"].get("features", [])
         )
         w({"type": "map.route" if is_route else "map.marker", "payload": state["map_payload"]})
-    if client is None:
+    if client is None or not usage.budget_ok():  # sin clave, interruptor apagado o tope de gasto alcanzado
         # Sin clave de API: modo extractivo (muestra el fragmento más relevante, sin redactar). Útil para probar la búsqueda.
         h = hits[0]
         if state.get("triage") == "denuncia":
@@ -818,14 +823,15 @@ async def generate(state: State) -> State:
     except Exception:
         record_anthropic_call(settings.anthropic_model, "answer_generation", time.perf_counter() - anthropic_started, outcome="error")
         raise
-    usage = final.usage
-    record_anthropic_call(settings.anthropic_model, "answer_generation", time.perf_counter() - anthropic_started, usage)
-    logger.info("anthropic_generation input_tokens=%d output_tokens=%d", usage.input_tokens, usage.output_tokens)
+    usage_ = final.usage
+    usage.record_anthropic("redaccion", usage_)
+    record_anthropic_call(settings.anthropic_model, "answer_generation", time.perf_counter() - anthropic_started, usage_)
+    logger.info("anthropic_generation input_tokens=%d output_tokens=%d", usage_.input_tokens, usage_.output_tokens)
     if buf.strip().startswith("SIN_INFORMACION"):
         _step("write", _t(lang, "Los fragmentos no responden tu pregunta", "The excerpts don't answer your question"), "warn",
               detail=_t(lang, "Prefiero no responder antes que adivinar.", "I'd rather not answer than guess."))
         w({"type": "unknown", "item": {"reason": "sin_fuente", "contact": _contact(hits[0].topic_id, lang, state["question"])}})
-        return {"kind": "sin_fuente", "doc_ids": [], "tokens_in": usage.input_tokens, "tokens_out": usage.output_tokens}
+        return {"kind": "sin_fuente", "doc_ids": [], "tokens_in": usage_.input_tokens, "tokens_out": usage_.output_tokens}
     clean = MARK.sub("", buf)
     if len(clean) > sent:
         w({"type": "token", "text": clean[sent:]})
@@ -852,7 +858,7 @@ async def generate(state: State) -> State:
                                                          + ", ".join(bad[:4]) + "). Verifícalos en la fuente.",
                                                          "Some details in this answer do not appear verbatim in the cited documents (" + ", ".join(bad[:4]) + "). Check them in the source.")})
     return {"kind": "respuesta_no_verificada" if bad else "respuesta" if cited else "respuesta_sin_marcas", "doc_ids": [h.doc_id for h in used],
-            "tokens_in": usage.input_tokens, "tokens_out": usage.output_tokens}
+            "tokens_in": usage_.input_tokens, "tokens_out": usage_.output_tokens}
 
 
 async def finish(state: State) -> State:
@@ -866,7 +872,7 @@ async def finish(state: State) -> State:
         sug = c.execute(
             # Solo preguntas hechas por varias personas y sin datos ocultos: una pregunta de una sola persona no se muestra a otras.
             "SELECT question FROM messages WHERE kind IN ('respuesta','lugar') AND lang = %s AND question <> %s AND question NOT LIKE '%%omitid%%' "
-            "AND created_at > now() - interval '7 days' GROUP BY question HAVING count(DISTINCT session_id) >= 3 ORDER BY count(*) DESC LIMIT 3",
+            f"AND created_at > now() - interval '7 days' AND {REAL_SESSIONS} GROUP BY question HAVING count(DISTINCT session_id) >= 3 ORDER BY count(*) DESC LIMIT 3",
             (lang if lang != "qu" else "es", state["question"]),
         ).fetchall()
         if state.get("sensitive"):  # no se guarda el texto ni se usa en tendencias ni en la bandeja

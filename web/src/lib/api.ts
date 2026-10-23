@@ -126,6 +126,13 @@ export interface RegisteredInquiry {
 }
 export const listInquiries = (): Promise<RegisteredInquiry[]> => MOCK ? Promise.resolve([]) : json('/admin/inquiries');
 
+/** Uso real del modelo frente al tope de gasto (ANTHROPIC_BUDGET_USD) y estado del interruptor YACHI_LLM. */
+export interface LlmUsage {
+  llmOn: boolean; hasKey: boolean; active: boolean; model: string; budgetUsd: number; spentUsd: number; calls: number; answeredWithModel: number;
+  bySource: { source: string; calls: number; inputTokens: number; outputTokens: number; usd: number }[];
+}
+export const getUsage = (): Promise<LlmUsage | null> => (MOCK ? Promise.resolve(null) : json('/admin/usage'));
+
 /** Bitácora del Portal: quién cambió la base de conocimiento y cuándo (últimas 200 acciones). */
 export interface AuditEntry { at: string; email: string; action: string; target: string | null }
 export const listAudit = (): Promise<AuditEntry[]> => (MOCK ? Promise.resolve([]) : json('/admin/audit'));

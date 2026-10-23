@@ -1,5 +1,8 @@
+"""Fixtures que aíslan las pruebas de PostgreSQL y del estado geográfico compartido."""
+
 import pytest
 
+from app import usage
 from app.geo_conversation import InMemoryGeoStateStore, reset_store, use_store_for_testing
 
 
@@ -9,6 +12,13 @@ def isolated_geo_state_store():
     use_store_for_testing(InMemoryGeoStateStore())
     yield
     reset_store()
+
+
+@pytest.fixture(autouse=True)
+def _usage_sin_base(monkeypatch):
+    """Las pruebas unitarias no dependen de una base ni consumen el presupuesto real."""
+    monkeypatch.setattr(usage, "spent", lambda: 0.0)
+    monkeypatch.setattr(usage, "record", lambda *a, **k: None)
 
 
 def pytest_asyncio_loop_factories(config, item):

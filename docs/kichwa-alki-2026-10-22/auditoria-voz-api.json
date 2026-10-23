@@ -1,0 +1,53 @@
+{
+  "scope": "Live local API with synthetic institutional questions; Kichwa examples include institutional Spanish loanwords. Does not validate natural speech or linguistic correctness.",
+  "results": [
+    {
+      "lang": "es",
+      "question": "Dónde queda la biblioteca",
+      "case": "location",
+      "structuredAction": true,
+      "error": false,
+      "seconds": 0.08
+    },
+    {
+      "lang": "es",
+      "question": "Cómo hago un cambio de carrera",
+      "case": "procedure",
+      "structuredAction": true,
+      "error": false,
+      "seconds": 0.05
+    },
+    {
+      "lang": "en",
+      "question": "Where is the library?",
+      "case": "location",
+      "structuredAction": true,
+      "error": false,
+      "seconds": 0.06
+    },
+    {
+      "lang": "en",
+      "question": "How do I change my major?",
+      "case": "procedure",
+      "structuredAction": true,
+      "error": false,
+      "seconds": 0.06
+    },
+    {
+      "lang": "qu",
+      "question": "Maypi biblioteca tiyan?",
+      "case": "location",
+      "structuredAction": true,
+      "error": false,
+      "seconds": 0.05
+    },
+    {
+      "lang": "qu",
+      "question": "Imashina carrera cambiota rurani?",
+      "case": "procedure",
+      "structuredAction": true,
+      "error": false,
+      "seconds": 0.06
+    }
+  ]
+}
