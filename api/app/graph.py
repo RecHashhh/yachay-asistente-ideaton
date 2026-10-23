@@ -290,13 +290,14 @@ async def out_of_domain(state: State) -> State:
 
 
 async def smalltalk(state: State) -> State:
-    if state['lang'] == 'qu' and client is not None and state.get('triage') in {'saludo', 'cierre'}:
+    if state['lang'] == 'qu' and client is not None and usage.budget_ok() and state.get('triage') in {'saludo', 'cierre'}:
         response = await client.messages.create(
             model=settings.anthropic_model, max_tokens=250,
             system='You are Yachi. Respond briefly to this greeting or farewell only. Do not add institutional facts. '
                    + language_context(state['question'], 'qu'),
             messages=[{'role': 'user', 'content': state['question']}],
         )
+        usage.record_anthropic("saludo_kichwa", response.usage)
         text = ''.join(getattr(part, 'text', '') for part in response.content).strip()
         if text:
             _say(text)
@@ -439,7 +440,7 @@ async def retrieve(state: State) -> State:
         return {'hits': [], 'kind': 'sin_fuente', 'doc_ids': []}
     best_cos, best_fts = (max(h.cos for h in hits), max(h.fts for h in hits)) if hits else (0.0, 0.0)
     weak = best_cos < MIN_COS and best_fts == 0
-    if client is None:  # modo extractivo: una palabra suelta en común ("me duele el pie" → formulario médico) no basta
+    if client is None or not usage.budget_ok():  # modo extractivo: una palabra suelta en común ("me duele el pie" → formulario médico) no basta
         weak = best_cos < EXTRACTIVE_MIN_COS or (best_cos < MIN_COS and best_fts < EXTRACTIVE_MIN_FTS)
     if not hits or weak:
         topic = "bienestar" if state.get("triage") == "denuncia" else (hits[0].topic_id if hits else None)
