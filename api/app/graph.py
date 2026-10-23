@@ -89,6 +89,8 @@ EXTRACTIVE_MIN_FTS = 0.10
 # Lo que se guarda en vez del texto cuando el mensaje es sensible (LOPDP: datos de salud o de terceros).
 PLACEHOLDER = {"crisis": "[mensaje de crisis: texto no guardado]", "denuncia": "[consulta sobre acoso o violencia: texto no guardado]",
                "respeto": "[mensaje ofensivo: texto no guardado]", "salud": "[consulta de salud: texto no guardado]"}
+# Sesiones de prueba (set de control del Portal, scripts de verificación): no cuentan como personas para tendencias ni sugerencias.
+REAL_SESSIONS = "session_id NOT LIKE 'validacion-%%' AND session_id NOT LIKE 'verif-%%' AND session_id NOT LIKE 'prueba-%%'"
 QUIET = ("aclaracion", "saludo", "cierre", "respeto", "vacio", "manipulacion", "confesionario", "crisis", "salud")
 
 
@@ -565,7 +567,7 @@ async def finish(state: State) -> State:
         sug = c.execute(
             # Solo preguntas hechas por varias personas y sin datos ocultos: una pregunta de una sola persona no se muestra a otras.
             "SELECT question FROM messages WHERE kind IN ('respuesta','lugar') AND lang = %s AND question <> %s AND question NOT LIKE '%%omitid%%' "
-            "AND created_at > now() - interval '7 days' GROUP BY question HAVING count(DISTINCT session_id) >= 3 ORDER BY count(*) DESC LIMIT 3",
+            f"AND created_at > now() - interval '7 days' AND {REAL_SESSIONS} GROUP BY question HAVING count(DISTINCT session_id) >= 3 ORDER BY count(*) DESC LIMIT 3",
             (lang if lang != "qu" else "es", state["question"]),
         ).fetchall()
         if state.get("sensitive"):  # no se guarda el texto ni se usa en tendencias ni en la bandeja
