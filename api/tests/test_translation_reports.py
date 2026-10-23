@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from unittest.mock import patch
-from fastapi.testclient import TestClient
+import httpx
 import pytest
 from app import main
 from types import SimpleNamespace
@@ -9,7 +9,7 @@ PAYLOAD = {'messageId': 'm1', 'lang': 'qu', 'question': 'Pregunta de prueba',
            'answer': 'Respuesta de prueba', 'fragment': 'Frase de prueba', 'correction': ''}
 
 
-def submit(payload, *, fail=False):
+async def submit(payload, *, fail=False):
     calls = []
     class Connection:
         def execute(self, sql, values):
@@ -21,13 +21,16 @@ def submit(payload, *, fail=False):
     def transaction():
         yield Connection()
 
+    transport = httpx.ASGITransport(app=main.app)
     with patch.object(main, 'conn', transaction):
-        response = TestClient(main.app).post('/translation-reports', json=payload)
+        async with httpx.AsyncClient(transport=transport, base_url='http://test') as client:
+            response = await client.post('/translation-reports', json=payload)
     return response, calls
 
 
-def test_report_persists_pending_without_approval():
-    response, calls = submit(PAYLOAD)
+@pytest.mark.asyncio
+async def test_report_persists_pending_without_approval():
+    response, calls = await submit(PAYLOAD)
     assert response.status_code == 201
     assert response.json()['status'] == 'pending_review'
     assert response.json()['id'] == calls[0][1][0]
@@ -38,26 +41,31 @@ def test_report_persists_pending_without_approval():
 
 @pytest.mark.parametrize('changes', [{'fragment': '   '}, {'lang': 'es'}, {'answer': ''},
     {'correction': 'x' * 6001}, {'status': 'approved'}])
-def test_invalid_or_self_approved_report_is_rejected(changes):
-    response, calls = submit({**PAYLOAD, **changes})
+@pytest.mark.asyncio
+async def test_invalid_or_self_approved_report_is_rejected(changes):
+    response, calls = await submit({**PAYLOAD, **changes})
     assert response.status_code == 422
     assert not calls
 
 
-def test_storage_failure_is_not_reported_as_success():
-    response, calls = submit(PAYLOAD, fail=True)
+@pytest.mark.asyncio
+async def test_storage_failure_is_not_reported_as_success():
+    response, calls = await submit(PAYLOAD, fail=True)
     assert response.status_code == 503
     assert response.json()['detail'] == 'translation_report_unavailable'
     assert not calls
 
 
-def test_canonical_chat_preserves_kichwa_language():
+@pytest.mark.asyncio
+async def test_canonical_chat_preserves_kichwa_language():
     seen = []
     async def run(question, lang, history, session_id):
         seen.append(lang)
         yield {'type': 'token', 'text': 'Prueba sintética'}
+    transport = httpx.ASGITransport(app=main.app)
     with patch.object(main.filters, 'allow', return_value=True), patch.object(main.graph, 'run', run):
-        response = TestClient(main.app).post('/chat', json={'sessionId': 'test', 'message': 'Consulta', 'lang': 'qu'})
+        async with httpx.AsyncClient(transport=transport, base_url='http://test') as client:
+            response = await client.post('/chat', json={'sessionId': 'test', 'message': 'Consulta', 'lang': 'qu'})
     assert response.status_code == 200
     assert seen == ['qu']
 

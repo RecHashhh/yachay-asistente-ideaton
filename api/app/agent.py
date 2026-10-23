@@ -1,6 +1,8 @@
 from collections.abc import AsyncIterator, Callable
 import asyncio
 import json
+import logging
+import time
 from typing import Any, TypedDict
 
 from langchain_anthropic import ChatAnthropic
@@ -12,6 +14,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
+from app.geo_conversation import GeoPendingAction, clear_pending, set_pending
+from app.intent_router import GeoIntent, IntentDecision, classify_local, classify_request
 from app.kichwa import language_context
 try:  # sin PostGIS/geoalchemy2 (fuera de Docker) el agente trabaja sin la herramienta de mapas
     from app.maps_tool import MapActionInput, compact_map_result, execute_map_action
@@ -19,6 +23,9 @@ except Exception:
     MapActionInput = None
 from app.retrieval import RetrievedChunk, Retriever
 from app.schemas import ChatRequest
+from app.telemetry import measure_anthropic_call, record_geo_operation
+
+logger = logging.getLogger(__name__)
 
 
 class AgentState(TypedDict, total=False):
@@ -29,6 +36,10 @@ class AgentState(TypedDict, total=False):
     reused_sources: list[dict[str, Any]]
     map_results: list[dict[str, Any]]
     map_found: bool
+    intent_decision: dict[str, Any]
+    session_id: str
+    intent_classification_attempted: bool
+    map_prehandled: bool
     searched: bool
     unknown: bool
     answer: str
@@ -87,7 +98,7 @@ def _decision_prompt(max_tool_calls: int) -> str:
     return f"""You gather evidence so the Yachay Tech assistant can answer. You may call tools repeatedly, reading each result before deciding the next step, up to {max_tool_calls} tool calls in total. Each history turn is labeled with its zero-based index. Source excerpts attached to an assistant turn are labeled with that history index.
 
 - Do not use tools for greetings, thanks, or ordinary small talk.
-- For a location request, call map_action with names, categories, or natural-language references. It searches, resolves ambiguity, calculates proximity, and routes deterministically in PostGIS; never estimate coordinates, distances, or paths. Use it without RAG for map-only requests and also use RAG only when the user asks for institutional facts.
+- For a location, marker, or navigation request, use map_action. It searches the verified campus catalog and calculates routes; preserve the user's wording and suspected typos. Never invent a place, choose between similar results, or calculate a route yourself. Use RAG as well only when the user asks an institutional question in the same message.
 - If a follow-up is already answered by a prior assistant turn with attached sources, and the user is not asking to verify/update it or for a missing detail, call reuse_history with that turn's index.
 - For a new institutional fact, a missing detail, or an explicit request to verify or update, call list_documents first (its result is cached; skip it only if you already called it), read the titles and descriptions, and then call search_rag with the document_ids of the relevant documents. The user's wording often differs from the documents' (for example "otra universidad" vs "cambio de IES"), so build the query with the terms found in the catalog. Search the full corpus with an empty document_ids list only when no catalog entry looks relevant.
 - After reading results, search again when the question has several parts and some are not yet covered, when a document refers to another procedure, document, or form that the answer needs, or when a needed detail (date, requirement, contact, step) is missing. Make each new query specific, using the exact names and terms found in the documents. Do not repeat a query that has already been made.
@@ -127,6 +138,8 @@ class RagAgent:
             raise RuntimeError("ANTHROPIC_API_KEY es necesaria para generar respuestas")
         self.settings = settings
         self.retriever = retriever or Retriever(settings)
+        # Se llama con el uso de tokens de cada decisión (registro de gasto real); opcional.
+        self.usage_hook = None
         self.llm = ChatAnthropic(
             model=settings.anthropic_model,
             anthropic_api_key=key,
@@ -134,6 +147,57 @@ class RagAgent:
             # Reasoning tokens count against max_tokens and left answers empty or cut off.
             thinking={"type": "disabled"},
         )
+
+    async def classify_intent(
+        self,
+        message: str,
+        history: list[dict[str, Any]] | None = None,
+        pending_action: str | None = None,
+    ) -> IntentDecision | None:
+        started = time.perf_counter()
+
+        async def classify_with_claude(query: str) -> IntentDecision:
+            chain = self.llm.with_structured_output(
+                IntentDecision, method="function_calling", include_raw=True,
+            )
+            context = "\n".join(
+                f"{turn.get('role', 'user')}: {turn.get('content', '')[:500]}"
+                for turn in (history or [])[-4:]
+            )
+            prompt = (
+                "Classify the user's current request for a university campus assistant. "
+                "Return one schema-valid intent. A place name is not proof that the user asks for a map: "
+                "'what is SENESCYT' is DOCUMENT_SEARCH, while 'where is SENESCYT' is LOCATION_SEARCH. "
+                "A route needs destination and, when stated, origin. Do not invent entities. "
+                "If a short reply answers a pending clarification, use FOLLOW_UP. "
+                "Use MIXED_REQUEST only when both a map action and a document question are requested.\n\n"
+                f"Pending map action: {pending_action or 'none'}\n"
+                f"Recent conversation:\n{context or '(none)'}\n\n"
+                f"Current message: {query}"
+            )
+            response = await measure_anthropic_call(
+                self.settings.anthropic_model, "intent_classification",
+                chain.ainvoke([HumanMessage(content=prompt)]),
+            )
+            if isinstance(response, dict) and "parsed" in response:
+                usage = getattr(response.get("raw"), "usage_metadata", {}) or {}
+                logger.info(
+                    "anthropic_intent_usage input_tokens=%d output_tokens=%d",
+                    int(usage.get("input_tokens", 0)), int(usage.get("output_tokens", 0)),
+                )
+                return response.get("parsed")
+            return response
+
+        decision = await classify_request(
+            message, pending_action, classify_with_claude, self.settings.geo_intent_min_confidence,
+        )
+        logger.info(
+            "intent_router source=claude intent=%s confidence=%.2f latency_ms=%d",
+            decision.intent.value if decision else "unclassified",
+            decision.confidence if decision else 0,
+            int((time.perf_counter() - started) * 1000),
+        )
+        return decision
 
     async def gather(
         self, state: AgentState, session: Any, notify: Callable[[str, dict[str, Any]], None] | None = None,
@@ -146,6 +210,10 @@ class RagAgent:
         map_results: list[dict[str, Any]] = []
         map_found = False
         searched = False
+        supplied_decision = state.get("intent_decision")
+        decision = IntentDecision.model_validate(supplied_decision) if supplied_decision else classify_local(state["message"])
+        if decision is None and not state.get("intent_classification_attempted"):
+            decision = await self.classify_intent(state["message"], state.get("history", []))
 
         @tool("list_documents")
         async def list_documents() -> str:
@@ -192,10 +260,13 @@ class RagAgent:
             radius_m: int = 800,
             origin: str | None = None,
             destination: str | None = None,
+            origin_id: str | None = None,
+            destination_id: str | None = None,
             mode: str = "walking",
         ) -> str:
-            """Busca lugares, resuelve referencias, calcula proximidad y rutas con PostGIS."""
+            """Find a campus place or marker, search nearby places, or calculate a walking/driving route between verified places. Keep original names and typos; PostGIS verifies identities and routes. Use IDs from prior results only to resume a user selection."""
             nonlocal map_found
+            started = time.perf_counter()
             try:
                 result, geometry = await asyncio.to_thread(
                     execute_map_action,
@@ -206,15 +277,64 @@ class RagAgent:
                     radius_m=radius_m,
                     origin=origin,
                     destination=destination,
+                    origin_id=origin_id,
+                    destination_id=destination_id,
                     mode=mode,
                 )
             except Exception as e:  # base sin PostGIS o sin el esquema de mapas: el agente sigue con los documentos
                 print("map_action falló:", repr(e))
-                return json.dumps({"status": "unavailable", "message": "Map service unavailable"})
+                result = {"status": "error", "reason": "map_service_unavailable"}
+                record_geo_operation(intent, "error", time.perf_counter() - started)
+                map_results.append(result)
+                logger.info(
+                    "geo_tool intent=%s status=error latency_ms=%d",
+                    intent, int((time.perf_counter() - started) * 1000),
+                )
+                if state.get("session_id"):
+                    clear_pending(state["session_id"])
+                return compact_map_result(result)
             map_results.append(result)
+            record_geo_operation(intent, result.get("status", "error"), time.perf_counter() - started)
             map_found = map_found or result.get("status") in {"ok", "ambiguous"}
+            logger.info(
+                "geo_tool intent=%s status=%s candidate_count=%d latency_ms=%d",
+                intent,
+                result.get("status", "unknown"),
+                len(result.get("results") or result.get("origin_candidates") or result.get("destination_candidates") or []),
+                int((time.perf_counter() - started) * 1000),
+            )
+            session_id = state.get("session_id")
+            if session_id and intent == "route" and result.get("status") == "ambiguous":
+                origin_candidates = result.get("origin_candidates") or []
+                destination_candidates = result.get("destination_candidates") or []
+                resolved_origin = result.get("origin") or {}
+                resolved_destination = result.get("destination") or {}
+                awaiting = "origin_selection" if origin_candidates else "destination_selection"
+                set_pending(session_id, GeoPendingAction(
+                    pending_action=GeoIntent.ROUTE_REQUEST,
+                    origin_query=origin,
+                    destination_query=destination,
+                    origin_id=resolved_origin.get("id") or origin_id,
+                    destination_id=resolved_destination.get("id") or destination_id,
+                    origin_candidates=origin_candidates,
+                    destination_candidates=destination_candidates,
+                    awaiting=awaiting,
+                ))
+            elif session_id and intent == "search" and result.get("status") == "ambiguous":
+                set_pending(session_id, GeoPendingAction(
+                    pending_action=GeoIntent.LOCATION_SEARCH,
+                    place_query=query,
+                    place_candidates=result.get("results") or [],
+                    awaiting="place_selection",
+                ))
+            elif session_id and intent == "route" and result.get("status") == "ok":
+                clear_pending(session_id)
+            elif session_id and intent == "route" and result.get("status") in {"not_found", "route_unavailable", "error", "unavailable"}:
+                clear_pending(session_id)
             if geometry:
-                get_stream_writer()({"type": "map", "payload": geometry})
+                writer = get_stream_writer()
+                writer({"type": "map", "payload": geometry})
+                writer({"type": "map.route" if intent == "route" else "map.marker", "payload": geometry})
             return compact_map_result(result)
 
         async def execute_search(args: dict[str, Any]) -> str:
@@ -253,7 +373,34 @@ class RagAgent:
             turn.get("role") == "assistant" and turn.get("sources")
             for turn in state.get("history", [])[-6:]
         )
-        tools = [list_documents, search_rag] + ([map_action] if MapActionInput is not None else [])
+        force_map = decision and decision.intent in {
+            GeoIntent.LOCATION_SEARCH, GeoIntent.MAP_MARKER, GeoIntent.ROUTE_REQUEST,
+        }
+        if force_map and MapActionInput is not None:
+            intent = "route" if decision.intent == GeoIntent.ROUTE_REQUEST else "search"
+            args = {"intent": intent}
+            if intent == "route":
+                args.update(origin=decision.origin, destination=decision.destination)
+            else:
+                args["query"] = decision.place
+            await map_action.ainvoke(args)
+            return {
+                "retrieved": [], "reused_sources": [], "map_results": map_results,
+                "map_found": map_found, "searched": False, "unknown": False,
+            }
+
+        if decision and decision.intent == GeoIntent.MIXED_REQUEST and MapActionInput is not None and not state.get("map_prehandled"):
+            intent = "route" if decision.destination else "search"
+            args = {"intent": intent}
+            if intent == "route":
+                args.update(origin=decision.origin, destination=decision.destination)
+            else:
+                args["query"] = decision.place
+            await map_action.ainvoke(args)
+
+        tools = [list_documents, search_rag]
+        if MapActionInput is not None and decision is None:
+            tools.append(map_action)
         if has_sourced_history:
             tools.append(reuse_history)
 
@@ -264,7 +411,11 @@ class RagAgent:
         reuse_attempted = False
 
         while calls_used < max_calls:
-            decision = await selector.ainvoke(messages)
+            decision = await measure_anthropic_call(
+                self.settings.anthropic_model, "tool_selection", selector.ainvoke(messages),
+            )
+            if self.usage_hook:
+                self.usage_hook(getattr(decision, "usage_metadata", None))
             tool_calls = [
                 item for item in getattr(decision, "tool_calls", [])
                 if item.get("name") in {tool_.name for tool_ in tools}
@@ -296,6 +447,11 @@ class RagAgent:
                         reuse_attempted = True
                         result = await reuse_history.ainvoke(args)
                 messages.append(ToolMessage(content=result, tool_call_id=call["id"]))
+
+        logger.info(
+            "agent_tool_selection calls=%d searched=%s map_results=%d",
+            calls_used, searched, len(map_results),
+        )
 
         if reuse_attempted and not reused_sources and not searched:
             # Client history is untrusted; stale or mismatched source records require a fresh retrieval.

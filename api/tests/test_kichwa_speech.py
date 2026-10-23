@@ -2,8 +2,8 @@ import io
 import wave
 
 import pytest
+import httpx
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
 from app import kichwa_speech as speech
 
@@ -30,17 +30,19 @@ def test_pcm_shape():
     assert samples.max() == 0
 
 
-def test_api(monkeypatch):
+@pytest.mark.asyncio
+async def test_api(monkeypatch):
     app = FastAPI()
     app.include_router(speech.router)
     monkeypatch.setattr(speech, 'available', lambda: True)
     monkeypatch.setattr(speech, 'transcribe', lambda samples: 'alli puncha')
-    with TestClient(app) as client:
-        assert client.post('/speech/transcribe', content=wav()).status_code == 415
-        assert client.post('/speech/transcribe', content=b'bad', headers={'Content-Type': 'audio/wav'}).status_code == 422
-        assert client.post('/speech/transcribe', content=b'x' * (speech.MAX_BYTES + 1), headers={'Content-Type': 'audio/wav'}).status_code == 413
-        result = client.post('/speech/transcribe', content=wav(), headers={'Content-Type': 'audio/wav'})
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url='http://test') as client:
+        assert (await client.post('/speech/transcribe', content=wav())).status_code == 415
+        assert (await client.post('/speech/transcribe', content=b'bad', headers={'Content-Type': 'audio/wav'})).status_code == 422
+        assert (await client.post('/speech/transcribe', content=b'x' * (speech.MAX_BYTES + 1), headers={'Content-Type': 'audio/wav'})).status_code == 413
+        result = await client.post('/speech/transcribe', content=wav(), headers={'Content-Type': 'audio/wav'})
         assert result.json()['text'] == 'alli puncha'
-        assert client.get('/speech/capabilities').json()['audioStored'] is False
+        assert (await client.get('/speech/capabilities')).json()['audioStored'] is False
         monkeypatch.setattr(speech, 'available', lambda: False)
-        assert client.post('/speech/transcribe', content=wav(), headers={'Content-Type': 'audio/wav'}).status_code == 503
+        assert (await client.post('/speech/transcribe', content=wav(), headers={'Content-Type': 'audio/wav'})).status_code == 503

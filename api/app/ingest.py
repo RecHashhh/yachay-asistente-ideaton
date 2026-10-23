@@ -6,6 +6,7 @@ Es idempotente: vuelve a cargar todo lo que viene del corpus sin tocar los docum
 
 import csv
 import json
+import os
 import re
 import sys
 import time
@@ -109,8 +110,19 @@ def load_places(c: psycopg.Connection) -> None:
 
 def main() -> None:
     with_embeddings = "--sin-embeddings" not in sys.argv
-    if not (RAG / "chunks.jsonl").exists():
-        sys.exit(f"No encuentro el corpus en {RAG}. Revisa RAG_DIR en api/.env.")
+    required_files = (
+        RAG / "chunks.jsonl",
+        RAG / "fuentes.csv",
+        RAG / "datos" / "puntos_importantes_universidad.xlsx",
+        RAG / "datos" / "Distribución Aulas_.xlsx",
+    )
+    missing_files = [path for path in required_files if not path.is_file()]
+    if missing_files:
+        if os.getenv("RAG_OPTIONAL", "").lower() in {"1", "true", "yes"}:
+            missing = ", ".join(str(path.relative_to(RAG)) for path in missing_files)
+            print(f"AVISO: corpus incompleto en {RAG}; se omite la carga RAG (faltan: {missing}).")
+            return
+        sys.exit(f"Corpus incompleto en {RAG}; faltan: {', '.join(str(p) for p in missing_files)}")
     t0 = time.time()
     fuentes = [r for r in csv.DictReader(open(RAG / "fuentes.csv", encoding="utf-8")) if r.get("incluir") == "si"]
     chunks = [json.loads(line) for line in open(RAG / "chunks.jsonl", encoding="utf-8") if line.strip()]

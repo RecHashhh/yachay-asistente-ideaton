@@ -1,5 +1,7 @@
 # Asistente institucional Yachay Tech
 
+[![CI](https://github.com/RecHashhh/yachay-asistente-ideaton/actions/workflows/ci.yml/badge.svg)](https://github.com/RecHashhh/yachay-asistente-ideaton/actions/workflows/ci.yml)
+
 Prototipo del chatbot público de la universidad. Responde con documentos fuente, cita su período de vigencia y sección, y puede marcar lugares en el mapa del campus.
 
 Marco técnico de referencia: [normativas, controles aplicados y buenas prácticas](docs/NORMATIVAS-Y-BUENAS-PRACTICAS.md). Documenta la adopción de referencias ISO, OWASP y WCAG, las medidas de protección de datos y sus brechas, sin afirmar certificaciones ni cumplimiento legal integral.
@@ -22,6 +24,8 @@ cp .env.example .env
 # Copia el corpus autorizado (confidencial, no está en el repo) a ./rag
 docker compose up --build
 ```
+
+Si aún no tienes el corpus autorizado, Compose inicia el API sin indexar documentos RAG; chat y búsqueda documental quedan sin fuentes. Para exigir el corpus y detener el arranque si falta, configura `RAG_OPTIONAL=false` en `.env`.
 
 Sin Docker: ver `api/README.md` (PostgreSQL 18 + pgvector local, `python -m app.migrate`, `python -m app.ingest`, `uvicorn app.main:app`).
 

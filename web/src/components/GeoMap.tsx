@@ -5,6 +5,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '../lib/i18n';
+import { googleMapsNavigation } from '../lib/googleMapsNavigation';
 import type { MapConfig, MapFeatures } from '../lib/mapGeoApi';
 import type { MapView, PlaceRole } from '../lib/mapConversation';
 
@@ -182,6 +183,9 @@ export function GeoMap({ view, theme, basemap, config }: Props) {
     }
 
     mapRef.current = map;
+    if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('mapDebug')) {
+      (window as Window & { __yachayMapDebug?: MapLibreMap }).__yachayMapDebug = map;
+    }
     loadedRef.current = false;
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
     const markers: Marker[] = [];
@@ -301,6 +305,7 @@ export function GeoMap({ view, theme, basemap, config }: Props) {
   const destination = view.places.find((entry) => entry.role === 'destination')?.place;
   const origin = view.places.find((entry) => entry.role === 'origin')?.place;
   const candidates = view.places.filter((entry) => entry.role === 'candidate');
+  const googleMaps = googleMapsNavigation(view, lang);
   let caption: string;
   if (view.route) {
     const distance = view.route.distance_m >= 1000 ? `${(view.route.distance_m / 1000).toFixed(1)} km` : `${Math.round(view.route.distance_m)} m`;
@@ -330,6 +335,11 @@ export function GeoMap({ view, theme, basemap, config }: Props) {
         <span>{caption}</span>
         <span className="sp" />
         <span className="tag">{mode === 'satellite' ? 'Esri World Imagery' : 'OpenStreetMap'}</span>
+        {googleMaps && (
+          <a className="btn sm geo-map-google-link" href={googleMaps.href} target="_blank" rel="noopener noreferrer">
+            {googleMaps.label}
+          </a>
+        )}
       </figcaption>
     </figure>
   );

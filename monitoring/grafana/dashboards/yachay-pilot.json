@@ -1,0 +1,22 @@
+{
+  "uid": "yachay-pilot",
+  "title": "Agente Yachay · Piloto",
+  "tags": ["yachay", "pilot"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "panels": [
+    {"id": 1, "type": "timeseries", "title": "Solicitudes API / segundo", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}, "targets": [{"expr": "sum by (status_class) (rate(yachay_http_requests_total[5m]))", "legendFormat": "{{status_class}}", "refId": "A"}]},
+    {"id": 2, "type": "timeseries", "title": "Tasa de error API", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}, "targets": [{"expr": "100 * sum(rate(yachay_http_requests_total{status_class=~\"4xx|5xx\"}[5m])) / clamp_min(sum(rate(yachay_http_requests_total[5m])), 0.001)", "legendFormat": "error %", "refId": "A"}]},
+    {"id": 3, "type": "timeseries", "title": "Latencia chat p95", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}, "targets": [{"expr": "histogram_quantile(0.95, sum by (le, intent) (rate(yachay_chat_duration_seconds_bucket[5m])))", "legendFormat": "{{intent}}", "refId": "A"}]},
+    {"id": 4, "type": "timeseries", "title": "Primer evento SSE p95", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}, "targets": [{"expr": "histogram_quantile(0.95, sum by (le, intent) (rate(yachay_chat_time_to_first_event_seconds_bucket[5m])))", "legendFormat": "{{intent}}", "refId": "A"}]},
+    {"id": 5, "type": "timeseries", "title": "Costo estimado Anthropic USD / hora", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}, "targets": [{"expr": "sum by (model, operation) (rate(yachay_anthropic_estimated_cost_usd_total[1h])) * 3600", "legendFormat": "{{model}} · {{operation}}", "refId": "A"}]},
+    {"id": 6, "type": "timeseries", "title": "Llamadas Anthropic / minuto", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}, "targets": [{"expr": "sum by (operation, outcome) (rate(yachay_anthropic_requests_total[5m])) * 60", "legendFormat": "{{operation}} · {{outcome}}", "refId": "A"}]},
+    {"id": 7, "type": "timeseries", "title": "Operaciones geográficas", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}, "targets": [{"expr": "sum by (operation, outcome) (rate(yachay_geo_operations_total[5m])) * 60", "legendFormat": "{{operation}} · {{outcome}}", "refId": "A"}]},
+    {"id": 8, "type": "timeseries", "title": "Solicitudes en vuelo", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}, "targets": [{"expr": "yachay_http_requests_in_flight", "legendFormat": "in flight", "refId": "A"}]},
+    {"id": 9, "type": "timeseries", "title": "Tokens Anthropic / minuto", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32}, "targets": [{"expr": "sum by (operation, direction) (rate(yachay_anthropic_tokens_total[5m])) * 60", "legendFormat": "{{operation}} · {{direction}}", "refId": "A"}]},
+    {"id": 10, "type": "timeseries", "title": "Errores SSE / minuto", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32}, "targets": [{"expr": "sum by (component) (rate(yachay_sse_errors_total[5m])) * 60", "legendFormat": "{{component}}", "refId": "A"}]}
+  ],
+  "time": {"from": "now-1h", "to": "now"}
+}

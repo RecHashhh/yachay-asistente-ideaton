@@ -16,6 +16,10 @@ from sqlalchemy.engine import URL
 
 API_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(API_DIR / ".env")
+DEFAULT_ANTHROPIC_PRICING_JSON = (
+    '{"claude-haiku-5-5":{"base":{"input":0.10,"output":0.50,"cache_write":0.125,"cache_read":0.01},'
+    '"over_100k":{"input":0.50,"output":2.50,"cache_write":0.625,"cache_read":0.05}}}'
+)
 
 
 class Settings(BaseSettings):
@@ -25,6 +29,10 @@ class Settings(BaseSettings):
     database_url: str = ""
     anthropic_api_key: SecretStr = SecretStr("")
     anthropic_model: str = "claude-haiku-5-5"
+    anthropic_pricing_json: str = Field(
+        default=DEFAULT_ANTHROPIC_PRICING_JSON,
+        validation_alias=AliasChoices("ANTHROPIC_PRICING_USD_PER_MTOK_JSON", "anthropic_pricing_json"),
+    )
     rag_dir: Path = Path("../docs/rag/rag")
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     admin_emails_raw: str = Field(default="", validation_alias=AliasChoices("ADMIN_EMAILS", "admin_emails_raw"))
@@ -34,10 +42,20 @@ class Settings(BaseSettings):
     rate_session_min: int = Field(default=12, validation_alias=AliasChoices("RATE_SESSION_PER_MIN", "rate_session_min"))
     rate_session_day: int = Field(default=300, validation_alias=AliasChoices("RATE_SESSION_PER_DAY", "rate_session_day"))
     rate_ip_min: int = Field(default=120, validation_alias=AliasChoices("RATE_IP_PER_MIN", "rate_ip_min"))
+    geo_lock_pool_size: int = Field(default=32, ge=1, le=128, validation_alias=AliasChoices("GEO_LOCK_POOL_SIZE", "geo_lock_pool_size"))
     # Detrás de App Service o un proxy: tomar la IP del último X-Forwarded-For (lo agrega el proxy, no el cliente).
     trust_proxy: bool = False
     # Conservación (LOPDP): preguntas anónimas y votos; debe coincidir con el aviso de datos (web/src/config.ts).
     retention_days: int = 365
+
+    # ------------------------------------------------------------- uso del modelo (Claude) y tope de gasto
+    # Interruptor general: con YACHI_LLM=off la clave queda cargada pero no se llama al modelo (modo sin modelo).
+    llm_switch: str = Field(default="on", validation_alias=AliasChoices("YACHI_LLM", "llm_switch"))
+    # Tope de gasto acumulado en USD (tabla llm_usage). Al alcanzarlo, el chat pasa solo al modo sin modelo. 0 = sin tope.
+    anthropic_budget_usd: float = Field(default=5.0, validation_alias=AliasChoices("ANTHROPIC_BUDGET_USD", "anthropic_budget_usd"))
+    # Precio por millón de tokens del modelo de respuesta (Claude Haiku 5.5, consultado el 20-10-2026).
+    price_in_per_m: float = 0.10
+    price_out_per_m: float = 0.50
 
     # ------------------------------------------------------------- agente (búsqueda guiada por catálogo)
     # auto: se usa si hay clave de Anthropic; off: siempre la búsqueda híbrida directa.
@@ -46,6 +64,7 @@ class Settings(BaseSettings):
     rag_vector_candidates: int = 20
     rag_context_chunks: int = 8
     rag_max_tool_calls: int = 6
+    geo_intent_min_confidence: float = Field(default=0.72, ge=0.5, le=0.99)
 
     # ------------------------------------------------------------- capa SQLAlchemy/Ollama (docker-compose del agente)
     postgres_db: str = "yachay_rag"
@@ -57,14 +76,24 @@ class Settings(BaseSettings):
     ollama_embedding_model: str = "bge-m3"
     cors_origins: str = "http://localhost:5180,http://127.0.0.1:5180"
 
+    @field_validator("anthropic_pricing_json", mode="before")
+    @classmethod
+    def _default_empty_price_table(cls, value: str) -> str:
+        return value if isinstance(value, str) and value.strip() else DEFAULT_ANTHROPIC_PRICING_JSON
+
     @field_validator("rag_dir")
     @classmethod
     def _resolve_rag_dir(cls, v: Path) -> Path:
         return v if v.is_absolute() else (API_DIR / v).resolve()
 
     @property
+    def llm_on(self) -> bool:
+        return self.llm_switch.strip().lower() not in ("off", "0", "false", "no")
+
+    @property
     def has_anthropic_key(self) -> bool:
-        return bool(self.anthropic_api_key.get_secret_value().strip())
+        """Hay clave Y el interruptor está encendido: solo entonces se crea el cliente del modelo."""
+        return self.llm_on and bool(self.anthropic_api_key.get_secret_value().strip())
 
     @property
     def agent_enabled(self) -> bool:

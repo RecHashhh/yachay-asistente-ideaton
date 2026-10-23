@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .geo import google_maps_search_url
+from .matching import resolve_category
 from .osm import CATEGORY_QUERIES, category_label, normalize_text
 
 RESULT_COLUMNS = """
@@ -51,8 +52,13 @@ def category_filter(query: str, category: str | None) -> tuple[str | None, str |
         normalized = normalize_text(category)
         if normalized in CATEGORY_QUERIES:
             return CATEGORY_QUERIES[normalized]
+        resolved = resolve_category(category)
+        if resolved:
+            return resolved
         return category, None
-    return CATEGORY_QUERIES.get(normalize_text(query), (None, None))
+    normalized_query = normalize_text(query)
+    exact = CATEGORY_QUERIES.get(normalized_query)
+    return exact or resolve_category(query) or (None, None)
 
 
 def _plural_variant(value: str) -> str:
@@ -77,11 +83,12 @@ def search_places(
     offset = max(0, offset)
     fetch_limit = min(2000, offset + limit + 50)
     category_key, category_value = category_filter(normalized_query, category)
+    category_only_query = category is None and resolve_category(normalized_query) is not None
 
     results: list[dict[str, Any]] = []
     seen: set[str] = set()
 
-    if normalized_query:
+    if normalized_query and not category_only_query:
         variant = _plural_variant(normalized_query)
         rows = session.execute(
             text(
@@ -97,7 +104,14 @@ def search_places(
                             WHEN p.search_text LIKE '%' || :q || '%' THEN 0.85
                             ELSE 0
                         END AS text_score,
-                        similarity(p.search_text, :q) AS fuzzy_score,
+                        GREATEST(
+                            COALESCE(similarity(p.name_normalized, :q), 0),
+                            CASE WHEN char_length(:q) >= 4
+                                THEN COALESCE(word_similarity(:q, p.name_normalized), 0) * 0.95
+                                ELSE 0
+                            END
+                        ) AS name_fuzzy_score,
+                        similarity(p.search_text, :q) * 0.75 AS fuzzy_score,
                         GREATEST(
                             COALESCE(MAX(CASE
                                 WHEN a.alias_normalized = :q THEN 0.99
@@ -105,7 +119,13 @@ def search_places(
                                 WHEN a.alias_normalized LIKE '%' || :q || '%' THEN 0.90
                                 ELSE 0
                             END), 0),
-                            COALESCE(MAX(similarity(a.alias_normalized, :q)), 0) * 0.85
+                            COALESCE(MAX(GREATEST(
+                                similarity(a.alias_normalized, :q),
+                                CASE WHEN char_length(:q) >= 4
+                                    THEN word_similarity(:q, a.alias_normalized) * 0.95
+                                    ELSE 0
+                                END
+                            )), 0) * 0.85
                         ) AS alias_score,
                         CASE WHEN CAST(:lat AS double precision) IS NULL THEN NULL ELSE
                             ST_Distance(
@@ -125,12 +145,17 @@ def search_places(
                           OR p.search_text LIKE '%' || :variant || '%'
                           OR a.alias_normalized LIKE '%' || :q || '%'
                           OR a.alias_normalized LIKE '%' || :variant || '%'
+                          OR p.name_normalized % :q
+                          OR p.name_normalized %> :q
+                          OR p.search_text % :q
+                          OR a.alias_normalized % :q
+                          OR a.alias_normalized %> :q
                           OR similarity(p.search_text, :q) >= 0.25
                           OR similarity(a.alias_normalized, :q) >= 0.40
                       )
                     GROUP BY p.id
                 )
-                SELECT *, GREATEST(text_score, alias_score, fuzzy_score) AS score,
+                SELECT *, GREATEST(text_score, alias_score, name_fuzzy_score, fuzzy_score) AS score,
                     CASE
                         WHEN name_normalized = :q THEN 'exact_name'
                         WHEN alias_score >= 0.99 THEN 'exact_alias'

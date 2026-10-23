@@ -1,3 +1,5 @@
+import asyncio
+
 from langchain_core.messages import AIMessage, SystemMessage
 import pytest
 
@@ -90,6 +92,17 @@ class FakeChatModel:
         self.decision_messages = []
         self.answer_messages = []
         self.bound_tools = []
+        self.intent_calls = []
+
+    def with_structured_output(self, schema, **_kwargs):
+        model = self
+
+        class StructuredSelector:
+            async def ainvoke(self, messages):
+                model.intent_calls.append(messages)
+                return schema(intent="DOCUMENT_SEARCH", confidence=0.9)
+
+        return StructuredSelector()
 
     def bind_tools(self, tools, **kwargs):
         names = [item.name for item in tools]
@@ -153,6 +166,33 @@ async def test_agent_caps_document_selection_at_five_ids(monkeypatch) -> None:
     )]
 
     assert retriever.search_calls == [("¿Cómo me matriculo?", selected_ids[:5])]
+
+
+@pytest.mark.asyncio
+async def test_unrecognized_location_is_classified_before_any_rag_search(monkeypatch):
+    retriever = FakeRetriever()
+    agent, model = make_agent(monkeypatch, retriever)
+    map_calls = []
+
+    def execute_map(**args):
+        map_calls.append(args)
+        return {"status": "ambiguous", "results": [{"id": "building", "display_name": "Edificio SENESCYT"}]}, None
+
+    monkeypatch.setattr("app.agent.execute_map_action", execute_map)
+    model.with_structured_output = lambda schema, **_kwargs: type(
+        "GeoClassifier", (), {"ainvoke": lambda _self, _messages: asyncio.sleep(0, result=schema(
+            intent="LOCATION_SEARCH", place="senecyt", confidence=0.91,
+        ))}
+    )()
+
+    result = await agent.gather({"message": "Me gustaría conocer senecyt", "lang": "es"}, FakeSession())
+
+    assert len(map_calls) == 1
+    assert map_calls[0]["intent"] == "search"
+    assert map_calls[0]["query"] == "senecyt"
+    assert retriever.search_calls == []
+    assert result["map_found"] is True
+    assert model.bound_tools == []
 
 
 @pytest.mark.asyncio

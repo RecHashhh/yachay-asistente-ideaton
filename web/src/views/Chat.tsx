@@ -40,6 +40,7 @@ interface Msg {
   sources?: Source[];
   map?: MapAction;
   geoMap?: MapView;
+  mapError?: string;
   procedure?: Procedure;
   unknown?: Unknown;
   suggestions?: string[];
@@ -104,6 +105,16 @@ function mapViewFromPayload(payload: FeatureCollection<Geometry, Record<string, 
   }
 
   return { places, ...(route ? { route } : {}) };
+}
+
+function mapErrorText(reason: string, lang: Lang): string {
+  const messages: Record<string, [string, string]> = {
+    route_unavailable: ["No hay una ruta disponible entre esos lugares en la red del campus.", "No route is available between those places on the campus network."],
+    not_found: ["No encontré esos lugares en el mapa del campus.", "I couldn't find those places on the campus map."],
+    map_service_unavailable: ["El servicio de mapas no está disponible ahora.", "The map service is unavailable right now."],
+  };
+  const [es, en] = messages[reason] ?? ["No se pudo completar la búsqueda en el mapa.", "The map request could not be completed."];
+  return lang === 'en' ? en : es;
 }
 
 /** Título automático según lo consultado: el trámite o lugar que respondió, si no, la pregunta limpia y corta. */
@@ -272,7 +283,8 @@ export function Chat({ theme, toggleTheme, setLang, embed, voice }: Props) {
         else if (ev.type === 'answer_mode') patch(ai.id, () => ({ answerMode: ev.mode }));
         else if (ev.type === 'token') patch(ai.id, (m) => ({ text: m.text + ev.text, status: m.status ?? (lang === 'en' ? 'Responding' : 'Respondiendo') }));
         else if (ev.type === 'tool') patch(ai.id, () => ({ map: ev.input }));
-        else if (ev.type === 'map') patch(ai.id, () => ({ geoMap: mapViewFromPayload(ev.payload) }));
+        else if (ev.type === 'map' || ev.type === 'map.marker' || ev.type === 'map.route') patch(ai.id, () => ({ geoMap: mapViewFromPayload(ev.payload) }));
+        else if (ev.type === 'map.error') patch(ai.id, () => ({ mapError: ev.reason, status: undefined }));
         else if (ev.type === 'procedure') patch(ai.id, () => ({ procedure: ev.item }));
         else if (ev.type === 'unknown') patch(ai.id, () => ({ unknown: ev.item, status: undefined }));
         else if (ev.type === 'clarify') patch(ai.id, () => ({ clarify: { question: ev.question, options: ev.options }, status: undefined }));
@@ -560,6 +572,7 @@ function AssistantMsg({ m, question, transcript, theme, mapConfig, onVote, onRea
         </AnimatePresence>
         {m.map && !mapAfter && <CampusMap action={m.map} />}
         {m.geoMap && <Suspense fallback={<p className="small muted">{lang === 'en' ? 'Loading map…' : 'Cargando mapa…'}</p>}><GeoMap view={m.geoMap} theme={theme} config={mapConfig} /></Suspense>}
+        {m.mapError && <p className="err" role="status">{mapErrorText(m.mapError, lang)}</p>}
         {m.text && <div className={extractive ? 'extractive-answer' : undefined}>
           {m.lang === 'qu' && <p className="small muted" lang="es">Kichwa · experimental</p>}
           {extractive && <p className="extractive-label">{lang === 'en' ? 'Document excerpt' : 'Fragmento del documento'}</p>}
