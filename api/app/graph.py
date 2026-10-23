@@ -303,13 +303,15 @@ async def route(state: State) -> State:
         )
         logger.info("geo_dispatch intent=%s status=%s", decision.intent.value, operation.result.get("status"))
         # Sin servicio de mapas (o lugar ausente en el OSM, como las aulas), la tabla curada de aulas y lugares responde igual.
-        if operation.result.get("status") in {"error", "unavailable", "not_found"} and decision.intent in {
-            GeoIntent.LOCATION_SEARCH, GeoIntent.MAP_MARKER,
+        if operation.result.get("status") in {"error", "unavailable", "not_found"} and decision.intent not in {
+            GeoIntent.ROUTE_REQUEST, GeoIntent.FOLLOW_UP,
         }:
             room = rules.room_lookup(q)
             pl = None if room else rules.place_lookup(q, need_intent=False)
             if room or pl:
                 return {"question": q, "route": "place", "place": room[0] if room else pl, "room": room[1] if room else None, "origin": None}
+            # Tampoco está en las tablas: puede no ser una ubicación ("¿hay piscina en el campus?"); se busca en los documentos.
+            return {**base, "route": "retrieve", "intent_classification_attempted": True}
         return {
             **base,
             "route": "map_search",

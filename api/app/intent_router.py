@@ -128,6 +128,9 @@ def classify_local(message: str, pending_action: str | None = None) -> IntentDec
     # desplazamiento, las palabras de trámite mandan la consulta a la búsqueda documental.
     if route and PROCEDURE_WORDS.search(folded) and not MOTION_WORDS.search(folded):
         return _decision(GeoIntent.DOCUMENT_SEARCH, confidence=0.93)
+    # "de X a Y" sin desplazamiento ni "desde/hasta/hacia" no es una ruta ("el examen de inglés a los de nivelación").
+    if route and not MOTION_WORDS.search(folded) and not re.search(r"\b(?:desde|hasta|hacia|entre)\b", folded):
+        route = None
     if route:
         origin, destination = route
         if document_request:
