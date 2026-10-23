@@ -1,8 +1,11 @@
 import { expect, test } from '@playwright/test';
 
-const TILE_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jL9sAAAAASUVORK5CYII=', 'base64');
-
 test('renders compact map geometry streamed by the unified API', async ({ page }) => {
+  const tilePng = Buffer.from(await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    return canvas.toDataURL('image/png').split(',')[1]!;
+  }), 'base64');
   await page.addInitScript(() => {
     localStorage.setItem('yt-consent-2026-10c', '1');
     localStorage.setItem('yt-lang', 'es');
@@ -21,7 +24,7 @@ test('renders compact map geometry streamed by the unified API', async ({ page }
       data_version: {},
     }),
   }));
-  const tile = (route: import('@playwright/test').Route) => route.fulfill({ status: 200, contentType: 'image/png', body: TILE_PNG });
+  const tile = (route: import('@playwright/test').Route) => route.fulfill({ status: 200, contentType: 'image/png', body: tilePng });
   await page.route('https://server.arcgisonline.com/**', tile);
   await page.route('https://tile.openstreetmap.org/**', tile);
   await page.route('**/__yachi_api/chat', (route) => route.fulfill({

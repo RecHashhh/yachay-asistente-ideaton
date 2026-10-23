@@ -1,0 +1,74 @@
+{
+  "date": "2026-10-22",
+  "scope": "Revisión local de funcionamiento y contenido. La revisión del Kichwa compara comportamiento y versión española; no certifica gramática ni pronunciación.",
+  "automated": {
+    "backend": {"passed": 77, "skipped": 1},
+    "frontend": {"passed": 31, "skipped": 5},
+    "build": "passed_with_existing_large_chunk_warning",
+    "mapE2E": "passed",
+    "liveApiQueries": 27,
+    "liveApiCompletedWithoutTransportError": 27,
+    "liveBrowserQueries": 9,
+    "liveBrowserJavaScriptErrors": 0,
+    "liveBrowserLocalHttpErrors": 0,
+    "desktopAndMobileLanguages": ["es", "en", "qu"],
+    "additionalBrowserChecks": ["historial, eliminar y deshacer", "cambio de tema", "guías y progreso persistido", "exportación y calendario", "feedback y reintentos", "portal con API simulada", "reporte de traducción y reintentos", "voz: interrupción, cancelación, pasos, enlaces y salida"]
+  },
+  "findings": [
+    {
+      "id": "QU-01", "priority": "high", "status": "open",
+      "case": "location, procedure",
+      "observation": "La biblioteca y el cambio de carrera producen las acciones correctas, pero sus respuestas predeterminadas y la tarjeta del trámite siguen en español en modo Kichwa.",
+      "next": "Localizar estas rutas y sus tarjetas conservando datos y fuentes; mantenerlas identificadas como traducción experimental."
+    },
+    {
+      "id": "CONTENT-01", "priority": "high", "status": "open",
+      "case": "academic",
+      "observation": "Justificar una inasistencia a clases devuelve sin información en ES/EN. En QU genera texto poco útil y cita un procedimiento de retiro de carrera; la fuente no debe interpretarse como respaldo del procedimiento de inasistencias.",
+      "next": "Confirmar si existe una fuente sobre inasistencias, incorporarla si falta y comprobar relevancia antes de redactar en los tres idiomas."
+    },
+    {
+      "id": "QU-02", "priority": "high", "status": "open",
+      "case": "real synthetic TTS to ASR",
+      "observation": "Síntesis y transcripción reales funcionan, pero la transcripción de una frase sintetizada no coincide con el original. No mide exactitud con voz humana.",
+      "next": "Mantener la revisión editable por defecto y evaluar grabaciones de hablantes con ruido y micrófono reales."
+    },
+    {
+      "id": "UX-01", "priority": "medium", "status": "open",
+      "case": "ambiguous",
+      "observation": "Una solicitud genérica devuelve sin información en los tres idiomas, en lugar de preguntar qué trámite necesita la persona.",
+      "next": "Pedir una aclaración breve con opciones útiles sin atribuir requisitos a una solicitud desconocida."
+    },
+    {
+      "id": "QU-03", "priority": "medium", "status": "open",
+      "case": "residences",
+      "observation": "ES/EN orientan sobre las normas disponibles; QU devuelve una respuesta parcial y pide concretar, con menor utilidad que los otros idiomas.",
+      "next": "Revisar equivalencia de recuperación y significado con un hablante, usando las mismas fuentes."
+    },
+    {
+      "id": "EN-01", "priority": "low", "status": "open",
+      "case": "location",
+      "observation": "La respuesta inglesa de la biblioteca conserva la categoría Lugar de estudio en español.",
+      "next": "Localizar categorías y descripciones de lugares, además de sus nombres."
+    }
+  ],
+  "correctObservedBehavior": [
+    "Biblioteca: coordenadas reales y mapa visibles en los tres idiomas.",
+    "Cambio de carrera: guía estructurada con fuente y avisos sobre fechas vencidas.",
+    "Precios de piscina y convocatoria 2035: sin inventar montos ni fechas.",
+    "Las consultas de pizza no recibieron una receta institucional inventada.",
+    "El seguimiento sobre documentos se renderiza en los tres idiomas; en Kichwa tomó unos 15 segundos y requiere revisión de contenido."
+  ],
+  "fixedTestInfrastructure": [
+    "Selectores de adjuntos y navegación del portal actualizados a la interfaz vigente.",
+    "Variables del servidor Playwright compatibles con Windows.",
+    "PNG de prueba de mapas válido para evitar errores de decodificación."
+  ],
+  "limits": [
+    "El portal se recorrió con respuestas simuladas: no se subieron, retiraron ni modificaron documentos reales.",
+    "Los ciclos de voz ES/EN/QU del navegador usaron reconocimiento y síntesis simulados; QU tuvo además una prueba real de modelos con voz sintética.",
+    "No se probaron micrófono físico, lector de pantalla humano, pronunciación nativa ni todos los navegadores.",
+    "Una petición completada o una cita presente no garantizan que la respuesta sea útil ni lingüísticamente correcta.",
+    "Las respuestas institucionales completas permanecen en un archivo local excluido de Git."
+  ]
+}
