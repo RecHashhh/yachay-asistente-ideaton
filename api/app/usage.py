@@ -84,10 +84,15 @@ def summary() -> dict:
             "FROM llm_usage GROUP BY source ORDER BY source"
         ).fetchall()
         questions = c.execute("SELECT count(*) AS n FROM messages WHERE tokens_in IS NOT NULL AND tokens_in > 0").fetchone()["n"]
+        # Costo real por consulta desde que hay registro: incluye las consultas que se responden sin modelo (guías, lugares, filtros).
+        since = c.execute("SELECT min(at) AS t FROM llm_usage").fetchone()["t"]
+        q = c.execute("SELECT count(*) AS n, count(*) FILTER (WHERE tokens_in > 0) AS m FROM messages WHERE created_at >= %s", (since,)).fetchone() if since else {"n": 0, "m": 0}
     total = sum(float(r["usd"]) for r in rows)
+    real = {"since": since.isoformat() if since else None, "queries": q["n"], "modelQueries": q["m"],
+            "perQueryUsd": round(total / q["n"], 6) if q["n"] else None, "perModelAnswerUsd": round(total / q["m"], 6) if q["m"] else None}
     return {
         "llmOn": settings.llm_on, "hasKey": bool(settings.anthropic_api_key.get_secret_value().strip()), "active": settings.has_anthropic_key and budget_ok(),
         "model": settings.anthropic_model, "budgetUsd": settings.anthropic_budget_usd, "spentUsd": round(total, 6),
-        "calls": sum(r["n"] for r in rows), "answeredWithModel": questions,
+        "calls": sum(r["n"] for r in rows), "answeredWithModel": questions, "real": real,
         "bySource": [{"source": r["source"], "calls": r["n"], "inputTokens": r["i"], "outputTokens": r["o"], "usd": round(float(r["usd"]), 6)} for r in rows],
     }

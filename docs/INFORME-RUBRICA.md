@@ -182,7 +182,9 @@ Resultado actual (simulador, 20-10-2026): **100 %** de exactitud, **0** alucinac
 
 **Nivel 4 pide:** estimación detallada y matemáticamente consistente (infraestructura, modelo, almacenamiento, inferencia), con supuestos explícitos, escenarios de carga y decisiones de arquitectura que la sustentan.
 
-En el portal, pestaña **Costo**: los supuestos se pueden editar, la fórmula se muestra paso a paso y hay tres escenarios. Con los valores por defecto:
+**Actualización del 23-10-2026:** el Portal muestra el consumo registrado y la proyección mensual junto a la calculadora. La medición de la sesión de revisión de Claude reportó **USD 0,0047 por consulta en 109 consultas**, frente a unos USD 0,00031 de la estimación inicial. Con 540 consultas diarias y 30 días, esa tasa supone **USD 76,14 de modelo al mes** y **USD 124,14 incluyendo el supuesto de servidor de USD 48**. Es una extrapolación del set de control, no una factura ni una medición de tráfico estudiantil; el dato vigente debe tomarse del registro del Portal. El catálogo reenviado en los pasos del agente explica gran parte de la diferencia. La caché de prompt está habilitada, pero no se le atribuye un ahorro sin medirlo.
+
+En el portal, pestaña **Costo**: los supuestos se pueden editar y la fórmula se muestra paso a paso. La tabla siguiente conserva el **escenario teórico inicial**, que no representa el costo medido del agente:
 
 | Concepto | Valor |
 |---|---|
@@ -236,7 +238,7 @@ Material listo para el paper:
    - La misma pregunta en inglés.
    - "¿Cuál es el sueldo del rector?" → sin información oficial → enviar la consulta a la dependencia.
 3. **Veracidad** (1 min): las nueve capas, la pestaña Validación y el caso del parqueadero.
-4. **Costo** (30 s): ≈ $54 al mes para toda la universidad, y por qué.
+4. **Costo** (30 s): comparar el escenario inicial de ≈ USD 54/mes con la extrapolación medida de ≈ USD 124/mes, explicar los supuestos y mostrar el registro actual del Portal.
 5. **Impacto y adopción** (30 s): widget de una línea, las dependencias actualizan sus documentos y el ciclo de la bandeja.
 
 Preguntas probables del jurado:

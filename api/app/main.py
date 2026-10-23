@@ -368,6 +368,75 @@ def admin_usage(_: str = Depends(admin)):
     return usage.summary()
 
 
+@app.get("/admin/summary")
+def admin_summary(_: str = Depends(admin)):
+    """Inicio del Portal: uso real de los últimos 7 días (sin sesiones de prueba), calidad, pendientes, gasto y última validación."""
+    from . import usage
+    real = graph.REAL_SESSIONS
+    with conn() as c:
+        m = c.execute(
+            f"""SELECT count(*) AS total, count(*) FILTER (WHERE created_at > now() - interval '1 day') AS today,
+                   count(DISTINCT session_id) AS sessions,
+                   count(*) FILTER (WHERE kind IN ('respuesta','lugar','respuesta_sin_marcas')) AS answered,
+                   count(*) FILTER (WHERE kind IN ('sin_fuente','respuesta_no_verificada')) AS unanswered,
+                   count(*) FILTER (WHERE kind = 'fuera_de_dominio') AS ood,
+                   count(*) FILTER (WHERE kind IN ('crisis','denuncia','salud')) AS care,
+                   count(*) FILTER (WHERE kind IN ('aclaracion','saludo','cierre','vacio','respeto','manipulacion','confesionario')) AS conversation,
+                   percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms) AS p50, percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) AS p95
+               FROM messages WHERE created_at > now() - interval '7 days' AND {real}""").fetchone()
+        langs = {r["lang"]: r["n"] for r in c.execute(
+            f"SELECT lang, count(*) AS n FROM messages WHERE created_at > now() - interval '7 days' AND {real} GROUP BY lang").fetchall()}
+        fb = c.execute("SELECT count(*) FILTER (WHERE vote = 'up') AS up, count(*) FILTER (WHERE vote = 'down') AS down "
+                       "FROM feedback WHERE created_at > now() - interval '7 days'").fetchone()
+        pend = c.execute("SELECT (SELECT count(*) FROM unanswered WHERE status = 'nuevo') AS inbox, "
+                         "(SELECT count(*) FROM inquiries WHERE status = 'nueva') AS inquiries, "
+                         "(SELECT count(*) FROM documents WHERE is_current AND status = 'indexado') AS docs, "
+                         "(SELECT count(*) FROM documents WHERE status = 'error') AS doc_errors").fetchone()
+        run = c.execute("SELECT id, created_at, model, results FROM validation_runs ORDER BY created_at DESC LIMIT 1").fetchone()
+    try:
+        spend = usage.summary()
+    except Exception:
+        spend = None
+    return {
+        "week": {k: (int(v) if v is not None else None) for k, v in m.items()}, "langs": langs, "feedback": dict(fb), "pending": dict(pend),
+        "guides": len(procedures._all()), "usage": spend,
+        "lastValidation": {"at": run["created_at"].isoformat(), "model": run["model"], **_run_metrics(run["results"] or [])} if run else None,
+    }
+
+
+@app.get("/admin/procedures")
+def admin_procedures(_: str = Depends(admin)):
+    """Guías de trámite publicadas: cada dato tiene una cita textual verificada contra el documento vigente."""
+    out = []
+    for p in procedures._all():
+        d = p["data"]["es"]
+        out.append({"id": p["id"], "docId": p["doc_id"], "period": p["periodo"], "locator": p["locator"], "title": d["title"],
+                    "summary": d.get("summary"), "office": d.get("office"), "steps": d.get("steps") or [], "documents": d.get("documents") or [],
+                    "deadlines": d.get("deadlines") or [], "evidence": len(p["evidence"]), "hasEnglish": bool(p["data"].get("en"))})
+    return out
+
+
+def _run_metrics(results: list[dict]) -> dict:
+    """Métricas de una corrida guardada: exactitud, por idioma, rechazos, aclaraciones, alertas sin fuente y latencias."""
+    def acc(xs: list[dict]) -> int | None:
+        return round(100 * sum(bool(r.get("ok")) for r in xs) / len(xs)) if xs else None
+    ms = sorted(r.get("ms") or 0 for r in results)
+    n = len(results)
+    return {"total": n, "ok": sum(bool(r.get("ok")) for r in results), "accuracy": acc(results),
+            "es": acc([r for r in results if r.get("lang") == "es"]), "en": acc([r for r in results if r.get("lang") == "en"]),
+            "refusal": acc([r for r in results if r.get("expect") == "no_se"]), "clarify": acc([r for r in results if r.get("expect") == "aclaracion"]),
+            "hallucinations": sum(bool(r.get("hallucination")) for r in results),
+            "p50": ms[n // 2] if n else None, "p95": ms[min(n - 1, int(n * 0.95))] if n else None}
+
+
+@app.get("/admin/validation/runs")
+def validation_runs(_: str = Depends(admin)):
+    """Historial de corridas del set de control, para comparar el efecto de cada cambio."""
+    with conn() as c:
+        rows = c.execute("SELECT id, created_at, model, results FROM validation_runs ORDER BY created_at DESC LIMIT 20").fetchall()
+    return [{"id": r["id"], "at": r["created_at"].isoformat(), "model": r["model"], **_run_metrics(r["results"] or [])} for r in rows]
+
+
 @app.get("/admin/audit")
 def admin_audit_log(_: str = Depends(admin)):
     with conn() as c:

@@ -52,9 +52,6 @@ jobs:
   mapas:
     name: Mapas (PostGIS + pgRouting)
     runs-on: ubuntu-latest
-    # Las pruebas aún usan nombres anteriores a la corrección ortográfica del OSM (p. ej. "Senecyt" → "SENESCYT").
-    # Quitar esta línea cuando se actualicen.
-    continue-on-error: true
     env:
       MAPS_DATABASE_URL: postgresql+psycopg://yachay_app:ci@localhost:5433/yachay_maps_test
       OSM_PATH: ${{ github.workspace }}/Mapa/YACHAY_FINAL.osm

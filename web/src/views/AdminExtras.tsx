@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
-import { MOCK, getUsage, type LlmUsage, addControlCase, listControlCases, listInbox, replaceControlSet, runControl, updateInbox, type ControlResult, type InboxItem } from '../lib/api';
+import { MOCK, getUsage, type LlmUsage, addControlCase, listControlCases, listInbox, listValidationRuns, replaceControlSet, runControl, updateInbox, type ControlResult, type InboxItem, type ValidationRun } from '../lib/api';
 import type { DocMeta } from '../lib/types';
 
 // ---------------------------------------------------------------------------
@@ -17,6 +17,9 @@ export function Validation() {
   const [msg, setMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [runs, setRuns] = useState<ValidationRun[]>([]);
+  const loadRuns = () => void listValidationRuns().then(setRuns).catch(() => setRuns([]));
+  useEffect(loadRuns, []);
   useEffect(() => {
     let active = true;
     listControlCases().then((cases) => { if (active) setTotal(cases.length); })
@@ -92,7 +95,7 @@ export function Validation() {
     setRes(null); setMsg(null); setProgress(0);
     try { setRes(await runControl(setProgress)); }
     catch { setMsg('No se pudo completar la evaluación. Vuelve a intentarlo.'); }
-    finally { setProgress(null); }
+    finally { setProgress(null); loadRuns(); }
   };
 
   return (
@@ -115,6 +118,29 @@ export function Validation() {
           <div className="kpi"><b>{m.es} / {m.en} %</b><span>exactitud español / inglés</span></div>
           <div className="kpi"><b>{(m.p50 / 1000).toFixed(1)} s</b><span>latencia p50 · p95 {(m.p95 / 1000).toFixed(1)} s</span></div>
         </motion.div>
+      )}
+      {runs.length > 0 && (
+        <section className="card" aria-labelledby="historial-validacion">
+          <h3 id="historial-validacion">Historial de corridas</h3>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Fecha</th><th>Modelo</th><th>Exactitud</th><th>ES / EN</th><th>"Sin información"</th><th>Aclaración</th><th>Sin fuente</th><th>Latencia p50 / p95</th></tr></thead>
+              <tbody>{runs.map((x) => (
+                <tr key={x.id}>
+                  <td className="small">{new Date(x.at).toLocaleString('es-EC', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+                  <td className="mono small">{x.model}</td>
+                  <td className="mono"><b>{x.accuracy ?? '—'} %</b> ({x.ok}/{x.total})</td>
+                  <td className="mono">{x.es ?? '—'} / {x.en ?? '—'} %</td>
+                  <td className="mono">{x.refusal ?? '—'} %</td>
+                  <td className="mono">{x.clarify ?? '—'} %</td>
+                  <td className="mono">{x.hallucinations}</td>
+                  <td className="mono">{x.p50 != null ? (x.p50 / 1000).toFixed(1) : '—'} / {x.p95 != null ? (x.p95 / 1000).toFixed(1) : '—'} s</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+          <p className="small muted">Cada corrida queda guardada: sirve para mostrar el efecto de cada cambio (documentos, filtros o prompt) con la misma batería de preguntas.</p>
+        </section>
       )}
       <div className="table-wrap">
         <table>
@@ -224,7 +250,7 @@ export function Cost() {
   return (
     <>
       <header><div><h2>Costo computacional</h2><p>Estimación por consulta y por mes. Cambia cualquier supuesto y el cálculo se actualiza.</p></div></header>
-      {use && <UsageCard u={use} />}
+      {use && <UsageCard u={use} qDay={r.qDay} infra={a.infraMonthly} estimate={r.perQuery} />}
       <div className="kpis">
         <div className="kpi"><b>{usd(r.perQuery, 5)}</b><span>costo de modelo por consulta</span></div>
         <div className="kpi"><b>{usd(r.per1000)}</b><span>por cada 1.000 consultas</span></div>
@@ -372,7 +398,7 @@ export function Inbox({ docs, onUpload, onValidate }: { docs: DocMeta[]; onUploa
 }
 
 /** Gasto real del modelo (tabla llm_usage) frente al tope; el interruptor YACHI_LLM y el tope se configuran en api/.env. */
-function UsageCard({ u }: { u: LlmUsage }) {
+function UsageCard({ u, qDay, infra, estimate }: { u: LlmUsage; qDay: number; infra: number; estimate: number }) {
   const usd = (n: number) => `$${n.toFixed(n < 1 ? 4 : 2)}`;
   const pct = u.budgetUsd > 0 ? Math.min(100, (u.spentUsd / u.budgetUsd) * 100) : 0;
   const state = !u.hasKey ? 'Sin clave de Anthropic: el chat responde en modo sin modelo.'
@@ -385,11 +411,23 @@ function UsageCard({ u }: { u: LlmUsage }) {
       <div className="kpis">
         <div className="kpi"><b>{usd(u.spentUsd)}</b><span>gastado{u.budgetUsd > 0 ? ` de ${usd(u.budgetUsd)} (tope)` : ' (sin tope)'}</span></div>
         <div className="kpi"><b>{u.calls}</b><span>llamadas al modelo</span></div>
-        <div className="kpi"><b>{u.answeredWithModel}</b><span>respuestas redactadas por el modelo</span></div>
-        <div className="kpi"><b>{u.answeredWithModel ? usd(u.spentUsd / u.answeredWithModel) : '—'}</b><span>costo real por respuesta</span></div>
+        <div className="kpi"><b>{u.real?.modelQueries ?? u.answeredWithModel}</b><span>respuestas redactadas por el modelo{u.real ? ' (período medido)' : ''}</span></div>
+        <div className="kpi"><b>{u.real?.perModelAnswerUsd != null ? usd(u.real.perModelAnswerUsd) : '—'}</b><span>costo real por respuesta con modelo</span></div>
       </div>
       {u.budgetUsd > 0 && <div className="progress" role="progressbar" aria-label="Gasto frente al tope" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}><i style={{ transform: `scaleX(${pct / 100})` }} /></div>}
-      {u.bySource.length > 0 && <p className="small muted">{u.bySource.map((s) => `${s.source === 'agente' ? 'Agente (elegir documentos)' : 'Redacción'}: ${s.calls} llamadas · ${s.inputTokens.toLocaleString('es-EC')} tokens de entrada · ${s.outputTokens.toLocaleString('es-EC')} de salida · ${usd(s.usd)}`).join(' — ')}</p>}
+      {u.bySource.length > 0 && <p className="small muted">{u.bySource.map((s) => `${s.source === 'agente' ? 'Agente (elegir documentos)' : s.source === 'redaccion' ? 'Redacción' : s.source}: ${s.calls} llamadas · ${s.inputTokens.toLocaleString('es-EC')} tokens de entrada · ${s.outputTokens.toLocaleString('es-EC')} de salida · ${usd(s.usd)}`).join(' — ')}</p>}
+      {u.real?.perQueryUsd != null && (
+        <>
+          <h3>Proyección con el costo medido</h3>
+          <div className="kpis">
+            <div className="kpi"><b>{usd(u.real.perQueryUsd)}</b><span>costo real por consulta ({u.real.queries} consultas medidas, {u.real.modelQueries} con modelo)</span></div>
+            <div className="kpi"><b>{usd(u.real.perQueryUsd * qDay * 30)}</b><span>modelo al mes con {Math.round(qDay).toLocaleString('es-EC')} consultas/día</span></div>
+            <div className="kpi"><b>{usd(u.real.perQueryUsd * qDay * 30 + infra)}</b><span>total al mes con el servidor ({usd(infra)})</span></div>
+            <div className="kpi"><b>{estimate > 0 ? `${(u.real.perQueryUsd / estimate).toFixed(1)}×` : '—'}</b><span>medido frente a la estimación de abajo ({usd(estimate)})</span></div>
+          </div>
+          <p className="small muted">Medido desde {u.real.since ? new Date(u.real.since).toLocaleString('es-EC') : '—'} con los tokens reales de cada llamada (incluye lecturas y escrituras de caché y las decisiones del agente). El promedio incluye las consultas que se responden sin modelo.</p>
+        </>
+      )}
     </section>
   );
 }

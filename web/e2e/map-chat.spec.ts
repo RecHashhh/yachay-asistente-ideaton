@@ -27,11 +27,7 @@ const VALID_TILE_PNG = Buffer.concat([
 ]);
 
 test('renders compact map geometry streamed by the unified API', async ({ page }) => {
-  const tilePng = Buffer.from(await page.evaluate(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = 1;
-    return canvas.toDataURL('image/png').split(',')[1]!;
-  }), 'base64');
+  const tilePng = VALID_TILE_PNG;
   await page.addInitScript(() => {
     localStorage.setItem('yt-consent-2026-10c', '1');
     localStorage.setItem('yt-lang', 'es');

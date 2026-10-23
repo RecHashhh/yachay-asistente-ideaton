@@ -4,6 +4,7 @@ import { BRAND } from '../config';
 import { Mascot } from '../components/Mascot';
 import { IcArrowLeft, IcMoon, IcSun, IcTrash, IcUpload } from '../components/icons';
 import { Cost, Inbox, Validation } from './AdminExtras';
+import { Guides, Home } from './AdminHome';
 import { Filters } from './AdminFilters';
 import { AdminInquiries } from './AdminInquiries';
 import {
@@ -12,13 +13,14 @@ import {
 } from '../lib/api';
 import type { DocMeta, Topic, Trend } from '../lib/types';
 
-type Tab = 'docs' | 'upload' | 'topics' | 'inbox' | 'validation' | 'filters' | 'trends' | 'inquiries' | 'cost' | 'audit';
+type Tab = 'home' | 'docs' | 'upload' | 'topics' | 'guides' | 'inbox' | 'validation' | 'filters' | 'trends' | 'inquiries' | 'cost' | 'audit';
 const ACCEPT = '.pdf,.xlsx,.csv';
 const today = () => new Date().toISOString().slice(0, 10);
 
 /** Índice del portal: agrupado por la tarea que resuelve cada sección. */
 const NAV: { group: string; items: { id: Tab; label: string }[] }[] = [
-  { group: 'Contenido', items: [{ id: 'docs', label: 'Documentos' }, { id: 'upload', label: 'Subir documento' }, { id: 'topics', label: 'Temas' }] },
+  { group: 'Resumen', items: [{ id: 'home', label: 'Inicio' }] },
+  { group: 'Contenido', items: [{ id: 'docs', label: 'Documentos' }, { id: 'upload', label: 'Subir documento' }, { id: 'topics', label: 'Temas' }, { id: 'guides', label: 'Guías de trámite' }] },
   { group: 'Calidad de respuestas', items: [{ id: 'inbox', label: 'Sin respuesta' }, { id: 'validation', label: 'Validación' }, { id: 'filters', label: 'Filtros' }] },
   { group: 'Seguimiento', items: [{ id: 'trends', label: 'Tendencias' }, { id: 'inquiries', label: 'Consultas' }, { id: 'cost', label: 'Costo' }, { id: 'audit', label: 'Bitácora' }] },
 ];
@@ -27,7 +29,7 @@ const groupOf = (t: Tab) => NAV.find((g) => g.items.some((i) => i.id === t))?.gr
 export function Admin({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggleTheme: () => void }) {
   const reduce = useReducedMotion();
   const [user, setUser] = useState<AdminUser | null>(null);
-  const [tab, setTab] = useState<Tab>('docs');
+  const [tab, setTab] = useState<Tab>('home');
   const [docs, setDocs] = useState<DocMeta[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [trends, setTrends] = useState<Trend[]>([]);
@@ -114,6 +116,8 @@ export function Admin({ theme, toggleTheme }: { theme: 'light' | 'dark'; toggleT
       <AnimatePresence mode="wait">
         <motion.main key={tab} className="adm-main" initial={reduce ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={reduce ? undefined : { opacity: 0 }} transition={{ duration: 0.16 }}>
           <p className="adm-eyebrow">{groupOf(tab)}</p>
+          {tab === 'home' && <Home onGo={go} />}
+          {tab === 'guides' && <Guides />}
           {tab === 'docs' && <Docs docs={docs} topics={topics} topicName={topicName} onNew={() => go('upload')} onReplace={(d) => { setReplacing(d); setTab('upload'); }} onChanged={() => void refresh()} onDelete={async (d) => { if (confirm(`¿Retirar "${d.title}" de la base de conocimiento? El asistente dejará de usarlo.`)) { await deleteDoc(d.id); await refresh(); } }} />}
           {tab === 'upload' && <Upload topics={topics} docs={docs} replacing={replacing} onDone={async () => { setReplacing(null); await refresh(); setTab('docs'); }} />}
           {tab === 'topics' && <Topics topics={topics} docs={docs} onCreate={async (t) => { await createTopic(t); await refresh(); }} />}

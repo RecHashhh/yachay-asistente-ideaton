@@ -184,7 +184,7 @@ def test_search_rejects_lat_without_lon(client: TestClient) -> None:
 
 
 def test_walking_and_driving_routes_between_platforms(client: TestClient) -> None:
-    origin = _place_id(client, "Parada Senecyt")
+    origin = _place_id(client, "Parada SENESCYT")
     destination = _place_id(client, "Parada Yachay")
     for mode in ("walking", "driving"):
         response = client.get(
@@ -251,7 +251,7 @@ def test_route_between_entrances_avoids_building_interiors() -> None:
 
 
 def test_building_route_uses_verified_entrances(client: TestClient) -> None:
-    origin = _place_id(client, "Edificio Senecyt")
+    origin = _place_id(client, "Edificio SENESCYT")
     destination = _place_id(client, "Bloque A")
     response = client.get(
         "/api/routes",
@@ -272,15 +272,15 @@ WALKING_ROUTE_CASES = [
     ("Biblioteca Ingenio", "Plaza Las Manuelas"),
     ("Pato Goloso", "Plaza Las Manuelas"),
     ("Antaños", "Plaza Las Manuelas"),
-    ("Colibri", "Plaza Las Manuelas"),
-    ("Clinica Urcuqui", "Plaza Las Manuelas"),
-    ("Panaderia y Pastelería La Pasteleza", "Plaza Las Manuelas"),
-    ("Estacionamiento Senecyt 1", "Plaza Las Manuelas"),
-    ("Parada Senecyt", "Plaza Las Manuelas"),
-    ("Baño de Las manuelas", "Plaza Las Manuelas"),
+    ("Colibrí", "Plaza Las Manuelas"),
+    ("Clínica Urcuquí", "Plaza Las Manuelas"),
+    ("Panadería y Pastelería La Pasteleza", "Plaza Las Manuelas"),
+    ("Estacionamiento SENESCYT 1", "Plaza Las Manuelas"),
+    ("Parada SENESCYT", "Plaza Las Manuelas"),
+    ("Baño de Las Manuelas", "Plaza Las Manuelas"),
     ("Plaza Las Manuelas", "Krispan"),
-    ("Edificio Senecyt", "Bloque A"),
-    ("Bloque A", "Edificio Senecyt"),
+    ("Edificio SENESCYT", "Bloque A"),
+    ("Bloque A", "Edificio SENESCYT"),
 ]
 
 
@@ -304,9 +304,9 @@ def test_walking_route_matrix(client: TestClient, origin_name: str, destination_
 KNOWN_NON_BUILDING_ROUTE_GAPS = {
     "Baño de Aulas Inteligentes": "route_crosses_building",
     "Canchas Deportivas": "no_nearby_routing_node",
-    "Concha Acustica": "disconnected_components",
+    "Concha Acústica": "disconnected_components",
     "Estacionamiento Multifamiliares": "disconnected_components",
-    "Estadio Municipal de Urcuqui": "no_nearby_routing_node",
+    "Estadio Municipal de Urcuquí": "no_nearby_routing_node",
 }
 
 
@@ -372,7 +372,7 @@ def test_nearby_restaurant_route_skips_access_nodes_inside_buildings(client: Tes
 
 def test_building_without_verified_entrance_stays_unavailable(client: TestClient) -> None:
     origin = _place_id(client, "Municipio de Urcuquí")
-    destination = _place_id(client, "Parada Senecyt")
+    destination = _place_id(client, "Parada SENESCYT")
     response = client.get(
         "/api/routes",
         params={"origin_id": origin, "destination_id": destination, "mode": "walking"},
@@ -422,7 +422,7 @@ def test_resolve_route_includes_google_maps_fallback(client: TestClient) -> None
         "/api/geo/resolve",
         json={
             "intent": "route",
-            "origin": "Parada Senecyt",
+            "origin": "Parada SENESCYT",
             "destination": "Parada Yachay",
             "mode": "walking",
         },

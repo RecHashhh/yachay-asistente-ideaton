@@ -83,7 +83,9 @@ def search_places(
     offset = max(0, offset)
     fetch_limit = min(2000, offset + limit + 50)
     category_key, category_value = category_filter(normalized_query, category)
-    category_only_query = category is None and resolve_category(normalized_query) is not None
+    # A fuzzy category ("bloque a" ~ "bloque") must not hide an exact place name.
+    # Search names first for fuzzy matches; category results remain the fallback.
+    category_only_query = category is None and normalized_query in CATEGORY_QUERIES
 
     results: list[dict[str, Any]] = []
     seen: set[str] = set()

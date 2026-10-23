@@ -34,6 +34,7 @@ from .geo_conversation import clear_pending, conversation_lock, get_pending
 from .geo_orchestration import handle_geo_decision
 from .intent_router import GeoIntent, IntentDecision, classify_local
 from .kichwa import language_context
+from . import kichwa_presentation
 from .search import Hit, expand, hits_by_ids, hybrid
 from .telemetry import measure_anthropic_call, record_anthropic_call, record_chat_completion, request_telemetry, set_chat_result
 
@@ -274,7 +275,7 @@ async def route(state: State) -> State:
             "intent_router source=local intent=%s confidence=%.2f latency_ms=%d",
             decision.intent.value, decision.confidence, int((time.perf_counter() - intent_started) * 1000),
         )
-    if decision is None and settings.agent_enabled:
+    if decision is None and settings.agent_enabled and usage.budget_ok():
         try:
             decision = await _agent().classify_intent(
                 q,
@@ -373,10 +374,16 @@ async def procedure_answer(state: State) -> State:
           docs=[{"docId": s["docId"], "title": s["title"]} for s in sources])
     _step("verify", _t(lang, f"Cada dato tiene su cita en el documento ({n_ev} citas verificadas)", f"Every detail is quoted from the document ({n_ev} verified quotes)"))
     if procedures.is_followup(state['question']):
-        _say(procedures.followup_answer(item, state['question'], lang))
+        text = procedures.followup_answer(item, state['question'], lang)
+        _say(await kichwa_presentation.translated_text(text, client) if lang == 'qu' else text)
         w({'type': 'sources', 'items': sources})
         return {'kind': 'respuesta', 'doc_ids': doc_ids}
-    _say(_t(lang, f"Esta es la guía para **{item['title'].lower()}**, armada con el documento oficial. Puedes ir marcando los pasos.",
+    if lang == 'qu':
+        item = await kichwa_presentation.procedure_card(item, client)
+        _say('Kay ruray ñanta katishpa ruraykunata akllayta ushanki.' if item['translationStatus'] == 'experimental'
+             else 'Kichwaman tikrachiyta kunan mana ushanichu. Español killkata rikuy.')
+    else:
+        _say(_t(lang, f"Esta es la guía para **{item['title'].lower()}**, armada con el documento oficial. Puedes ir marcando los pasos.",
             f"Here is the guide to **{item['title'].lower()}**, built from the official document. You can tick the steps as you go."))
     w({"type": "procedure", "item": item})
     w({"type": "sources", "items": sources})
@@ -469,9 +476,12 @@ async def place_answer(state: State) -> State:
             text += _t(lang, f" Horario de apertura: **{p.horario}**.", f" Opening hours: **{p.horario}**.")
         doc = p.fuente
         locator = _t(lang, f"fila {p.name}", f"row {p.name}")
+    source_text = text
+    if lang == 'qu':
+        text = await kichwa_presentation.translated_text(text, client)
     for part in re.findall(r"\S+\s*", text):
         w({"type": "token", "text": part})
-    src = _doc_source(doc, locator, text.replace("**", ""))
+    src = _doc_source(doc, locator, source_text.replace("**", ""))
     if src:
         w({"type": "sources", "items": [{**src, "url": None, "origin": "interno"}]})
     return {"kind": "lugar", "doc_ids": [doc]}
@@ -593,7 +603,7 @@ def _agent():
         from .yachi_retriever import YachiRetriever
 
         _agent_instance = RagAgent(settings, YachiRetriever(settings))
-        _agent_instance.usage_hook = lambda md: usage.record_langchain("agente", md)  # tokens reales de cada decisión
+        _agent_instance.usage_hook = lambda md, source="agente": usage.record_langchain(source, md)
     return _agent_instance
 
 

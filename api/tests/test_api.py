@@ -16,6 +16,26 @@ from app import graph, maps_tool, rules
 from app.geo_conversation import clear_pending
 from app.yachi_retriever import YachiRetriever
 
+
+@pytest.mark.asyncio
+async def test_exhausted_budget_skips_remote_intent_classification(monkeypatch):
+    from unittest.mock import Mock
+    monkeypatch.setattr(graph.settings, 'agent_mode', 'on')
+    monkeypatch.setattr(graph.settings, 'llm_switch', 'on')
+    monkeypatch.setattr(graph.settings, 'anthropic_api_key', SecretStr('test-key'))
+    monkeypatch.setattr(graph.usage, 'budget_ok', lambda: False)
+    monkeypatch.setattr(graph.rules, 'triage', lambda q, lang: rules.Triage('normal', q))
+    monkeypatch.setattr(graph.procedures, 'resolve', lambda *a: None)
+    monkeypatch.setattr(graph.rules, 'clarify', lambda *a: None)
+    monkeypatch.setattr(graph.rules, 'split_origin', lambda q: (q, None))
+    monkeypatch.setattr(graph.rules, 'room_lookup', lambda q: None)
+    monkeypatch.setattr(graph.rules, 'place_lookup', lambda q: None)
+    agent = Mock()
+    monkeypatch.setattr(graph, '_agent', agent)
+    result = await graph.route({'question': 'Consulta de matrícula', 'lang': 'es', 'history': []})
+    assert result['route'] == 'retrieve'
+    agent.assert_not_called()
+
 SOURCE = {
     "docId": "reglamento-1",
     "title": "Reglamento académico",
@@ -163,6 +183,7 @@ async def test_location_typo_uses_postgis_search_without_anthropic(monkeypatch) 
 @pytest.mark.asyncio
 async def test_clarification_choice_reuses_location_context_for_map_search(monkeypatch) -> None:
     calls = []
+    monkeypatch.setattr(graph.settings, "agent_mode", "off")
 
     def search_map(**args):
         calls.append(args)

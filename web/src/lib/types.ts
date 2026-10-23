@@ -106,6 +106,9 @@ export interface RealPlaceInfo { id: string; name: string; nameEn: string | null
 
 /** Guía paso a paso de un trámite: qué es, qué se necesita, en qué orden y dónde. Sale de un documento fuente, nunca del modelo solo. */
 export interface Procedure {
+  translationStatus?: 'experimental' | 'unavailable';
+  /** Read-only source-language comparison; never a second editable checklist. */
+  original?: Procedure;
   id?: string;
   revision?: string;
   period?: string | null;
