@@ -29,6 +29,7 @@ from . import contacts, filters, procedures, rules
 from .config import settings
 from .db import conn
 from .kichwa import language_context
+from . import kichwa_presentation
 from .search import Hit, expand, hits_by_ids, hybrid
 
 client = anthropic.AsyncAnthropic() if settings.has_anthropic_key else None
@@ -89,6 +90,8 @@ EXTRACTIVE_MIN_FTS = 0.10
 # Lo que se guarda en vez del texto cuando el mensaje es sensible (LOPDP: datos de salud o de terceros).
 PLACEHOLDER = {"crisis": "[mensaje de crisis: texto no guardado]", "denuncia": "[consulta sobre acoso o violencia: texto no guardado]",
                "respeto": "[mensaje ofensivo: texto no guardado]", "salud": "[consulta de salud: texto no guardado]"}
+# Sesiones de prueba (set de control del Portal, scripts de verificación): no cuentan como personas para tendencias ni sugerencias.
+REAL_SESSIONS = "session_id NOT LIKE 'validacion-%%' AND session_id NOT LIKE 'verif-%%' AND session_id NOT LIKE 'prueba-%%'"
 QUIET = ("aclaracion", "saludo", "cierre", "respeto", "vacio", "manipulacion", "confesionario", "crisis", "salud")
 
 
@@ -242,10 +245,16 @@ async def procedure_answer(state: State) -> State:
           docs=[{"docId": s["docId"], "title": s["title"]} for s in sources])
     _step("verify", _t(lang, f"Cada dato tiene su cita en el documento ({n_ev} citas verificadas)", f"Every detail is quoted from the document ({n_ev} verified quotes)"))
     if procedures.is_followup(state['question']):
-        _say(procedures.followup_answer(item, state['question'], lang))
+        text = procedures.followup_answer(item, state['question'], lang)
+        _say(await kichwa_presentation.translated_text(text, client) if lang == 'qu' else text)
         w({'type': 'sources', 'items': sources})
         return {'kind': 'respuesta', 'doc_ids': doc_ids}
-    _say(_t(lang, f"Esta es la guía para **{item['title'].lower()}**, armada con el documento oficial. Puedes ir marcando los pasos.",
+    if lang == 'qu':
+        item = await kichwa_presentation.procedure_card(item, client)
+        _say('Kay ruray ñanta katishpa ruraykunata akllayta ushanki.' if item['translationStatus'] == 'experimental'
+             else 'Kichwaman tikrachiyta kunan mana ushanichu. Español killkata rikuy.')
+    else:
+        _say(_t(lang, f"Esta es la guía para **{item['title'].lower()}**, armada con el documento oficial. Puedes ir marcando los pasos.",
             f"Here is the guide to **{item['title'].lower()}**, built from the official document. You can tick the steps as you go."))
     w({"type": "procedure", "item": item})
     w({"type": "sources", "items": sources})
@@ -337,6 +346,8 @@ async def place_answer(state: State) -> State:
             text += _t(lang, f" Horario de apertura: **{p.horario}**.", f" Opening hours: **{p.horario}**.")
         doc = p.fuente
         locator = _t(lang, f"fila {p.name}", f"row {p.name}")
+    if lang == 'qu':
+        text = await kichwa_presentation.translated_text(text, client)
     for part in re.findall(r"\S+\s*", text):
         w({"type": "token", "text": part})
     src = _doc_source(doc, locator, text.replace("**", ""))
@@ -517,6 +528,8 @@ async def generate(state: State) -> State:
             # No enviar una marca a medio escribir ("[F" al final).
             cut = clean.rfind("[")
             safe = clean if cut == -1 or "]" in clean[cut:] else clean[:cut]
+            # El espacio final se retiene: si sigue una marca, MARK lo borra y el texto ya enviado se correría (se perdían saltos de línea).
+            safe = safe.rstrip()
             if len(safe) > sent:
                 w({"type": "token", "text": safe[sent:]})
                 sent = len(safe)
@@ -563,7 +576,7 @@ async def finish(state: State) -> State:
         sug = c.execute(
             # Solo preguntas hechas por varias personas y sin datos ocultos: una pregunta de una sola persona no se muestra a otras.
             "SELECT question FROM messages WHERE kind IN ('respuesta','lugar') AND lang = %s AND question <> %s AND question NOT LIKE '%%omitid%%' "
-            "AND created_at > now() - interval '7 days' GROUP BY question HAVING count(DISTINCT session_id) >= 3 ORDER BY count(*) DESC LIMIT 3",
+            f"AND created_at > now() - interval '7 days' AND {REAL_SESSIONS} GROUP BY question HAVING count(DISTINCT session_id) >= 3 ORDER BY count(*) DESC LIMIT 3",
             (lang if lang != "qu" else "es", state["question"]),
         ).fetchall()
         if state.get("sensitive"):  # no se guarda el texto ni se usa en tendencias ni en la bandeja
