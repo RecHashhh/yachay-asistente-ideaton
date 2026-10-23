@@ -27,7 +27,7 @@ if __name__ == '__main__':
     for lang, questions in QUESTIONS.items():
         for i, question in enumerate(questions):
             request = urllib.request.Request(BASE + '/chat',
-                data=json.dumps({'sessionId': 'voice-audit-' + uuid.uuid4().hex[:12],
+                data=json.dumps({'sessionId': 'verif-voice-' + uuid.uuid4().hex[:12],
                                  'message': question, 'lang': lang, 'history': []}).encode(),
                 headers={'Content-Type': 'application/json'})
             started = time.monotonic()
