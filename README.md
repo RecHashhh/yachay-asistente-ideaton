@@ -2,6 +2,8 @@
 
 Prototipo del chatbot público de la universidad. Responde con documentos fuente, cita su período de vigencia y sección, y puede marcar lugares en el mapa del campus.
 
+Marco técnico de referencia: [normativas, controles aplicados y buenas prácticas](docs/NORMATIVAS-Y-BUENAS-PRACTICAS.md). Documenta la adopción de referencias ISO, OWASP y WCAG, las medidas de protección de datos y sus brechas, sin afirmar certificaciones ni cumplimiento legal integral.
+
 ```
 IDEATHON/
   web/   Frontend React + Vite + motion (este paso)
